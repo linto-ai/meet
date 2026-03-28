@@ -12,6 +12,7 @@ from django.utils.translation import gettext_lazy as _
 import requests
 
 from core import models
+from core.tasks.linto import process_linto_transcription
 
 logger = logging.getLogger(__name__)
 
@@ -40,12 +41,17 @@ class NotificationService:
         """Process a recording based on its mode."""
 
         if recording.mode == models.RecordingModeChoices.TRANSCRIPT:
+            if getattr(settings, "LINTO_STUDIO_ENABLED", False):
+                return self._notify_linto_studio(recording)
             return self._notify_summary_service(recording)
 
         if recording.mode == models.RecordingModeChoices.SCREEN_RECORDING:
             summary_success = True
             if recording.options.get("transcribe", False):
-                summary_success = self._notify_summary_service(recording)
+                if getattr(settings, "LINTO_STUDIO_ENABLED", False):
+                    summary_success = self._notify_linto_studio(recording)
+                else:
+                    summary_success = self._notify_summary_service(recording)
 
             email_success = self._notify_user_by_email(recording)
             return email_success and summary_success
@@ -193,6 +199,19 @@ class NotificationService:
             return False
 
         return True
+
+    @staticmethod
+    def _notify_linto_studio(recording) -> bool:
+        """Launch async LinTO Studio transcription via Celery task."""
+        try:
+            process_linto_transcription.delay(str(recording.id))
+            return True
+        except Exception:
+            logger.exception(
+                "Failed to queue LinTO Studio task for recording %s",
+                recording.id,
+            )
+            return False
 
 
 notification_service = NotificationService()
