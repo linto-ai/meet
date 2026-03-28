@@ -795,6 +795,16 @@ class Base(Configuration):
     ANALYTICS_BACKEND_SETTINGS = values.DictValue(
         {}, environ_name="ANALYTICS_BACKEND_SETTINGS", environ_prefix=None
     )
+    # LinTO Studio integration
+    LINTO_STUDIO_ENABLED = values.BooleanValue(
+        False, environ_name="LINTO_STUDIO_ENABLED", environ_prefix=None
+    )
+    LINTO_STUDIO_BASE_URL = values.Value(
+        None, environ_name="LINTO_STUDIO_BASE_URL", environ_prefix=None
+    )
+    LINTO_STUDIO_API_TOKEN = SecretFileValue(
+        None, environ_name="LINTO_STUDIO_API_TOKEN", environ_prefix=None
+    )
 
     # Marketing and communication settings
     SIGNUP_NEW_USER_TO_MARKETING_EMAIL = values.BooleanValue(
