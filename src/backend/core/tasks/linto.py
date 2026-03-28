@@ -125,12 +125,90 @@ async def _process_linto_transcription_sync(recording_id):
         len(media.full_text),
     )
 
+    # 5.5 Trigger LLM summary (failure does not block email)
+    summary_content = None
+    if getattr(settings, "LINTO_LLM_SUMMARY_ENABLED", True):
+        try:
+            services = await linto.list_llm_services()
+            if services:
+                service_route = (
+                    getattr(settings, "LINTO_LLM_SERVICE_ROUTE", None)
+                    or services[0].get("route")
+                    or services[0].get("name")
+                )
+                conversation_id = media.response.get("_id", "")
+                logger.info(
+                    "Triggering LLM summary for %s (service=%s)",
+                    recording_id,
+                    service_route,
+                )
+
+                summary_handle = await linto.summarize(
+                    conversation_id, service_route
+                )
+
+                summary_done = asyncio.Event()
+                summary_result = {}
+
+                def on_summary_done(content):
+                    summary_result["content"] = content
+                    summary_result["success"] = True
+                    summary_done.set()
+
+                def on_summary_error(*args):
+                    summary_result["success"] = False
+                    summary_done.set()
+
+                def on_summary_update(export):
+                    status = export.get("status") if export else "unknown"
+                    logger.info(
+                        "LLM summary %s: %s", recording_id, status
+                    )
+
+                summary_handle.on("done", on_summary_done)
+                summary_handle.on("error", on_summary_error)
+                summary_handle.on("update", on_summary_update)
+
+                timeout = getattr(
+                    settings, "LINTO_LLM_SUMMARY_TIMEOUT", 600
+                )
+                await asyncio.wait_for(summary_done.wait(), timeout=timeout)
+
+                if summary_result.get("success"):
+                    c = summary_result.get("content", {})
+                    summary_content = (
+                        c.get("content", "")
+                        if isinstance(c, dict)
+                        else str(c)
+                    )
+                    logger.info(
+                        "LLM summary done for %s: %d chars",
+                        recording_id,
+                        len(summary_content),
+                    )
+                else:
+                    logger.warning(
+                        "LLM summary failed for %s, continuing",
+                        recording_id,
+                    )
+            else:
+                logger.info(
+                    "No LLM services available, skipping summary for %s",
+                    recording_id,
+                )
+        except Exception:
+            logger.exception(
+                "LLM summary error for %s, continuing", recording_id
+            )
+
     # 6. Send email with preview + link
-    await sync_to_async(_send_linto_result_email)(recording, media)
+    await sync_to_async(_send_linto_result_email)(
+        recording, media, summary_content
+    )
 
 
-def _send_linto_result_email(recording, media):
-    """Send email to recording owner with transcription preview."""
+def _send_linto_result_email(recording, media, summary_content=None):
+    """Send email to recording owner with transcription preview and optional summary."""
     owner_access = (
         models.RecordingAccess.objects.select_related("user")
         .filter(
@@ -189,7 +267,15 @@ def _send_linto_result_email(recording, media):
                     f"Participants : {', '.join(speakers) or 'N/A'}\n"
                     f"Segments : {len(media.turns)}\n\n"
                     f"--- Aperçu ---\n{preview}\n\n"
-                    f"Transcription complète :\n{conversation_url}\n"
+                    + (
+                        f"--- Résumé ---\n"
+                        f"{summary_content[:2000]}"
+                        f"{'...' if len(summary_content) > 2000 else ''}"
+                        f"\n\n"
+                        if summary_content
+                        else ""
+                    )
+                    + f"Transcription complète :\n{conversation_url}\n"
                 ),
                 from_email=settings.EMAIL_FROM,
                 recipient_list=[user.email],
