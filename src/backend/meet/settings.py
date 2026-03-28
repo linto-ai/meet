@@ -839,6 +839,15 @@ class Base(Configuration):
     LINTO_STUDIO_API_TOKEN = SecretFileValue(
         None, environ_name="LINTO_STUDIO_API_TOKEN", environ_prefix=None
     )
+    LINTO_LLM_SUMMARY_ENABLED = values.BooleanValue(
+        True, environ_name="LINTO_LLM_SUMMARY_ENABLED", environ_prefix=None
+    )
+    LINTO_LLM_SERVICE_ROUTE = values.Value(
+        None, environ_name="LINTO_LLM_SERVICE_ROUTE", environ_prefix=None
+    )
+    LINTO_LLM_SUMMARY_TIMEOUT = values.IntegerValue(
+        600, environ_name="LINTO_LLM_SUMMARY_TIMEOUT", environ_prefix=None
+    )
 
     # Marketing and communication settings
     SIGNUP_NEW_USER_TO_MARKETING_EMAIL = values.BooleanValue(
