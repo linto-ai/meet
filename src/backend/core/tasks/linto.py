@@ -140,9 +140,8 @@ async def _process_linto_transcription_sync(recording_id):
                     service_route,
                 )
 
-                flavor = getattr(settings, "LINTO_LLM_FLAVOR", None)
                 summary_handle = await linto.summarize(
-                    conversation_id, service_route, flavor=flavor
+                    conversation_id, service_route
                 )
 
                 summary_done = asyncio.Event()
