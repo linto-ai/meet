@@ -1098,14 +1098,10 @@ redis = [
 
 [[package]]
 name = "linto"
-version = "1.1.2"
-source = { registry = "https://pypi.org/simple" }
+version = "1.3.0"
+source = { git = "https://github.com/jslinagora/sdk-linto-temp-python.git#13d8acda53f01bfdccaebee81a23279ed792823e" }
 dependencies = [
     { name = "aiohttp" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/49/33/f5c2b2616715a1c0d4e817c653b11df48fb7fa7d5e3ecf85d03a82e534f6/linto-1.1.2.tar.gz", hash = "sha256:5074a939fc96bc77bc2565c1e586602a86bf86a8276019841b40156e9fce18c9", size = 22180, upload-time = "2025-10-07T16:32:04.4Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/57/67/4d5f72ac647d11f197f274ee3e58bb6a444a95758a41a7256074fc82691d/linto-1.1.2-py3-none-any.whl", hash = "sha256:05bc65dfb25416e2525922b7a81ce541f5df546ec0b112505d3e7260cbcb1c93", size = 21757, upload-time = "2025-10-07T16:32:03.344Z" },
 ]
 
 [[package]]
@@ -1258,7 +1254,7 @@ requires-dist = [
     { name = "factory-boy", specifier = "==3.3.3" },
     { name = "gunicorn", specifier = "==25.1.0" },
     { name = "jsonschema", specifier = "==4.26.0" },
-    { name = "linto", specifier = "==1.1.2" },
+    { name = "linto", git = "https://github.com/jslinagora/sdk-linto-temp-python.git" },
     { name = "livekit-api", specifier = "==1.1.0" },
     { name = "markdown", specifier = "==3.10.2" },
     { name = "mozilla-django-oidc", specifier = "==5.0.2" },
