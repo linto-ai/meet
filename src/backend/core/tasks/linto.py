@@ -1,13 +1,10 @@
 """Tasks related to LinTO Studio transcription."""
 
 import logging
-import smtplib
 
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.core.files.storage import default_storage
-from django.core.mail import send_mail
-from django.utils.translation import override
 
 from core import models
 from core.tasks._task import task
@@ -20,8 +17,9 @@ def process_linto_transcription(recording_id):
     """Upload recording to LinTO Studio and notify user when done.
 
     Downloads the audio file from MinIO, uploads it to LinTO Studio
-    via the SDK, waits for transcription completion, then sends
-    an email to the recording owner with a preview and link.
+    via the SDK, waits for transcription completion, optionally triggers
+    an LLM summary, then shares the conversation with room participants.
+    LinTO Studio handles email notifications automatically.
     """
     try:
         _process_linto_transcription_sync(recording_id)
@@ -125,8 +123,7 @@ async def _process_linto_transcription_sync(recording_id):
         len(media.full_text),
     )
 
-    # 5.5 Trigger LLM summary (failure does not block email)
-    summary_content = None
+    # 5.5 Trigger LLM summary (failure does not block sharing)
     if getattr(settings, "LINTO_LLM_SUMMARY_ENABLED", True):
         try:
             services = await linto.list_llm_services()
@@ -143,15 +140,15 @@ async def _process_linto_transcription_sync(recording_id):
                     service_route,
                 )
 
+                flavor = getattr(settings, "LINTO_LLM_FLAVOR", None)
                 summary_handle = await linto.summarize(
-                    conversation_id, service_route
+                    conversation_id, service_route, flavor=flavor
                 )
 
                 summary_done = asyncio.Event()
                 summary_result = {}
 
                 def on_summary_done(content):
-                    summary_result["content"] = content
                     summary_result["success"] = True
                     summary_done.set()
 
@@ -175,16 +172,8 @@ async def _process_linto_transcription_sync(recording_id):
                 await asyncio.wait_for(summary_done.wait(), timeout=timeout)
 
                 if summary_result.get("success"):
-                    c = summary_result.get("content", {})
-                    summary_content = (
-                        c.get("content", "")
-                        if isinstance(c, dict)
-                        else str(c)
-                    )
                     logger.info(
-                        "LLM summary done for %s: %d chars",
-                        recording_id,
-                        len(summary_content),
+                        "LLM summary done for %s", recording_id
                     )
                 else:
                     logger.warning(
@@ -201,93 +190,29 @@ async def _process_linto_transcription_sync(recording_id):
                 "LLM summary error for %s, continuing", recording_id
             )
 
-    # 6. Send email with preview + link
-    await sync_to_async(_send_linto_result_email)(
-        recording, media, summary_content
-    )
-
-
-def _send_linto_result_email(recording, media, summary_content=None):
-    """Send email to recording owner with transcription preview and optional summary."""
-    owner_access = (
-        models.RecordingAccess.objects.select_related("user")
-        .filter(
-            role=models.RoleChoices.OWNER,
-            recording_id=recording.id,
-        )
-        .first()
-    )
-    if not owner_access:
-        logger.warning(
-            "No owner found for recording %s, skipping email",
-            recording.id,
-        )
-        return
-
-    user = owner_access.user
-
-    # SDK Media: formatted preview with speaker names and timestamps
-    preview = media.to_format(
-        sep=" - ",
-        meta_text_sep=" : ",
-        eol="LF",
-        include={"speaker": True, "lang": False, "timestamp": True},
-        order=["speaker", "timestamp"],
-    )
-    if len(preview) > 1000:
-        preview = preview[:1000] + "\n..."
-
-    # SDK Media: extract unique speaker names
-    speakers = sorted(
-        {t["speaker"] for t in media.turns if t.get("speaker")}
-    )
-
-    # Build LinTO Studio conversation URL
-    # Frontend route: /interface/{orgId}/conversations/{convId}
+    # 6. Share conversation with room participants via LinTO Studio
+    #    LinTO Studio sends email notifications automatically (with magic link)
     conversation_id = media.response.get("_id", "")
-    org_id = media.response.get("organization", {})
-    if isinstance(org_id, dict):
-        org_id = org_id.get("organizationId", "")
-    linto_base = (settings.LINTO_STUDIO_BASE_URL or "").replace(
-        "/cm-api", ""
-    )
-    conversation_url = (
-        f"{linto_base}/interface/{org_id}/conversations/{conversation_id}"
-    )
+    room_emails = await sync_to_async(
+        lambda: list(
+            recording.room.accesses.select_related("user")
+            .exclude(user__email__isnull=True)
+            .exclude(user__email="")
+            .values_list("user__email", flat=True)
+        )
+    )()
 
-    language = user.language or "en"
-    with override(language):
+    for email in room_emails:
         try:
-            send_mail(
-                subject=f"Transcription : {recording.room.name}",
-                message=(
-                    f"Votre transcription est prête.\n\n"
-                    f"Réunion : {recording.room.name}\n"
-                    f"Date : {recording.created_at.strftime('%Y-%m-%d %H:%M')}\n"
-                    f"Participants : {', '.join(speakers) or 'N/A'}\n"
-                    f"Segments : {len(media.turns)}\n\n"
-                    f"--- Aperçu ---\n{preview}\n\n"
-                    + (
-                        f"--- Résumé ---\n"
-                        f"{summary_content[:2000]}"
-                        f"{'...' if len(summary_content) > 2000 else ''}"
-                        f"\n\n"
-                        if summary_content
-                        else ""
-                    )
-                    + f"Transcription complète :\n{conversation_url}\n"
-                ),
-                from_email=settings.EMAIL_FROM,
-                recipient_list=[user.email],
-                fail_silently=False,
-            )
+            await linto.share_conversation(conversation_id, email)
             logger.info(
-                "LinTO result email sent to %s for recording %s",
-                user.email,
-                recording.id,
+                "Shared LinTO conversation %s with %s",
+                conversation_id,
+                email,
             )
-        except smtplib.SMTPException:
-            logger.exception(
-                "Failed to send LinTO result email for recording %s",
-                recording.id,
+        except Exception:
+            logger.warning(
+                "Failed to share conversation with %s, continuing",
+                email,
+                exc_info=True,
             )
