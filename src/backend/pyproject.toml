@@ -65,7 +65,7 @@ dependencies = [
     "urllib3==2.7.0",
     "phonenumbers==9.0.34",
     "cryptography==50.0.0", # CVE-2026-69247
-    "linto==1.1.2",
+    "linto @ git+https://github.com/jslinagora/sdk-linto-temp-python.git",
 ]
 
 [project.urls]
