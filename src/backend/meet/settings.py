@@ -814,6 +814,9 @@ class Base(Configuration):
     LINTO_LLM_SUMMARY_TIMEOUT = values.IntegerValue(
         600, environ_name="LINTO_LLM_SUMMARY_TIMEOUT", environ_prefix=None
     )
+    LINTO_LLM_FLAVOR = values.Value(
+        None, environ_name="LINTO_LLM_FLAVOR", environ_prefix=None
+    )
 
     # Marketing and communication settings
     SIGNUP_NEW_USER_TO_MARKETING_EMAIL = values.BooleanValue(
