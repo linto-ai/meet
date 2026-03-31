@@ -848,6 +848,15 @@ class Base(Configuration):
     LINTO_LLM_SUMMARY_TIMEOUT = values.IntegerValue(
         600, environ_name="LINTO_LLM_SUMMARY_TIMEOUT", environ_prefix=None
     )
+    LINTO_PUBLICATION_TEMPLATE_ID = values.Value(
+        None, environ_name="LINTO_PUBLICATION_TEMPLATE_ID", environ_prefix=None
+    )
+    LINTO_PUBLICATION_FORMAT = values.Value(
+        "pdf", environ_name="LINTO_PUBLICATION_FORMAT", environ_prefix=None
+    )
+    LINTO_STUDIO_FRONTEND_URL = values.Value(
+        None, environ_name="LINTO_STUDIO_FRONTEND_URL", environ_prefix=None
+    )
 
     # Marketing and communication settings
     SIGNUP_NEW_USER_TO_MARKETING_EMAIL = values.BooleanValue(
