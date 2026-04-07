@@ -191,9 +191,13 @@ async def _process_linto_transcription_sync(recording_id):
         except Exception:
             logger.exception("LLM summary error for %s, continuing", recording_id)
 
-    # 5.6 Generate PDF via publication template (failure does not block email)
+    # 5.6 Generate document attachment (failure does not block email)
     pdf_content = None
+    pub_format = getattr(settings, "LINTO_PUBLICATION_FORMAT", "pdf")
+    conversation_id = media.response.get("_id", "")
+
     if summary_result.get("success") and summary_result.get("job_id"):
+        # Summary available: export via publication template
         try:
             job_id = summary_result["job_id"]
             template_id = getattr(settings, "LINTO_PUBLICATION_TEMPLATE_ID", None)
@@ -212,9 +216,6 @@ async def _process_linto_transcription_sync(recording_id):
                     template_id = default.get("id") or default.get("_id")
 
             if template_id:
-                pub_format = getattr(
-                    settings, "LINTO_PUBLICATION_FORMAT", "pdf"
-                )
                 logger.info(
                     "Exporting %s for %s (job=%s, template=%s)",
                     pub_format,
@@ -235,14 +236,36 @@ async def _process_linto_transcription_sync(recording_id):
                 )
             else:
                 logger.warning(
-                    "No publication template found for %s, skipping PDF",
+                    "No publication template found for %s, skipping document",
                     recording_id,
                 )
         except Exception:
-            logger.exception("PDF generation error for %s, continuing", recording_id)
+            logger.exception("Document generation error for %s, continuing", recording_id)
 
-    # 6. Send email with PDF to room participants
-    conversation_id = media.response.get("_id", "")
+    elif conversation_id:
+        # No summary: export transcription directly as DOCX
+        try:
+            download_format = pub_format if pub_format in ("docx", "odt") else "docx"
+            logger.info(
+                "Downloading transcription as %s for %s",
+                download_format,
+                recording_id,
+            )
+            pdf_content = await linto.download_conversation(
+                conversation_id=conversation_id,
+                format=download_format,
+            )
+            pub_format = download_format
+            logger.info(
+                "%s downloaded for %s: %d bytes",
+                pub_format.upper(),
+                recording_id,
+                len(pdf_content) if pdf_content else 0,
+            )
+        except Exception:
+            logger.exception("Transcription download error for %s, continuing", recording_id)
+
+    # 6. Send email with document to room participants
     accesses = await sync_to_async(
         lambda: list(
             recording.room.accesses.select_related("user")
@@ -269,10 +292,10 @@ async def _process_linto_transcription_sync(recording_id):
 
     room_name = recording.room.name or "Meeting"
     date_str = recording.created_at.strftime("%Y-%m-%d")
-    pub_format = getattr(settings, "LINTO_PUBLICATION_FORMAT", "pdf")
     mime_types = {
         "pdf": "application/pdf",
         "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "odt": "application/vnd.oasis.opendocument.text",
     }
     pub_mime = mime_types.get(pub_format, "application/octet-stream")
     pub_filename = f"transcription-{room_name}-{date_str}.{pub_format}"
