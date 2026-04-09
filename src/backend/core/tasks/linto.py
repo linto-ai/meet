@@ -240,7 +240,9 @@ async def _process_linto_transcription_sync(recording_id):
                     recording_id,
                 )
         except Exception:
-            logger.exception("Document generation error for %s, continuing", recording_id)
+            logger.exception(
+                "Document generation error for %s, continuing", recording_id
+            )
 
     elif conversation_id:
         # No summary: export transcription directly as DOCX
@@ -263,7 +265,105 @@ async def _process_linto_transcription_sync(recording_id):
                 len(pdf_content) if pdf_content else 0,
             )
         except Exception:
-            logger.exception("Transcription download error for %s, continuing", recording_id)
+            logger.exception(
+                "Transcription download error for %s, continuing", recording_id
+            )
+
+    # Extract summary preview text (needed for Docs content and email)
+    summary_preview = None
+    if summary_result.get("content"):
+        c = summary_result["content"]
+        if isinstance(c, dict):
+            summary_preview = c.get("text") or c.get("content") or str(c)
+        elif isinstance(c, str):
+            summary_preview = c
+
+    # 5.7 Upload to Twake Drive via Cloudery (failure does not block email)
+    twake_drive_link = None
+    twake_configured = getattr(settings, "CLOUDERY_URL", None) and getattr(
+        settings, "CLOUDERY_TOKEN", None
+    )
+
+    if twake_configured:
+        try:
+            from core.services.twake_drive import (
+                build_drive_link,
+                ensure_meeting_directory,
+                get_drive_token,
+                save_file,
+            )
+
+            owner_access = await sync_to_async(
+                lambda: (
+                    recording.room.accesses.filter(role="owner")
+                    .select_related("user")
+                    .first()
+                )
+            )()
+
+            if owner_access and owner_access.user.sub:
+                sub = owner_access.user.sub
+                domain = getattr(
+                    settings, "TWAKE_INSTANCE_DOMAIN", "twake.linagora.com"
+                )
+                instance = f"{sub}.{domain}"
+
+                drive_token = await get_drive_token(
+                    cloudery_url=settings.CLOUDERY_URL,
+                    cloudery_token=settings.CLOUDERY_TOKEN,
+                    instance=instance,
+                )
+
+                meeting_time = recording.created_at.strftime("%d-%m-%Y_%H-%M")
+                dirname = f"Reunion_{meeting_time}"
+                dir_id = await ensure_meeting_directory(instance, drive_token, dirname)
+
+                transcript_content = media.full_text or ""
+                await save_file(
+                    instance=instance,
+                    token=drive_token,
+                    dir_id=dir_id,
+                    filename=f"Transcription_{meeting_time}.cozy-note",
+                    content=transcript_content,
+                    content_type="text/vnd.cozy.note+markdown",
+                )
+
+                if summary_preview:
+                    await save_file(
+                        instance=instance,
+                        token=drive_token,
+                        dir_id=dir_id,
+                        filename="Résumé.cozy-note",
+                        content=summary_preview,
+                        content_type="text/vnd.cozy.note+markdown",
+                    )
+
+                # Upload formatted document (PDF/DOCX from publication)
+                if pdf_content:
+                    await save_file(
+                        instance=instance,
+                        token=drive_token,
+                        dir_id=dir_id,
+                        filename=pub_filename,
+                        content=pdf_content,
+                        content_type=pub_mime,
+                    )
+
+                twake_drive_link = build_drive_link(instance, dir_id)
+                logger.info(
+                    "Files uploaded to Twake Drive for %s: %s",
+                    recording_id,
+                    twake_drive_link,
+                )
+            else:
+                logger.warning(
+                    "No room owner with sub found for %s, skipping Twake Drive",
+                    recording_id,
+                )
+        except Exception:
+            logger.exception(
+                "Twake Drive upload error for %s, continuing", recording_id
+            )
 
     # 6. Send email with document to room participants
     accesses = await sync_to_async(
@@ -280,15 +380,6 @@ async def _process_linto_transcription_sync(recording_id):
         if frontend_url and conversation_id
         else None
     )
-
-    # Extract summary preview text
-    summary_preview = None
-    if summary_result.get("content"):
-        c = summary_result["content"]
-        if isinstance(c, dict):
-            summary_preview = c.get("text") or c.get("content") or str(c)
-        elif isinstance(c, str):
-            summary_preview = c
 
     room_name = recording.room.name or "Meeting"
     date_str = recording.created_at.strftime("%Y-%m-%d")
@@ -321,7 +412,10 @@ async def _process_linto_transcription_sync(recording_id):
                         ).strftime("%H:%M"),
                         "summary_preview": summary_preview,
                         "linto_studio_link": linto_link,
-                        "has_pdf_attachment": pdf_content is not None,
+                        "twake_drive_link": twake_drive_link,
+                        "has_pdf_attachment": (
+                            pdf_content is not None and not twake_configured
+                        ),
                     }
                     msg_html = render_to_string("mail/html/transcription.html", ctx)
                     msg_plain = render_to_string("mail/text/transcription.txt", ctx)
@@ -333,7 +427,7 @@ async def _process_linto_transcription_sync(recording_id):
                         [user.email],
                     )
                     email_msg.attach_alternative(msg_html, "text/html")
-                    if pdf_content:
+                    if pdf_content and not twake_configured:
                         email_msg.attach(
                             pub_filename,
                             pdf_content,
