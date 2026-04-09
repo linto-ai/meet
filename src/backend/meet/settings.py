@@ -824,6 +824,17 @@ class Base(Configuration):
         None, environ_name="LINTO_STUDIO_FRONTEND_URL", environ_prefix=None
     )
 
+    # Twake Drive integration (Cloudery + Cozy Stack)
+    CLOUDERY_URL = values.Value(None, environ_name="CLOUDERY_URL", environ_prefix=None)
+    CLOUDERY_TOKEN = SecretFileValue(
+        None, environ_name="CLOUDERY_TOKEN", environ_prefix=None
+    )
+    TWAKE_INSTANCE_DOMAIN = values.Value(
+        "twake.linagora.com",
+        environ_name="TWAKE_INSTANCE_DOMAIN",
+        environ_prefix=None,
+    )
+
     # Marketing and communication settings
     SIGNUP_NEW_USER_TO_MARKETING_EMAIL = values.BooleanValue(
         False,  # When enabled, new users are automatically added to mailing list.
@@ -1223,7 +1234,7 @@ class Development(Base):
 
     ALLOWED_HOSTS = ["*"]
     CORS_ALLOW_ALL_ORIGINS = True
-    CSRF_TRUSTED_ORIGINS = ["http://localhost:8072", "http://localhost:3000"]
+    CSRF_TRUSTED_ORIGINS = ["http://localhost:8072", "http://localhost:3000", "http://localhost:3001"]
     DEBUG = True
 
     SESSION_COOKIE_NAME = "meet_sessionid"
