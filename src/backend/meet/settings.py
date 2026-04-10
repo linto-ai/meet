@@ -852,7 +852,7 @@ class Base(Configuration):
         None, environ_name="LINTO_PUBLICATION_TEMPLATE_ID", environ_prefix=None
     )
     LINTO_PUBLICATION_FORMAT = values.Value(
-        "pdf", environ_name="LINTO_PUBLICATION_FORMAT", environ_prefix=None
+        "docx", environ_name="LINTO_PUBLICATION_FORMAT", environ_prefix=None
     )
     LINTO_STUDIO_FRONTEND_URL = values.Value(
         None, environ_name="LINTO_STUDIO_FRONTEND_URL", environ_prefix=None
