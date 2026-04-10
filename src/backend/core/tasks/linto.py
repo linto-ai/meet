@@ -269,6 +269,17 @@ async def _process_linto_transcription_sync(recording_id):
                 "Transcription download error for %s, continuing", recording_id
             )
 
+    # Prepare publication filename and mime type
+    room_name = recording.room.name or "Meeting"
+    date_str = recording.created_at.strftime("%Y-%m-%d")
+    mime_types = {
+        "pdf": "application/pdf",
+        "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "odt": "application/vnd.oasis.opendocument.text",
+    }
+    pub_mime = mime_types.get(pub_format, "application/octet-stream")
+    pub_filename = f"transcription-{room_name}-{date_str}.{pub_format}"
+
     # Extract summary preview text (needed for Docs content and email)
     summary_preview = None
     if summary_result.get("content"):
@@ -277,6 +288,35 @@ async def _process_linto_transcription_sync(recording_id):
             summary_preview = c.get("text") or c.get("content") or str(c)
         elif isinstance(c, str):
             summary_preview = c
+
+    # 5.8 Set conversation owner to room admin (failure does not block)
+    owner_access = await sync_to_async(
+        lambda: (
+            recording.room.accesses.filter(role="owner").select_related("user").first()
+        )
+    )()
+
+    if owner_access and owner_access.user.email and conversation_id:
+        try:
+            owner_user_id = await linto.set_conversation_owner(
+                conversation_id, owner_access.user.email
+            )
+            if owner_user_id:
+                logger.info(
+                    "Conversation owner set to %s for %s",
+                    owner_access.user.email,
+                    recording_id,
+                )
+            else:
+                logger.warning(
+                    "User %s not found in LinTO Studio for %s",
+                    owner_access.user.email,
+                    recording_id,
+                )
+        except Exception:
+            logger.exception(
+                "Set conversation owner error for %s, continuing", recording_id
+            )
 
     # 5.7 Upload to Twake Drive via Cloudery (failure does not block email)
     twake_drive_link = None
@@ -292,14 +332,6 @@ async def _process_linto_transcription_sync(recording_id):
                 get_drive_token,
                 save_file,
             )
-
-            owner_access = await sync_to_async(
-                lambda: (
-                    recording.room.accesses.filter(role="owner")
-                    .select_related("user")
-                    .first()
-                )
-            )()
 
             if owner_access and owner_access.user.sub:
                 sub = owner_access.user.sub
@@ -336,6 +368,32 @@ async def _process_linto_transcription_sync(recording_id):
                         filename="Résumé.cozy-note",
                         content=summary_preview,
                         content_type="text/vnd.cozy.note+markdown",
+                    )
+
+                # Upload audio recording
+                await save_file(
+                    instance=instance,
+                    token=drive_token,
+                    dir_id=dir_id,
+                    filename=f"Enregistrement_{meeting_time}.ogg",
+                    content=file_content,
+                    content_type="audio/ogg",
+                )
+
+                # Upload LinTO Studio shortcut
+                frontend_url = getattr(settings, "LINTO_STUDIO_FRONTEND_URL", None)
+                if frontend_url and conversation_id:
+                    shortcut_url = (
+                        f"{frontend_url}/interface/conversations/{conversation_id}"
+                    )
+                    shortcut_content = f"[InternetShortcut]\nURL={shortcut_url}\n"
+                    await save_file(
+                        instance=instance,
+                        token=drive_token,
+                        dir_id=dir_id,
+                        filename="Plus_de_detail_dans_linto.url",
+                        content=shortcut_content,
+                        content_type="application/x-url",
                     )
 
                 # Upload formatted document (PDF/DOCX from publication)
@@ -380,16 +438,6 @@ async def _process_linto_transcription_sync(recording_id):
         if frontend_url and conversation_id
         else None
     )
-
-    room_name = recording.room.name or "Meeting"
-    date_str = recording.created_at.strftime("%Y-%m-%d")
-    mime_types = {
-        "pdf": "application/pdf",
-        "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "odt": "application/vnd.oasis.opendocument.text",
-    }
-    pub_mime = mime_types.get(pub_format, "application/octet-stream")
-    pub_filename = f"transcription-{room_name}-{date_str}.{pub_format}"
 
     for access in accesses:
         user = access.user
