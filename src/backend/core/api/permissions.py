@@ -5,7 +5,12 @@ from django.http import Http404
 
 from rest_framework import permissions
 
-from ..models import RoleChoices, RoomAccessLevel
+from ..models import (
+    Recording,
+    RecordingStatusChoices,
+    RoleChoices,
+    RoomAccessLevel,
+)
 from ..services.participants_management import (
     ParticipantNotFoundException,
     ParticipantsManagement,
@@ -91,6 +96,57 @@ class HasPrivilegesOnRoom(IsAuthenticated):
 
     def has_object_permission(self, request, view, obj):
         """Determine if user has privileges on room."""
+        return obj.is_administrator_or_owner(request.user)
+
+
+class HasRecordingPermission(permissions.BasePermission):
+    """Check if user has permission to start/stop recording based on mode and settings.
+
+    Authentication is checked at object level, after the recording feature
+    flag: anonymous requests get a 404 while recording is disabled, a 401 once
+    it is enabled.
+    """
+
+    message = "You do not have permission to perform this recording action."
+
+    def _get_permission_level(self, mode, room=None):
+        """Return the permission level for the given mode, checking room config first."""
+        if mode == "screen_recording":
+            key = "screen_recording_permission"
+            default = getattr(settings, "RECORDING_SCREEN_PERMISSION", "admin_owner")
+        elif mode == "transcript":
+            key = "transcript_permission"
+            default = getattr(
+                settings, "RECORDING_TRANSCRIPT_PERMISSION", "admin_owner"
+            )
+        else:
+            return "admin_owner"
+
+        if room and room.configuration:
+            return room.configuration.get(key, default)
+        return default
+
+    def has_object_permission(self, request, view, obj):
+        """Check object-level permissions based on recording mode."""
+        if not (request.auth or request.user.is_authenticated):
+            return False
+
+        mode = request.data.get("mode")
+
+        # For stop-recording, get mode from active recording
+        if not mode:
+            try:
+                recording = Recording.objects.get(
+                    room=obj, status=RecordingStatusChoices.ACTIVE
+                )
+                mode = recording.mode
+            except Recording.DoesNotExist:
+                return True
+
+        permission_level = self._get_permission_level(mode, room=obj)
+
+        if permission_level == "authenticated":
+            return True
         return obj.is_administrator_or_owner(request.user)
 
 
@@ -200,7 +256,6 @@ class ParticipantCapability(permissions.BasePermission):
     """
 
     message = "You are not allowed to perform this action."
-    enabled_setting = None
 
     def has_object_permission(self, request, view, obj):
         """Check privileges first, then the participant presence path."""
@@ -217,12 +272,10 @@ class ParticipantCapability(permissions.BasePermission):
         if obj.is_administrator_or_owner(user):
             return True
 
-        is_open_room = obj.access_level in (
+        if obj.access_level not in (
             RoomAccessLevel.TRUSTED,
             RoomAccessLevel.PUBLIC,
-        )
-        is_enabled = not self.enabled_setting or getattr(settings, self.enabled_setting)
-        if not (is_open_room and is_enabled):
+        ):
             return False
 
         try:
@@ -240,8 +293,3 @@ class CanManageLobby(ParticipantCapability):
     them to participants exposes nothing.
     """
 
-
-class CanManageRecording(ParticipantCapability):
-    """Grant starting/stopping a room recording (screen recording or transcript)."""
-
-    enabled_setting = "RECORDING_AUTHENTICATED_PARTICIPANTS_ENABLED"

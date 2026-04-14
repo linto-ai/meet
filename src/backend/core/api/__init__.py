@@ -55,9 +55,8 @@ def get_frontend_configuration(request):
                 "default_resolution": settings.RECORDING_ENCODING_DEFAULT_RESOLUTION,
                 "default_profile": settings.RECORDING_ENCODING_DEFAULT_PROFILE,
             },
-            "authenticated_participants_enabled": (
-                settings.RECORDING_AUTHENTICATED_PARTICIPANTS_ENABLED
-            ),
+            "screen_recording_permission": settings.RECORDING_SCREEN_PERMISSION,
+            "transcript_permission": settings.RECORDING_TRANSCRIPT_PERMISSION,
         },
         "background_image": {
             "upload_is_enabled": settings.FILE_UPLOAD_ENABLED,

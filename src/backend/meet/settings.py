@@ -882,12 +882,13 @@ class Base(Configuration):
     RECORDING_ENABLE = values.BooleanValue(
         False, environ_name="RECORDING_ENABLE", environ_prefix=None
     )
-    # Let any authenticated participant connected to a trusted or public room
-    # start/stop recordings. Disable to keep recording reserved to room
-    # admins/owners.
-    RECORDING_AUTHENTICATED_PARTICIPANTS_ENABLED = values.BooleanValue(
-        True,
-        environ_name="RECORDING_AUTHENTICATED_PARTICIPANTS_ENABLED",
+    # Recording permission levels: "admin_owner" (default) or "authenticated"
+    RECORDING_SCREEN_PERMISSION = values.Value(
+        "admin_owner", environ_name="RECORDING_SCREEN_PERMISSION", environ_prefix=None
+    )
+    RECORDING_TRANSCRIPT_PERMISSION = values.Value(
+        "admin_owner",
+        environ_name="RECORDING_TRANSCRIPT_PERMISSION",
         environ_prefix=None,
     )
     RECORDING_OUTPUT_FOLDER = values.Value(
@@ -1800,7 +1801,11 @@ class Development(Base):
 
     ALLOWED_HOSTS = ["*"]
     CORS_ALLOW_ALL_ORIGINS = True
-    CSRF_TRUSTED_ORIGINS = ["http://localhost:8072", "http://localhost:3000", "http://localhost:3001"]
+    CSRF_TRUSTED_ORIGINS = [
+        "http://localhost:8072",
+        "http://localhost:3000",
+        "http://localhost:3001",
+    ]
     DEBUG = True
 
     SESSION_COOKIE_NAME = "meet_sessionid"

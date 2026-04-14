@@ -31,13 +31,11 @@ import { useRecordingEncoding } from '../hooks/useRecordingEncoding'
 import { openSettingsDialog } from '@/stores/settings'
 import { useSidePanel } from '@/features/rooms/livekit/hooks/useSidePanel'
 import { useIsAdminOrOwner } from '@/features/rooms/livekit/hooks/useIsAdminOrOwner'
-import {
-  useCanRecord,
-  useIsRecordingOpenToParticipants,
-} from '../hooks/useCanRecord'
 import { FeatureFlags } from '@/features/analytics/enums'
 import { LimitDescription } from './LimitDescription'
 import { captureEvent, reportError } from '@/features/analytics/telemetry'
+import { useHasFeatureWithoutRecordingRights } from '../hooks/useHasFeatureWithoutRecordingRights'
+import { useRecordingPermission } from '../hooks/useRecordingPermission'
 
 export const ScreenRecordingSidePanel = () => {
   const { data } = useConfig()
@@ -48,8 +46,15 @@ export const ScreenRecordingSidePanel = () => {
   const [includeTranscript, setIncludeTranscript] = useState(false)
 
   const isAdminOrOwner = useIsAdminOrOwner()
-  const canRecord = useCanRecord()
-  const isRecordingOpenToParticipants = useIsRecordingOpenToParticipants()
+  const { isOpenToAuthenticated } = useRecordingPermission(
+    RecordingMode.ScreenRecording,
+    FeatureFlags.ScreenRecording
+  )
+
+  const hasFeatureWithoutRecordingRights = useHasFeatureWithoutRecordingRights(
+    RecordingMode.ScreenRecording,
+    FeatureFlags.ScreenRecording
+  )
 
   const hasScreenRecordingAccess = useHasRecordingAccess(
     RecordingMode.ScreenRecording,
@@ -132,12 +137,12 @@ export const ScreenRecordingSidePanel = () => {
     }
   }
 
-  if (!canRecord) {
+  if (hasFeatureWithoutRecordingRights) {
     return (
       <NoAccessView
         i18nKeyPrefix={keyPrefix}
         i18nKey={
-          isRecordingOpenToParticipants ? 'notLoggedIn' : 'notAdminOrOwner'
+          isOpenToAuthenticated ? 'notLoggedIn' : 'notAdminOrOwner'
         }
         helpArticle={data?.support?.help_article_recording}
         imagePath="/assets/intro-slider/4.png"

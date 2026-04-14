@@ -154,6 +154,9 @@ class ListRoomSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "slug"]
 
 
+VALID_RECORDING_PERMISSIONS = {"admin_owner", "authenticated"}
+
+
 class RoomSerializer(serializers.ModelSerializer):
     """Serialize Room model for the API."""
 
@@ -166,6 +169,16 @@ class RoomSerializer(serializers.ModelSerializer):
         """Validate room configuration against the RoomConfiguration schema."""
         if value is None or value == {}:
             return value
+
+        if isinstance(value, dict):
+            for key in ("screen_recording_permission", "transcript_permission"):
+                if key in value and value[key] not in VALID_RECORDING_PERMISSIONS:
+                    raise serializers.ValidationError(
+                        {
+                            key: f"Must be one of: {', '.join(sorted(VALID_RECORDING_PERMISSIONS))}"
+                        }
+                    )
+
         try:
             RoomConfiguration.model_validate(value)
         except PydanticValidationError as e:
@@ -196,6 +209,19 @@ class RoomSerializer(serializers.ModelSerializer):
                 many=True,
             )
             output["accesses"] = access_serializer.data
+
+        configuration = output["configuration"]
+
+        output["recording_permissions"] = {
+            "screen_recording_permission": configuration.get(
+                "screen_recording_permission",
+                settings.RECORDING_SCREEN_PERMISSION,
+            ),
+            "transcript_permission": configuration.get(
+                "transcript_permission",
+                settings.RECORDING_TRANSCRIPT_PERMISSION,
+            ),
+        }
 
         if not LobbyService.can_bypass_lobby(
             room=instance, user=request.user, role=role
@@ -436,6 +462,8 @@ class RoomConfiguration(BaseModel):
 
     can_publish_sources: list[TrackSource] | None = None
     everyone_can_mute: bool | None = None
+    screen_recording_permission: Literal["admin_owner", "authenticated"] | None = None
+    transcript_permission: Literal["admin_owner", "authenticated"] | None = None
 
     model_config = {"extra": "forbid"}
 

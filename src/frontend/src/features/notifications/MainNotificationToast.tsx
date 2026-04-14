@@ -8,6 +8,11 @@ import { NotificationDuration } from './NotificationDuration'
 import { decodeNotificationDataReceived } from './utils'
 import { useNotificationSound } from '@/features/notifications/hooks/useSoundNotification'
 import { toastQueue } from './components/ToastProvider'
+import { queryClient } from '@/api/queryClient'
+import { keys } from '@/api/queryKeys'
+import { fetchRoom } from '@/features/rooms/api/fetchRoom'
+import type { ApiRoom } from '@/features/rooms/api/ApiRoom'
+import { useParams } from 'wouter'
 import { layoutStore } from '@/stores/layout'
 import { PanelId } from '@/features/rooms/livekit/hooks/useSidePanel'
 import { useScreenReaderAnnounce } from '@/hooks/useScreenReaderAnnounce'
@@ -15,11 +20,13 @@ import { Emoji } from '@/features/reactions/types'
 import { useReactions } from '@/features/reactions/hooks/useReactions'
 import { NotificationProvider } from './NotificationProvider'
 import { useConfig } from '@/api/useConfig'
+import { reportError } from '@/features/analytics/telemetry'
 
 export const MainNotificationToast = () => {
   const room = useRoomContext()
   const { data } = useConfig()
   const { triggerNotificationSound } = useNotificationSound()
+  const { roomId } = useParams()
   const { t } = useTranslation('notifications')
   const announce = useScreenReaderAnnounce()
 
@@ -133,6 +140,28 @@ export const MainNotificationToast = () => {
           )
           break
         }
+        case NotificationType.RecordingPermissionsChanged:
+          // Merge the fresh permissions into the cached room: a GET returns no
+          // LiveKit credentials, so the cache entry is never replaced by it
+          if (!roomId) break
+          fetchRoom({ roomId })
+            .then((fresh) =>
+              queryClient.setQueryData<ApiRoom>(
+                [keys.room, roomId],
+                (previous) =>
+                  previous && {
+                    ...previous,
+                    configuration: fresh.configuration,
+                    recording_permissions: fresh.recording_permissions,
+                  }
+              )
+            )
+            .catch((error) =>
+              reportError('generic_failure', error, {
+                context: 'Failed to refresh recording permissions:',
+              })
+            )
+          break
         default:
           return
       }
@@ -141,7 +170,7 @@ export const MainNotificationToast = () => {
     return () => {
       room.off(RoomEvent.DataReceived, handleDataReceived)
     }
-  }, [room, handleEmoji])
+  }, [room, handleEmoji, roomId])
 
   const triggerNotificationSoundIfRoomIsSmall = useCallback(
     (type: NotificationType) => {

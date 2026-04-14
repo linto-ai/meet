@@ -62,19 +62,12 @@ def test_start_recording_anonymous(settings, recording_enabled, expected_status)
     assert Recording.objects.count() == 0
 
 
-@pytest.mark.parametrize("authenticated_participants_enabled", [True, False])
-def test_start_recording_restricted_room_non_owner_and_non_administrator(
-    settings, authenticated_participants_enabled
-):
+def test_start_recording_restricted_room_non_owner_and_non_administrator(settings):
     """
     On restricted rooms, non-owner and non-administrator users should not be
-    allowed to start recordings, whether or not authenticated participants
-    are allowed to record.
+    allowed to start recordings under the default `admin_owner` permission.
     """
     settings.RECORDING_ENABLE = True
-    settings.RECORDING_AUTHENTICATED_PARTICIPANTS_ENABLED = (
-        authenticated_participants_enabled
-    )
     room = RoomFactory(access_level=RoomAccessLevel.RESTRICTED)
     user = UserFactory()
     client = APIClient()

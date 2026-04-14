@@ -1,7 +1,7 @@
 import { fetchApi } from './fetchApi'
 import { keys } from './queryKeys'
 import { useQuery } from '@tanstack/react-query'
-import { RecordingMode } from '@/features/recording'
+import { RecordingMode, RecordingPermission } from '@/features/recording'
 import type { ApiAccessLevel } from '@/features/rooms/api/ApiRoom'
 import type { Track, VideoCodec } from 'livekit-client'
 type Source = Track.Source
@@ -45,7 +45,8 @@ export interface ApiConfig {
       default_resolution?: string | null
       default_profile?: string | null
     }
-    authenticated_participants_enabled?: boolean
+    screen_recording_permission?: RecordingPermission
+    transcript_permission?: RecordingPermission
   }
   background_image: {
     upload_is_enabled: boolean

@@ -109,6 +109,10 @@ def test_api_rooms_join_access(mock_token, access_level, requester, can_join_dir
         "slug": room.slug,
         "configuration": {"can_publish_sources": ["camera"]},
         "access_level": str(access_level),
+        "recording_permissions": {
+            "screen_recording_permission": "admin_owner",
+            "transcript_permission": "admin_owner",
+        },
     }
     if can_join_directly:
         expected["pin_code"] = room.pin_code

@@ -80,7 +80,7 @@ Deleting a room now only soft deletes it: it is hidden but keeps its slug and PI
 ### Recording permission
 
 We've introduced the ability for any authenticated participant to start a recording or transcription, but this behavior remains configurable.
-You can keep recording and transcription restricted to room admins and owners by setting `RECORDING_AUTHENTICATED_PARTICIPANTS_ENABLED` to `false`.
+In the LinTO fork, who may record is set per mode by `RECORDING_SCREEN_PERMISSION` and `RECORDING_TRANSCRIPT_PERMISSION` (`admin_owner` by default, or `authenticated`), and per room from the admin panel; `RECORDING_AUTHENTICATED_PARTICIPANTS_ENABLED` does not exist.
 
 ## [v1.34.0]
 

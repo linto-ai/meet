@@ -7,7 +7,7 @@ import {
   RecordingMode,
   useHasRecordingAccess,
   useHasFeatureWithoutRecordingRights,
-  useIsRecordingOpenToParticipants,
+  useRecordingPermission,
   useRecordingStatuses,
 } from '../index'
 import { useState } from 'react'
@@ -65,7 +65,10 @@ export const TranscriptSidePanel = () => {
   )
 
   const isAdminOrOwner = useIsAdminOrOwner()
-  const isRecordingOpenToParticipants = useIsRecordingOpenToParticipants()
+  const { isOpenToAuthenticated } = useRecordingPermission(
+    RecordingMode.Transcript,
+    FeatureFlags.Transcript
+  )
 
   const isMetadataCollectorEnabled = useIsMetadataCollectorEnabled()
 
@@ -150,7 +153,7 @@ export const TranscriptSidePanel = () => {
       <NoAccessView
         i18nKeyPrefix={keyPrefix}
         i18nKey={
-          isRecordingOpenToParticipants ? 'notLoggedIn' : 'notAdminOrOwner'
+          isOpenToAuthenticated ? 'notLoggedIn' : 'notAdminOrOwner'
         }
         helpArticle={data?.support?.help_article_transcript}
         imagePath="/assets/intro-slider/3.png"

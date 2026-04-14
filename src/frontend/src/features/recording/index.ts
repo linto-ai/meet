@@ -2,10 +2,7 @@
 export { useIsRecordingModeEnabled } from './hooks/useIsRecordingModeEnabled'
 export { useHasRecordingAccess } from './hooks/useHasRecordingAccess'
 export { useHasFeatureWithoutRecordingRights } from './hooks/useHasFeatureWithoutRecordingRights'
-export {
-  useCanRecord,
-  useIsRecordingOpenToParticipants,
-} from './hooks/useCanRecord'
+export { useRecordingPermission } from './hooks/useRecordingPermission'
 export { useRecordingStatuses } from './hooks/useRecordingStatuses'
 export {
   useRecordingEncoding,
@@ -17,7 +14,7 @@ export { useIsRecordingLocked } from './hooks/useIsRecordingLocked'
 // api
 export { useStartRecording } from './api/startRecording'
 export { useStopRecording } from './api/stopRecording'
-export { RecordingMode, RecordingStatus } from './types'
+export { RecordingMode, RecordingPermission, RecordingStatus } from './types'
 
 // components
 export { RecordingProvider } from './components/RecordingProvider'

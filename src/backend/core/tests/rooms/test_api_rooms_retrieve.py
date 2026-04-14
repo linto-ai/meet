@@ -19,6 +19,11 @@ from ..utils import generate_user_access_token
 
 pytestmark = pytest.mark.django_db
 
+EXPECTED_RECORDING_PERMISSIONS = {
+    "screen_recording_permission": "admin_owner",
+    "transcript_permission": "admin_owner",
+}
+
 
 def test_api_rooms_retrieve_anonymous_private_pk():
     """
@@ -35,6 +40,7 @@ def test_api_rooms_retrieve_anonymous_private_pk():
         "access_level": "restricted",
         "id": str(room.id),
         "name": room.name,
+        "recording_permissions": EXPECTED_RECORDING_PERMISSIONS,
         "slug": room.slug,
     }
 
@@ -54,6 +60,7 @@ def test_api_rooms_retrieve_anonymous_trusted_pk():
         "access_level": "trusted",
         "id": str(room.id),
         "name": room.name,
+        "recording_permissions": EXPECTED_RECORDING_PERMISSIONS,
         "slug": room.slug,
     }
 
@@ -72,6 +79,7 @@ def test_api_rooms_retrieve_anonymous_private_pk_no_dashes():
         "access_level": "restricted",
         "id": str(room.id),
         "name": room.name,
+        "recording_permissions": EXPECTED_RECORDING_PERMISSIONS,
         "slug": room.slug,
     }
 
@@ -88,6 +96,7 @@ def test_api_rooms_retrieve_anonymous_private_slug():
         "access_level": "restricted",
         "id": str(room.id),
         "name": room.name,
+        "recording_permissions": EXPECTED_RECORDING_PERMISSIONS,
         "slug": room.slug,
     }
 
@@ -104,6 +113,7 @@ def test_api_rooms_retrieve_anonymous_private_slug_not_normalized():
         "access_level": "restricted",
         "id": str(room.id),
         "name": room.name,
+        "recording_permissions": EXPECTED_RECORDING_PERMISSIONS,
         "slug": room.slug,
     }
 
@@ -229,6 +239,7 @@ def test_api_rooms_retrieve_anonymous_public(mock_token):
         "id": str(room.id),
         "name": room.name,
         "pin_code": room.pin_code,
+        "recording_permissions": EXPECTED_RECORDING_PERMISSIONS,
         "slug": room.slug,
     }
 
@@ -262,6 +273,7 @@ def test_api_rooms_retrieve_authenticated_public(mock_token):
         "id": str(room.id),
         "name": room.name,
         "pin_code": room.pin_code,
+        "recording_permissions": EXPECTED_RECORDING_PERMISSIONS,
         "slug": room.slug,
     }
 
@@ -292,6 +304,7 @@ def test_api_rooms_retrieve_authenticated_trusted(mock_token):
         "id": str(room.id),
         "name": room.name,
         "pin_code": room.pin_code,
+        "recording_permissions": EXPECTED_RECORDING_PERMISSIONS,
         "slug": room.slug,
     }
 
@@ -319,6 +332,7 @@ def test_api_rooms_retrieve_authenticated():
         "access_level": "restricted",
         "id": str(room.id),
         "name": room.name,
+        "recording_permissions": EXPECTED_RECORDING_PERMISSIONS,
         "slug": room.slug,
     }
 
@@ -357,6 +371,7 @@ def test_api_rooms_retrieve_members(mock_token, django_assert_num_queries, setti
         "id": str(room.id),
         "name": room.name,
         "pin_code": room.pin_code,
+        "recording_permissions": EXPECTED_RECORDING_PERMISSIONS,
         "slug": room.slug,
     }
 
@@ -432,6 +447,7 @@ def test_api_rooms_retrieve_administrators(
         "configuration": {},
         "name": room.name,
         "pin_code": room.pin_code,
+        "recording_permissions": EXPECTED_RECORDING_PERMISSIONS,
         "slug": room.slug,
     }
 

@@ -449,7 +449,7 @@ class RoomViewSet(  # pylint: disable=too-many-public-methods
         methods=["post"],
         url_path="start-recording",
         permission_classes=[
-            permissions.CanManageRecording,
+            permissions.HasRecordingPermission,
         ],
         audit_action=auditing.RECORDING_START,
         throttle_classes=[
@@ -536,7 +536,7 @@ class RoomViewSet(  # pylint: disable=too-many-public-methods
         methods=["post"],
         url_path="stop-recording",
         permission_classes=[
-            permissions.CanManageRecording,
+            permissions.HasRecordingPermission,
         ],
         audit_action=auditing.RECORDING_STOP,
     )
