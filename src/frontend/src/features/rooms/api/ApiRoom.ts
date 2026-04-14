@@ -1,4 +1,5 @@
 import type { Track } from 'livekit-client'
+import { RecordingPermission } from '@/features/recording/types'
 type Source = Track.Source
 
 export type ApiLiveKit = {
@@ -16,6 +17,8 @@ export enum ApiAccessLevel {
 export type RoomConfiguration = {
   can_publish_sources?: Source[] | null
   everyone_can_mute?: boolean | null
+  screen_recording_permission?: RecordingPermission
+  transcript_permission?: RecordingPermission
 }
 
 export type ParticipantRole = 'member' | 'administrator' | 'owner'
@@ -43,4 +46,8 @@ export type ApiRoom = {
    * participant attribute is not available.
    */
   accesses?: ApiResourceAccess[]
+  recording_permissions?: {
+    screen_recording_permission?: RecordingPermission
+    transcript_permission?: RecordingPermission
+  }
 }

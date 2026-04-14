@@ -1,7 +1,7 @@
 import { fetchApi } from './fetchApi'
 import { keys } from './queryKeys'
 import { useQuery } from '@tanstack/react-query'
-import { RecordingMode } from '@/features/recording'
+import { RecordingMode, RecordingPermission } from '@/features/recording'
 import type { ApiAccessLevel } from '@/features/rooms/api/ApiRoom'
 import type { Track } from 'livekit-client'
 type Source = Track.Source
@@ -34,6 +34,8 @@ export interface ApiConfig {
     available_modes?: RecordingMode[]
     expiration_days?: number
     max_duration?: number
+    screen_recording_permission?: RecordingPermission
+    transcript_permission?: RecordingPermission
   }
   background_image: {
     upload_is_enabled: boolean

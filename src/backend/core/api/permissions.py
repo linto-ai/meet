@@ -5,7 +5,7 @@ from django.http import Http404
 
 from rest_framework import permissions
 
-from ..models import RoleChoices
+from ..models import Recording, RecordingStatusChoices, RoleChoices
 from ..services.participants_management import (
     ParticipantNotFoundException,
     ParticipantsManagement,
@@ -104,6 +104,49 @@ class HasPrivilegesOnRoom(IsAuthenticated):
 
     def has_object_permission(self, request, view, obj):
         """Determine if user has privileges on room."""
+        return obj.is_administrator_or_owner(request.user)
+
+
+class HasRecordingPermission(IsAuthenticated):
+    """Check if user has permission to start/stop recording based on mode and settings."""
+
+    message = "You do not have permission to perform this recording action."
+
+    def _get_permission_level(self, mode, room=None):
+        """Return the permission level for the given mode, checking room config first."""
+        if mode == "screen_recording":
+            key = "screen_recording_permission"
+            default = getattr(settings, "RECORDING_SCREEN_PERMISSION", "admin_owner")
+        elif mode == "transcript":
+            key = "transcript_permission"
+            default = getattr(
+                settings, "RECORDING_TRANSCRIPT_PERMISSION", "admin_owner"
+            )
+        else:
+            return "admin_owner"
+
+        if room and room.configuration:
+            return room.configuration.get(key, default)
+        return default
+
+    def has_object_permission(self, request, view, obj):
+        """Check object-level permissions based on recording mode."""
+        mode = request.data.get("mode")
+
+        # For stop-recording, get mode from active recording
+        if not mode:
+            try:
+                recording = Recording.objects.get(
+                    room=obj, status=RecordingStatusChoices.ACTIVE
+                )
+                mode = recording.mode
+            except Recording.DoesNotExist:
+                return True
+
+        permission_level = self._get_permission_level(mode, room=obj)
+
+        if permission_level == "authenticated":
+            return True
         return obj.is_administrator_or_owner(request.user)
 
 
