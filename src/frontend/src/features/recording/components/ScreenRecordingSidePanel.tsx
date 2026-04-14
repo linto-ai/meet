@@ -29,6 +29,7 @@ import { useSidePanel } from '@/features/rooms/livekit/hooks/useSidePanel'
 import { useIsAdminOrOwner } from '@/features/rooms/livekit/hooks/useIsAdminOrOwner'
 import { FeatureFlags } from '@/features/analytics/enums'
 import { LimitDescription } from './LimitDescription'
+import { useHasFeatureWithoutAdminRights } from '../hooks/useHasFeatureWithoutAdminRights'
 
 export const ScreenRecordingSidePanel = () => {
   const { data } = useConfig()
@@ -39,6 +40,11 @@ export const ScreenRecordingSidePanel = () => {
   const [includeTranscript, setIncludeTranscript] = useState(false)
 
   const isAdminOrOwner = useIsAdminOrOwner()
+
+  const hasFeatureWithoutAdminRights = useHasFeatureWithoutAdminRights(
+    RecordingMode.ScreenRecording,
+    FeatureFlags.ScreenRecording
+  )
 
   const hasScreenRecordingAccess = useHasRecordingAccess(
     RecordingMode.ScreenRecording,
@@ -110,7 +116,7 @@ export const ScreenRecordingSidePanel = () => {
     }
   }
 
-  if (!isAdminOrOwner) {
+  if (hasFeatureWithoutAdminRights) {
     return (
       <NoAccessView
         i18nKeyPrefix={keyPrefix}

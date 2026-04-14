@@ -8,6 +8,10 @@ import { NotificationDuration } from './NotificationDuration'
 import { decodeNotificationDataReceived } from './utils'
 import { useNotificationSound } from '@/features/notifications/hooks/useSoundNotification'
 import { toastQueue } from './components/ToastProvider'
+import { queryClient } from '@/api/queryClient'
+import { keys } from '@/api/queryKeys'
+import { fetchRoom } from '@/features/rooms/api/fetchRoom'
+import { useParams } from 'wouter'
 import { layoutStore } from '@/stores/layout'
 import { PanelId } from '@/features/rooms/livekit/hooks/useSidePanel'
 import { useScreenReaderAnnounce } from '@/hooks/useScreenReaderAnnounce'
@@ -20,6 +24,7 @@ export const MainNotificationToast = () => {
   const room = useRoomContext()
   const { data } = useConfig()
   const { triggerNotificationSound } = useNotificationSound()
+  const { roomId } = useParams()
   const { t } = useTranslation('notifications')
   const announce = useScreenReaderAnnounce()
 
@@ -127,6 +132,12 @@ export const MainNotificationToast = () => {
           )
           break
         }
+        case NotificationType.RecordingPermissionsChanged:
+          queryClient.fetchQuery({
+            queryKey: [keys.room, roomId],
+            queryFn: () => fetchRoom({ roomId: roomId! }),
+          })
+          break
         default:
           return
       }
@@ -135,7 +146,7 @@ export const MainNotificationToast = () => {
     return () => {
       room.off(RoomEvent.DataReceived, handleDataReceived)
     }
-  }, [room, handleEmoji])
+  }, [room, handleEmoji, roomId])
 
   const triggerNotificationSoundIfRoomIsSmall = useCallback(
     (type: NotificationType) => {

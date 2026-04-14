@@ -551,6 +551,26 @@
         "label": "Muter les autres",
         "description": "En désactivant cette option, les participants ne pourront plus muter d'autres participants."
       }
+    },
+    "recording": {
+      "title": "Permissions d'enregistrement",
+      "description": "Contrôlez qui peut démarrer les enregistrements et transcriptions dans cette réunion.",
+      "screenRecording": {
+        "label": "Enregistrement d'écran"
+      },
+      "transcript": {
+        "label": "Transcription"
+      },
+      "levels": {
+        "adminOwner": {
+          "label": "Admins et propriétaires uniquement",
+          "description": "Seuls les admins et propriétaires de cette réunion peuvent démarrer cette fonctionnalité."
+        },
+        "authenticated": {
+          "label": "Tous les utilisateurs authentifiés",
+          "description": "Tout utilisateur connecté peut démarrer cette fonctionnalité."
+        }
+      }
     }
   },
   "rating": {

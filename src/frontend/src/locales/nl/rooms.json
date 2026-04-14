@@ -551,6 +551,26 @@
         "label": "Anderen dempen",
         "description": "Wanneer uitgeschakeld, kunnen deelnemers andere deelnemers niet meer dempen."
       }
+    },
+    "recording": {
+      "title": "Opnamerechten",
+      "description": "Bepaal wie opnames en transcripties in deze vergadering mag starten.",
+      "screenRecording": {
+        "label": "Schermopname"
+      },
+      "transcript": {
+        "label": "Transcriptie"
+      },
+      "levels": {
+        "adminOwner": {
+          "label": "Alleen admins en eigenaren",
+          "description": "Alleen admins en eigenaren van deze vergadering kunnen deze functie starten."
+        },
+        "authenticated": {
+          "label": "Alle geauthenticeerde gebruikers",
+          "description": "Elke ingelogde gebruiker kan deze functie starten."
+        }
+      }
     }
   },
   "rating": {

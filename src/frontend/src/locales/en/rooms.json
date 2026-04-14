@@ -551,6 +551,26 @@
         "label": "Mute others",
         "description": "When disabled, participants will no longer be able to mute other participants."
       }
+    },
+    "recording": {
+      "title": "Recording Permissions",
+      "description": "Control who can start recordings and transcriptions in this room.",
+      "screenRecording": {
+        "label": "Screen recording"
+      },
+      "transcript": {
+        "label": "Transcription"
+      },
+      "levels": {
+        "adminOwner": {
+          "label": "Admins and owners only",
+          "description": "Only admins and owners of this room can start this feature."
+        },
+        "authenticated": {
+          "label": "All authenticated users",
+          "description": "Any logged-in user can start this feature."
+        }
+      }
     }
   },
   "rating": {
