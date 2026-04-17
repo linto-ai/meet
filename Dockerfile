@@ -83,6 +83,7 @@ ENV PYTHONUNBUFFERED=1
 
 RUN apk --no-cache add \
   cairo \
+  ffmpeg \
   gdk-pixbuf \
   gettext \
   libffi-dev \

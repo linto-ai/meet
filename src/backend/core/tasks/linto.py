@@ -13,6 +13,8 @@ from django.utils.translation import gettext_lazy as _
 from asgiref.sync import async_to_sync, sync_to_async
 
 from core import models
+from core.recording.enums import FileExtension
+from core.services.audio_extract import extract_audio_from_video
 from core.tasks._task import task
 
 logger = logging.getLogger(__name__)
@@ -66,6 +68,18 @@ async def _process_linto_transcription_sync(recording_id):
         recording_id,
     )
 
+    # 1.5 Extract audio if source is a video (LinTO only accepts audio)
+    if recording.extension == FileExtension.MP4.value:
+        logger.info(
+            "Extracting audio from MP4 for LinTO for recording %s",
+            recording_id,
+        )
+        audio_content = await sync_to_async(extract_audio_from_video)(
+            file_content
+        )
+    else:
+        audio_content = file_content
+
     # 2. Initialize SDK (auto-discovers org, auto-selects ASR service)
     linto = LinTO(
         auth_token=settings.LINTO_STUDIO_API_TOKEN,
@@ -85,7 +99,7 @@ async def _process_linto_transcription_sync(recording_id):
 
     try:
         handle = await linto.transcribe(
-            file=file_content,
+            file=audio_content,
             enable_diarization=True,
             number_of_speaker="0",
             language=language,
@@ -298,7 +312,7 @@ async def _process_linto_transcription_sync(recording_id):
         elif isinstance(c, str):
             summary_preview = c
 
-    # 5.8 Set conversation owner to room admin (failure does not block)
+    # 5.8 Share conversation with room admin (failure does not block)
     owner_access = await sync_to_async(
         lambda: (
             recording.room.accesses.filter(role="owner").select_related("user").first()
@@ -307,24 +321,19 @@ async def _process_linto_transcription_sync(recording_id):
 
     if owner_access and owner_access.user.email and conversation_id:
         try:
-            owner_user_id = await linto.set_conversation_owner(
-                conversation_id, owner_access.user.email
+            await linto.share_conversation(
+                conversation_id=conversation_id,
+                email=owner_access.user.email,
+                right=32,  # RIGHTS.OWNER in LinTO Studio
             )
-            if owner_user_id:
-                logger.info(
-                    "Conversation owner set to %s for %s",
-                    owner_access.user.email,
-                    recording_id,
-                )
-            else:
-                logger.warning(
-                    "User %s not found in LinTO Studio for %s",
-                    owner_access.user.email,
-                    recording_id,
-                )
+            logger.info(
+                "Conversation shared with %s (right=OWNER) for %s",
+                owner_access.user.email,
+                recording_id,
+            )
         except Exception:
             logger.exception(
-                "Set conversation owner error for %s, continuing", recording_id
+                "Share conversation error for %s, continuing", recording_id
             )
 
     # 5.7 Upload to Twake Drive via Cloudery (failure does not block email)
@@ -379,15 +388,34 @@ async def _process_linto_transcription_sync(recording_id):
                         content_type="text/vnd.cozy.note+markdown",
                     )
 
-                # Upload audio recording
-                await save_file(
-                    instance=instance,
-                    token=drive_token,
-                    dir_id=dir_id,
-                    filename=f"Enregistrement_{meeting_time}.ogg",
-                    content=file_content,
-                    content_type="audio/ogg",
-                )
+                # Upload original recording (video or audio)
+                if recording.extension == FileExtension.MP4.value:
+                    await save_file(
+                        instance=instance,
+                        token=drive_token,
+                        dir_id=dir_id,
+                        filename=f"Enregistrement_{meeting_time}.mp4",
+                        content=file_content,
+                        content_type="video/mp4",
+                    )
+                    # Also upload extracted audio alongside the video
+                    await save_file(
+                        instance=instance,
+                        token=drive_token,
+                        dir_id=dir_id,
+                        filename=f"Enregistrement_{meeting_time}.ogg",
+                        content=audio_content,
+                        content_type="audio/ogg",
+                    )
+                else:
+                    await save_file(
+                        instance=instance,
+                        token=drive_token,
+                        dir_id=dir_id,
+                        filename=f"Enregistrement_{meeting_time}.ogg",
+                        content=file_content,
+                        content_type="audio/ogg",
+                    )
 
                 # Upload LinTO Studio shortcut
                 frontend_url = getattr(settings, "LINTO_STUDIO_FRONTEND_URL", None)
