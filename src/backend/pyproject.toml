@@ -64,7 +64,8 @@ dependencies = [
     "aiohttp==3.14.1",
     "urllib3==2.7.0",
     "phonenumbers==9.0.33",
-    "linto==1.2.0",
+    "linto==1.2.1",
+    "phonenumbers==9.0.31",
 ]
 
 [project.urls]
