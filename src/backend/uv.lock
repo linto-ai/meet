@@ -1098,14 +1098,14 @@ redis = [
 
 [[package]]
 name = "linto"
-version = "1.2.0"
+version = "1.2.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/69/8a/5138450de655cb20c972952f93fe43f1177d59891686d868cbee377b1f9f/linto-1.2.0.tar.gz", hash = "sha256:46ffb4679461115542d452486bba2e7c278f21e44a15a867c49cfff310710c89", size = 24228, upload-time = "2026-04-10T12:20:06.726Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/bf/3e/3607514a944ab3efcaa05235940d86f6e35e62dc671cc135374ffa457034/linto-1.2.1.tar.gz", hash = "sha256:efb3f82c7d02735fa4885809acfe0ade1fc32f60c336dfda35a113acacf3d856", size = 25910, upload-time = "2026-04-17T08:39:55.758Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/64/f4/a49999095fb7b0dd84537bf4988cbe17301a584c027d9a76307e258acc08/linto-1.2.0-py3-none-any.whl", hash = "sha256:23b6a7625c53dd451acadf0f99d7dfe7a9e290133a6e6d676f133ff9f7b0af8b", size = 24481, upload-time = "2026-04-10T12:20:05.409Z" },
+    { url = "https://files.pythonhosted.org/packages/0a/12/59e18dcd3f6c6c8d584f5c878cc3a317b5c39f5ca676de8ca5c6e4df4dfa/linto-1.2.1-py3-none-any.whl", hash = "sha256:633481ea6506b4da76ef1be2f5e5f8124e9002ce2d831c06631d38e544cd0b37", size = 26292, upload-time = "2026-04-17T08:39:54.715Z" },
 ]
 
 [[package]]
@@ -1258,7 +1258,7 @@ requires-dist = [
     { name = "factory-boy", specifier = "==3.3.3" },
     { name = "gunicorn", specifier = "==25.1.0" },
     { name = "jsonschema", specifier = "==4.26.0" },
-    { name = "linto", specifier = "==1.2.0" },
+    { name = "linto", specifier = "==1.2.1" },
     { name = "livekit-api", specifier = "==1.1.0" },
     { name = "markdown", specifier = "==3.10.2" },
     { name = "mozilla-django-oidc", specifier = "==5.0.2" },
