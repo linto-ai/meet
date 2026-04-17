@@ -13,8 +13,17 @@ import requests
 
 from core import models
 from core.tasks.linto import process_linto_transcription
+from core.tasks.recording import process_screen_recording_to_twake
 
 logger = logging.getLogger(__name__)
+
+
+def _is_twake_configured() -> bool:
+    """Return True when both Cloudery URL and token are set."""
+    return bool(
+        getattr(settings, "CLOUDERY_URL", None)
+        and getattr(settings, "CLOUDERY_TOKEN", None)
+    )
 
 
 def get_recording_download_base_url() -> str:
@@ -38,7 +47,14 @@ class NotificationService:
     """Service for processing recordings and notifying external services."""
 
     def notify_external_services(self, recording):
-        """Process a recording based on its mode."""
+        """Process a recording based on its mode.
+
+        Routing:
+        - mode=TRANSCRIPT → LinTO (or summary service fallback)
+        - mode=SCREEN_RECORDING + transcribe=True → LinTO handles video+audio+email
+        - mode=SCREEN_RECORDING + transcribe=False + Twake configured → upload MP4 to Twake + email
+        - mode=SCREEN_RECORDING + transcribe=False + Twake absent → direct download email only
+        """
 
         if recording.mode == models.RecordingModeChoices.TRANSCRIPT:
             if getattr(settings, "LINTO_STUDIO_ENABLED", False):
@@ -46,15 +62,17 @@ class NotificationService:
             return self._notify_summary_service(recording)
 
         if recording.mode == models.RecordingModeChoices.SCREEN_RECORDING:
-            summary_success = True
             if recording.options.get("transcribe", False):
                 if getattr(settings, "LINTO_STUDIO_ENABLED", False):
-                    summary_success = self._notify_linto_studio(recording)
-                else:
-                    summary_success = self._notify_summary_service(recording)
+                    return self._notify_linto_studio(recording)
+                summary_success = self._notify_summary_service(recording)
+                email_success = self._notify_user_by_email(recording)
+                return email_success and summary_success
 
-            email_success = self._notify_user_by_email(recording)
-            return email_success and summary_success
+            if _is_twake_configured():
+                return self._notify_screen_recording_to_twake(recording)
+
+            return self._notify_user_by_email(recording)
 
         logger.error(
             "Unknown recording mode %s for recording %s",
@@ -62,6 +80,19 @@ class NotificationService:
             recording.id,
         )
         return False
+
+    @staticmethod
+    def _notify_screen_recording_to_twake(recording) -> bool:
+        """Launch async Twake Drive upload via Celery task."""
+        try:
+            process_screen_recording_to_twake.delay(str(recording.id))
+            return True
+        except Exception:
+            logger.exception(
+                "Failed to queue Twake upload task for recording %s",
+                recording.id,
+            )
+            return False
 
     @staticmethod
     def _notify_user_by_email(recording) -> bool:

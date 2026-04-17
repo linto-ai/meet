@@ -42,14 +42,32 @@
               <li>{% blocktrans %}Save the file to your preferred location{% endblocktrans %}</li>
             </ol>
           </mj-text>
+          {% if twake_drive_link %}
+          <mj-text>
+            {% blocktrans %}
+            Your recording is saved in Twake Drive.
+            {% endblocktrans %}
+          </mj-text>
           <mj-button
-            href="{{link}}"
+            href="{{twake_drive_link}}"
             background-color="#000091"
             color="white"
+            padding-bottom="15px"
+          >
+            {% trans "Open in Twake Drive" %}
+          </mj-button>
+          {% endif %}
+          {% if link %}
+          <mj-button
+            href="{{link}}"
+            background-color="{% if twake_drive_link %}#FFFFFF{% else %}#000091{% endif %}"
+            color="{% if twake_drive_link %}#000091{% else %}white{% endif %}"
+            border="{% if twake_drive_link %}1px solid #000091{% else %}none{% endif %}"
             padding-bottom="30px"
           >
-            {% trans "Open"%}
+            {% trans "Download directly"%}
           </mj-button>
+          {% endif %}
           <mj-text>
             {% blocktrans %}
             If you have any questions or need assistance, please contact our support team at {{support_email}}.
