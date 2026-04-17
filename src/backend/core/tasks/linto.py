@@ -83,14 +83,23 @@ async def _process_linto_transcription_sync(recording_id):
         language,
     )
 
-    handle = await linto.transcribe(
-        file=file_content,
-        enable_diarization=True,
-        number_of_speaker="0",
-        language=language,
-        enablePunctuation=True,
-        name=f"{room_name} - {date_str}",
-    )
+    try:
+        handle = await linto.transcribe(
+            file=file_content,
+            enable_diarization=True,
+            number_of_speaker="0",
+            language=language,
+            enablePunctuation=True,
+            name=f"{room_name} - {date_str}",
+        )
+    except RuntimeError as exc:
+        logger.error(
+            "LinTO ASR configuration error for recording %s (lang=%s): %s",
+            recording_id,
+            language,
+            exc,
+        )
+        raise
 
     # 4. Wait for transcription via SDK polling (1s interval)
     done_event = asyncio.Event()
