@@ -105,7 +105,16 @@ class VideoCompositeEgressService(BaseEgressService):
         )
 
         request = livekit_api.RoomCompositeEgressRequest(
-            room_name=room_name, file_outputs=[file_output], layout="speaker-light"
+            room_name=room_name,
+            file_outputs=[file_output],
+            layout="speaker-light",
+            advanced=livekit_api.EncodingOptions(
+                width=1280,
+                height=720,
+                video_bitrate=1200,
+                framerate=24,
+                video_codec=livekit_api.VideoCodec.H264_HIGH,
+            ),
         )
 
         response = self._handle_request(request, "start_room_composite_egress")

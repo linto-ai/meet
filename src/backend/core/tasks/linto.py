@@ -75,7 +75,7 @@ async def _process_linto_transcription_sync(recording_id):
             recording_id,
         )
         audio_content = await sync_to_async(extract_audio_from_video)(
-            file_content
+            file_content, output_format="wav"
         )
     else:
         audio_content = file_content
@@ -356,7 +356,9 @@ async def _process_linto_transcription_sync(recording_id):
                 domain = getattr(
                     settings, "TWAKE_INSTANCE_DOMAIN", "twake.linagora.com"
                 )
-                instance = f"{sub}.{domain}"
+                instance = getattr(
+                    settings, "TWAKE_DEV_INSTANCE_OVERRIDE", None
+                ) or f"{sub}.{domain}"
 
                 drive_token = await get_drive_token(
                     cloudery_url=settings.CLOUDERY_URL,
@@ -399,12 +401,16 @@ async def _process_linto_transcription_sync(recording_id):
                         content_type="video/mp4",
                     )
                     # Also upload extracted audio alongside the video
+                    # (OGG for drive — compressed, smaller; WAV was only for LinTO)
+                    ogg_audio = await sync_to_async(extract_audio_from_video)(
+                        file_content, output_format="ogg"
+                    )
                     await save_file(
                         instance=instance,
                         token=drive_token,
                         dir_id=dir_id,
                         filename=f"Enregistrement_{meeting_time}.ogg",
-                        content=audio_content,
+                        content=ogg_audio,
                         content_type="audio/ogg",
                     )
                 else:
