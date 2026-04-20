@@ -877,6 +877,11 @@ class Base(Configuration):
         environ_name="TWAKE_INSTANCE_DOMAIN",
         environ_prefix=None,
     )
+    TWAKE_DEV_INSTANCE_OVERRIDE = values.Value(
+        None,
+        environ_name="TWAKE_DEV_INSTANCE_OVERRIDE",
+        environ_prefix=None,
+    )
 
     # Marketing and communication settings
     SIGNUP_NEW_USER_TO_MARKETING_EMAIL = values.BooleanValue(

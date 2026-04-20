@@ -127,8 +127,15 @@ class VideoCompositeEgressService(BaseEgressService):
         }
 
         advanced = self._build_encoding_options()
-        if advanced is not None:
-            request_kwargs["advanced"] = advanced
+        if advanced is None:
+            advanced = livekit_api.EncodingOptions(
+                width=1280,
+                height=720,
+                video_bitrate=1200,
+                framerate=24,
+                video_codec=livekit_api.VideoCodec.H264_HIGH,
+            )
+        request_kwargs["advanced"] = advanced
 
         request = livekit_api.RoomCompositeEgressRequest(**request_kwargs)
 
