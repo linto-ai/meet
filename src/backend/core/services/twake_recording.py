@@ -34,7 +34,7 @@ async def upload_recording_files(recording, owner_access, files):
         return None
 
     domain = getattr(settings, "TWAKE_INSTANCE_DOMAIN", "twake.linagora.com")
-    instance = f"{sub}.{domain}"
+    instance = getattr(settings, "TWAKE_DEV_INSTANCE_OVERRIDE", None) or f"{sub}.{domain}"
 
     drive_token = await get_drive_token(cloudery_url, cloudery_token, instance)
 
