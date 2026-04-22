@@ -703,3 +703,63 @@ msgstr "Duits"
 #: meet/settings.py:242
 msgid "Spanish"
 msgstr "Spaans"
+
+#: core/tasks/linto.py:505
+#, fuzzy
+#| msgid "Your recording is ready"
+msgid "Your meeting transcription is ready"
+msgstr "Je opname is klaar"
+
+#: core/templates/mail/html/screen_recording.html:216
+#: core/templates/mail/text/screen_recording.txt:18
+#, fuzzy
+#| msgid "Your recording is ready"
+msgid " Your recording is saved in Twake Drive. "
+msgstr "Je opname is klaar"
+
+#: core/templates/mail/html/screen_recording.html:225
+#: core/templates/mail/html/transcription.html:216
+#: core/templates/mail/text/screen_recording.txt:20
+#: core/templates/mail/text/transcription.txt:17
+msgid "Open in Twake Drive"
+msgstr ""
+
+#: core/templates/mail/html/screen_recording.html:237
+#: core/templates/mail/text/screen_recording.txt:24
+msgid "Download directly"
+msgstr ""
+
+#: core/templates/mail/html/transcription.html:188
+#: core/templates/mail/text/transcription.txt:6
+#, fuzzy
+#| msgid "Your recording is ready!"
+msgid "Your meeting transcription is ready!"
+msgstr "Je opname is klaar!"
+
+#: core/templates/mail/html/transcription.html:195
+#: core/templates/mail/text/transcription.txt:8
+#, fuzzy, python-format
+#| msgid ""
+#| " Your recording of \"%(room_name)s\" on %(recording_date)s at "
+#| "%(recording_time)s is now ready to download. "
+msgid ""
+" The transcription and summary of \"%(room_name)s\" on %(recording_date)s at "
+"%(recording_time)s are now available. "
+msgstr ""
+" Je opname van \"%(room_name)s\" op %(recording_date)s om %(recording_time)s "
+"is nu klaar om te downloaden. "
+
+#: core/templates/mail/html/transcription.html:201
+#: core/templates/mail/text/transcription.txt:10
+msgid "Summary preview:"
+msgstr ""
+
+#: core/templates/mail/html/transcription.html:207
+#: core/templates/mail/text/transcription.txt:15
+msgid " The meeting files are available in your Twake Drive. "
+msgstr ""
+
+#: core/templates/mail/html/transcription.html:224
+#: core/templates/mail/text/transcription.txt:20
+msgid " A PDF summary is attached to this email. "
+msgstr ""

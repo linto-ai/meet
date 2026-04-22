@@ -709,3 +709,54 @@ msgstr "Allemand"
 #: meet/settings.py:242
 msgid "Spanish"
 msgstr "Espagnol"
+
+#: core/tasks/linto.py:505
+msgid "Your meeting transcription is ready"
+msgstr "Votre transcription de réunion est prête"
+
+#: core/templates/mail/html/screen_recording.html:216
+#: core/templates/mail/text/screen_recording.txt:18
+msgid " Your recording is saved in Twake Drive. "
+msgstr " Votre enregistrement est sauvegardé dans votre Twake Drive. "
+
+#: core/templates/mail/html/screen_recording.html:225
+#: core/templates/mail/html/transcription.html:216
+#: core/templates/mail/text/screen_recording.txt:20
+#: core/templates/mail/text/transcription.txt:17
+msgid "Open in Twake Drive"
+msgstr "Ouvrir dans Twake Drive"
+
+#: core/templates/mail/html/screen_recording.html:237
+#: core/templates/mail/text/screen_recording.txt:24
+msgid "Download directly"
+msgstr "Télécharger directement"
+
+#: core/templates/mail/html/transcription.html:188
+#: core/templates/mail/text/transcription.txt:6
+msgid "Your meeting transcription is ready!"
+msgstr "Votre transcription de réunion est prête !"
+
+#: core/templates/mail/html/transcription.html:195
+#: core/templates/mail/text/transcription.txt:8
+#, python-format
+msgid ""
+" The transcription and summary of \"%(room_name)s\" on %(recording_date)s at "
+"%(recording_time)s are now available. "
+msgstr ""
+" La transcription et le résumé de \"%(room_name)s\" du %(recording_date)s à "
+"%(recording_time)s sont maintenant disponibles. "
+
+#: core/templates/mail/html/transcription.html:201
+#: core/templates/mail/text/transcription.txt:10
+msgid "Summary preview:"
+msgstr "Aperçu du résumé :"
+
+#: core/templates/mail/html/transcription.html:207
+#: core/templates/mail/text/transcription.txt:15
+msgid " The meeting files are available in your Twake Drive. "
+msgstr " Les fichiers de la réunion sont disponibles dans votre Twake Drive. "
+
+#: core/templates/mail/html/transcription.html:224
+#: core/templates/mail/text/transcription.txt:20
+msgid " A PDF summary is attached to this email. "
+msgstr " Un résumé PDF est joint à cet e-mail. "
