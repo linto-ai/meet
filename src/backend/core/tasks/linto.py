@@ -324,10 +324,10 @@ async def _process_linto_transcription_sync(recording_id):
             await linto.share_conversation(
                 conversation_id=conversation_id,
                 email=owner_access.user.email,
-                right=32,  # RIGHTS.OWNER in LinTO Studio
+                right=31,  # READ+COMMENT+WRITE+SHARE+DELETE (OWNER=32 is reserved)
             )
             logger.info(
-                "Conversation shared with %s (right=OWNER) for %s",
+                "Conversation shared with %s (right=31) for %s",
                 owner_access.user.email,
                 recording_id,
             )
@@ -475,13 +475,6 @@ async def _process_linto_transcription_sync(recording_id):
         )
     )()
 
-    frontend_url = getattr(settings, "LINTO_STUDIO_FRONTEND_URL", None)
-    linto_link = (
-        f"{frontend_url}/interface/conversations/{conversation_id}"
-        if frontend_url and conversation_id
-        else None
-    )
-
     for access in accesses:
         user = access.user
         try:
@@ -502,10 +495,9 @@ async def _process_linto_transcription_sync(recording_id):
                             user.timezone
                         ).strftime("%H:%M"),
                         "summary_preview": summary_preview,
-                        "linto_studio_link": linto_link,
                         "twake_drive_link": twake_drive_link,
                         "has_pdf_attachment": (
-                            pdf_content is not None and not twake_configured
+                            pdf_content is not None and not twake_drive_link
                         ),
                     }
                     msg_html = render_to_string("mail/html/transcription.html", ctx)
@@ -518,7 +510,7 @@ async def _process_linto_transcription_sync(recording_id):
                         [user.email],
                     )
                     email_msg.attach_alternative(msg_html, "text/html")
-                    if pdf_content and not twake_configured:
+                    if pdf_content and not twake_drive_link:
                         email_msg.attach(
                             pub_filename,
                             pdf_content,

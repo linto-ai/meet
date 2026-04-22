@@ -30,23 +30,27 @@
             <p>{{ summary_preview|truncatewords:100 }}</p>
           </mj-text>
           {% endif %}
-          {% if has_pdf_attachment %}
+          <mj-raw>{% if twake_drive_link %}</mj-raw>
+          <mj-text>
+            {% blocktrans %}
+            The meeting files are available in your Twake Drive.
+            {% endblocktrans %}
+          </mj-text>
+          <mj-button
+            href="{{twake_drive_link}}"
+            background-color="#000091"
+            color="white"
+            padding-bottom="30px"
+          >
+            {% trans "Open in Twake Drive" %}
+          </mj-button>
+          <mj-raw>{% elif has_pdf_attachment %}</mj-raw>
           <mj-text>
             {% blocktrans %}
             A PDF summary is attached to this email.
             {% endblocktrans %}
           </mj-text>
-          {% endif %}
-          {% if linto_studio_link %}
-          <mj-button
-            href="{{linto_studio_link}}"
-            background-color="#000091"
-            color="white"
-            padding-bottom="30px"
-          >
-            {% trans "View full transcription"%}
-          </mj-button>
-          {% endif %}
+          <mj-raw>{% endif %}</mj-raw>
           <mj-text>
             {% blocktrans %}
             If you have any questions or need assistance, please contact our support team at {{support_email}}.
