@@ -68,14 +68,16 @@ async def _process_linto_transcription_sync(recording_id):
         recording_id,
     )
 
-    # 1.5 Extract audio if source is a video (LinTO only accepts audio)
+    # 1.5 Extract audio if source is a video (LinTO only accepts audio).
+    # Stream-copy the original AAC track into an .m4a container — no
+    # re-encoding, lossless, fast; LinTO handles resampling internally.
     if recording.extension == FileExtension.MP4.value:
         logger.info(
-            "Extracting audio from MP4 for LinTO for recording %s",
+            "Demuxing audio from MP4 for LinTO for recording %s",
             recording_id,
         )
         audio_content = await sync_to_async(extract_audio_from_video)(
-            file_content, output_format="wav"
+            file_content, output_format="copy"
         )
     else:
         audio_content = file_content
