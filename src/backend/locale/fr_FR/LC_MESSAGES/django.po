@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-03-12 13:46+0000\n"
+"POT-Creation-Date: 2026-04-22 14:04+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: antoine.lebaud@mail.numerique.gouv.fr\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -95,11 +95,11 @@ msgstr ""
 "Vous devez être administrateur ou propriétaire d'une salle pour y ajouter "
 "des accès."
 
-#: core/api/serializers.py:516
+#: core/api/serializers.py:538
 msgid "This file extension is not allowed."
 msgstr "Cette extension n'est pas autorisée"
 
-#: core/api/serializers.py:533
+#: core/api/viewsets.py:987
 msgid "You have reached the maximum number of files for this type."
 msgstr "Vous avez atteint le nombre maximum de fichiers de ce type"
 
@@ -478,7 +478,7 @@ msgstr ""
 "Pour supprimer définitivement un fichier il doit d'abord avoir été marqué "
 "comme supprimé (soft delete)"
 
-#: core/recording/event/notification.py:116
+#: core/recording/event/notification.py:153 core/tasks/recording.py:151
 msgid "Your recording is ready"
 msgstr "Votre enregistrement est prêt"
 
@@ -487,10 +487,16 @@ msgstr "Votre enregistrement est prêt"
 msgid "Video call in progress: {sender.email} is waiting for you to connect"
 msgstr "Appel vidéo en cours : {sender.email} attend que vous vous connectiez"
 
+#: core/tasks/linto.py:505
+msgid "Your meeting transcription is ready"
+msgstr "Votre transcription de réunion est prête"
+
 #: core/templates/mail/html/invitation.html:159
 #: core/templates/mail/html/screen_recording.html:159
+#: core/templates/mail/html/transcription.html:159
 #: core/templates/mail/text/invitation.txt:3
 #: core/templates/mail/text/screen_recording.txt:3
+#: core/templates/mail/text/transcription.txt:3
 msgid "Logo email"
 msgstr "Logo email"
 
@@ -534,9 +540,11 @@ msgid "Make sure you have a stable internet connection"
 msgstr "Assurez-vous d'avoir une connexion Internet stable"
 
 #: core/templates/mail/html/invitation.html:248
-#: core/templates/mail/html/screen_recording.html:245
+#: core/templates/mail/html/screen_recording.html:260
+#: core/templates/mail/html/transcription.html:243
 #: core/templates/mail/text/invitation.txt:21
-#: core/templates/mail/text/screen_recording.txt:23
+#: core/templates/mail/text/screen_recording.txt:31
+#: core/templates/mail/text/transcription.txt:26
 #, python-format
 msgid " Thank you for using %(brandname)s. "
 msgstr " Merci d'utiliser %(brandname)s. "
@@ -591,13 +599,27 @@ msgstr "Utilisez le bouton \"Télécharger\" dans l'interface "
 msgid "Save the file to your preferred location"
 msgstr "Enregistrez le fichier à l'emplacement de votre choix"
 
-#: core/templates/mail/html/screen_recording.html:221
-#: core/templates/mail/text/screen_recording.txt:17
-msgid "Open"
-msgstr "Ouvrir"
+#: core/templates/mail/html/screen_recording.html:216
+#: core/templates/mail/text/screen_recording.txt:18
+msgid " Your recording is saved in Twake Drive. "
+msgstr " Votre enregistrement est sauvegardé dans votre Twake Drive. "
 
-#: core/templates/mail/html/screen_recording.html:230
-#: core/templates/mail/text/screen_recording.txt:19
+#: core/templates/mail/html/screen_recording.html:225
+#: core/templates/mail/html/transcription.html:216
+#: core/templates/mail/text/screen_recording.txt:20
+#: core/templates/mail/text/transcription.txt:17
+msgid "Open in Twake Drive"
+msgstr "Ouvrir dans Twake Drive"
+
+#: core/templates/mail/html/screen_recording.html:237
+#: core/templates/mail/text/screen_recording.txt:24
+msgid "Download directly"
+msgstr "Télécharger directement"
+
+#: core/templates/mail/html/screen_recording.html:245
+#: core/templates/mail/html/transcription.html:228
+#: core/templates/mail/text/screen_recording.txt:27
+#: core/templates/mail/text/transcription.txt:22
 #, python-format
 msgid ""
 " If you have any questions or need assistance, please contact our support "
@@ -605,6 +627,36 @@ msgid ""
 msgstr ""
 " Si vous avez des questions ou besoin d'assistance, veuillez contacter notre "
 "équipe d'assistance à %(support_email)s. "
+
+#: core/templates/mail/html/transcription.html:188
+#: core/templates/mail/text/transcription.txt:6
+msgid "Your meeting transcription is ready!"
+msgstr "Votre transcription de réunion est prête !"
+
+#: core/templates/mail/html/transcription.html:195
+#: core/templates/mail/text/transcription.txt:8
+#, python-format
+msgid ""
+" The transcription and summary of \"%(room_name)s\" on %(recording_date)s at "
+"%(recording_time)s are now available. "
+msgstr ""
+" La transcription et le résumé de \"%(room_name)s\" du %(recording_date)s à "
+"%(recording_time)s sont maintenant disponibles. "
+
+#: core/templates/mail/html/transcription.html:201
+#: core/templates/mail/text/transcription.txt:10
+msgid "Summary preview:"
+msgstr "Aperçu du résumé :"
+
+#: core/templates/mail/html/transcription.html:207
+#: core/templates/mail/text/transcription.txt:15
+msgid " The meeting files are available in your Twake Drive. "
+msgstr " Les fichiers de la réunion sont disponibles dans votre Twake Drive. "
+
+#: core/templates/mail/html/transcription.html:224
+#: core/templates/mail/text/transcription.txt:20
+msgid " A PDF summary is attached to this email. "
+msgstr " Un résumé PDF est joint à cet e-mail. "
 
 #: meet/settings.py:223
 msgid "English"
@@ -621,3 +673,6 @@ msgstr "Néerlandais"
 #: meet/settings.py:226
 msgid "German"
 msgstr "Allemand"
+
+#~ msgid "Open"
+#~ msgstr "Ouvrir"
