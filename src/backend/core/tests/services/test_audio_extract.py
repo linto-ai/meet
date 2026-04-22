@@ -74,3 +74,22 @@ class TestExtractAudioFromVideo:
         extract_audio_from_video(b"fake mp4", output_format="wav")
 
         assert "pcm_s16le" in captured["cmd"]
+
+    def test_copy_output_streams_without_reencoding(self, monkeypatch):
+        captured = {}
+
+        def fake_run(cmd, **kwargs):
+            captured["cmd"] = cmd
+            with open(cmd[-1], "wb") as f:
+                f.write(b"fake m4a")
+            return mock.Mock(returncode=0)
+
+        monkeypatch.setattr(subprocess, "run", fake_run)
+        result = extract_audio_from_video(b"fake mp4", output_format="copy")
+
+        assert result == b"fake m4a"
+        assert "-c:a" in captured["cmd"]
+        assert "copy" in captured["cmd"]
+        assert "ipod" in captured["cmd"]
+        assert captured["cmd"][-1].endswith(".m4a")
+        assert "-acodec" not in captured["cmd"]
