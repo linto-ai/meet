@@ -113,6 +113,12 @@ export const Header = () => {
     ? `${loggedInTooltip} ${userLabel}`
     : loggedInTooltip
 
+  if (window !== window.top) {
+    return (
+      <div className={css({ height: '76px', lg: { height: '88px' } })} />
+    )
+  }
+
   return (
     <>
       <FeedbackBanner />
