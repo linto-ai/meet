@@ -14,10 +14,11 @@ import './i18n/init'
 import { queryClient } from '@/api/queryClient'
 import { AppInitialization } from '@/components/AppInitialization'
 import { useIsSdkContext } from '@/features/sdk/hooks/useIsSdkContext'
+import { getEnv } from '@/utils/getEnv'
 
 function App() {
   const { i18n } = useTranslation()
-  useTitle(import.meta.env.VITE_APP_TITLE ?? '')
+  useTitle(getEnv('VITE_APP_TITLE') ?? '')
 
   const isSDKContext = useIsSdkContext()
 

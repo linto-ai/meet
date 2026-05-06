@@ -7,3 +7,7 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
+
+interface Window {
+  VITE_CONFIG?: Partial<Record<keyof ImportMetaEnv, string>>
+}
