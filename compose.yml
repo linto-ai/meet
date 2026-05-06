@@ -165,6 +165,17 @@ services:
     image: meet:frontend-development
     ports:
       - "3000:8080"
+    volumes:
+      - ./docker/theme/twake/twake-styles.css:/usr/share/nginx/html/assets/twake-styles.css:ro
+      - ./docker/theme/twake/styles:/usr/share/nginx/html/assets/styles:ro
+      - ./docker/theme/twake/fonts:/usr/share/nginx/html/assets/fonts:ro
+      - ./docker/theme/twake/icons/favicon-16x16.png:/usr/share/nginx/html/favicon-16x16.png:ro
+      - ./docker/theme/twake/icons/favicon-32x32.png:/usr/share/nginx/html/favicon-32x32.png:ro
+      - ./docker/theme/twake/icons/favicon.ico:/usr/share/nginx/html/favicon.ico:ro
+      - ./docker/theme/twake/icons/apple-touch-icon.png:/usr/share/nginx/html/apple-touch-icon.png:ro
+      - ./docker/theme/twake/icons/android-chrome-192x192.png:/usr/share/nginx/html/android-chrome-192x192.png:ro
+      - ./docker/theme/twake/icons/android-chrome-512x512.png:/usr/share/nginx/html/android-chrome-512x512.png:ro
+      - ./docker/theme/twake/icons/icon.png:/usr/share/nginx/html/icon.png:ro
 
   dockerize:
     image: jwilder/dockerize
