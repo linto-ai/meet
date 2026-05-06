@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next'
 import { injectIconIntoTranslation } from '@/utils/translation'
 import { isSafari } from '@/utils/livekit'
 import { type OS, getOS } from '@/utils/os'
+import { getEnv } from '@/utils/getEnv'
 
 type StepsOs = 'macos' | 'windows' | 'android' | 'other'
 
@@ -163,7 +164,7 @@ export const Permissions = () => {
     }
   }, [permissions])
 
-  const appTitle = `${import.meta.env.VITE_APP_TITLE}`
+  const appTitle = `${getEnv('VITE_APP_TITLE')}`
 
   return (
     <>
