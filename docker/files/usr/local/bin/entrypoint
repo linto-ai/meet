@@ -31,5 +31,21 @@ if ! whoami > /dev/null 2>&1; then
   fi
 fi
 
+# Runtime configuration: emit /config.js so the SPA can read VITE_* env vars
+# without rebuilding the bundle. Loaded by index.html before the React entrypoint
+# and consumed via the getEnv() helper, which falls back to import.meta.env.
+RUNTIME_CONFIG_PATH="/usr/share/nginx/html/config.js"
+if [ -d "$(dirname "$RUNTIME_CONFIG_PATH")" ] && [ -w "$(dirname "$RUNTIME_CONFIG_PATH")" ]; then
+  echo "🐳(entrypoint) generating runtime config at ${RUNTIME_CONFIG_PATH}..."
+  {
+    echo "window.VITE_CONFIG = {"
+    env | grep "^VITE_" | sort | while IFS='=' read -r key value; do
+      escaped=$(printf '%s' "$value" | sed 's/\\/\\\\/g; s/"/\\"/g')
+      printf '  "%s": "%s",\n' "$key" "$escaped"
+    done
+    echo "};"
+  } > "$RUNTIME_CONFIG_PATH"
+fi
+
 echo "🐳(entrypoint) running your command: ${*}"
 exec "$@"

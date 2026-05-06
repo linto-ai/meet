@@ -1,12 +1,12 @@
 import { A, Text } from '@/primitives'
 import { useTranslation } from 'react-i18next'
 import { useConfig } from '@/api/useConfig'
-
-const appTitle = import.meta.env.VITE_APP_TITLE ?? 'LaSuite Meet'
+import { getEnv } from '@/utils/getEnv'
 
 export const MoreLink = () => {
   const { t } = useTranslation('home')
   const { data } = useConfig()
+  const appTitle = getEnv('VITE_APP_TITLE') ?? 'LaSuite Meet'
 
   if (!data?.manifest_link) return null
 
