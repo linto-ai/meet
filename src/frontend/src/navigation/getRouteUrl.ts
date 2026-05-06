@@ -7,5 +7,8 @@ export const getRouteUrl = (
   params?: any
 ) => {
   const to = getRoutePath(routeName, params)
+  if (window?.twake?.twakeOrigin) {
+    return `${window.twake.twakeOrigin}${to}`
+  }
   return `${window.location.origin}${to}`
 }
