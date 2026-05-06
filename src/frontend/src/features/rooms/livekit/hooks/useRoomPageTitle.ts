@@ -1,8 +1,7 @@
 import { useTitle } from 'hoofd'
 import { useRoomData } from './useRoomData'
 import { useMemo } from 'react'
-
-const APP_TITLE = import.meta.env.VITE_APP_TITLE ?? ''
+import { getEnv } from '@/utils/getEnv'
 
 /**
  * Updates the browser tab title with the room name to help users easily find
@@ -13,15 +12,16 @@ export const useRoomPageTitle = () => {
   const roomData = useRoomData()
 
   const pageTitle = useMemo(() => {
+    const appTitle = getEnv('VITE_APP_TITLE') ?? ''
     if (!roomData) {
-      return APP_TITLE
+      return appTitle
     }
 
     const roomLabel = roomData.name || roomData.slug || ''
 
-    if (!roomLabel) return APP_TITLE
+    if (!roomLabel) return appTitle
 
-    return `${APP_TITLE} - ${roomLabel}  `
+    return `${appTitle} - ${roomLabel}  `
   }, [roomData])
 
   useTitle(pageTitle)

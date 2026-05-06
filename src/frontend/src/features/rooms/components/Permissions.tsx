@@ -8,6 +8,7 @@ import { closePermissionsDialog, permissionsStore } from '@/stores/permissions'
 import { useTranslation } from 'react-i18next'
 import { injectIconIntoTranslation } from '@/utils/translation'
 import { isSafari } from '@/utils/livekit'
+import { getEnv } from '@/utils/getEnv'
 
 /**
  * Singleton component - ensures permissions sync runs only once across the app.
@@ -62,7 +63,7 @@ export const Permissions = () => {
     }
   }, [permissions])
 
-  const appTitle = `${import.meta.env.VITE_APP_TITLE}`
+  const appTitle = `${getEnv('VITE_APP_TITLE')}`
 
   return (
     <Dialog

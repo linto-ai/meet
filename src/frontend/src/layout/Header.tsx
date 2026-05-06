@@ -15,11 +15,12 @@ import { VisualOnlyTooltip } from '@/primitives/VisualOnlyTooltip'
 import { useLoginHint } from '@/hooks/useLoginHint'
 import { logout } from '@/features/auth/utils/logout'
 import { useMemo } from 'react'
+import { getEnv } from '@/utils/getEnv'
 
 const Logo = () => (
   <img
     src="/assets/logo.svg"
-    alt={`${import.meta.env.VITE_APP_TITLE}`}
+    alt={`${getEnv('VITE_APP_TITLE')}`}
     className={`Header-logo ${css({
       maxHeight: { base: '30px', sm: '40px' },
       marginTop: { base: '10px', sm: '5px' },
