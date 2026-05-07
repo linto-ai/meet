@@ -16,7 +16,7 @@ pytestmark = pytest.mark.django_db
 def _make_recording(mode):
     rec = factories.RecordingFactory(mode=mode)
     user = factories.UserFactory(sub="owner-sub-2", email="owner2@example.com")
-    factories.RecordingAccessFactory(
+    factories.UserRecordingAccessFactory(
         recording=rec, user=user, role=models.RoleChoices.OWNER
     )
     return rec
@@ -61,9 +61,7 @@ def test_ogg_source_skips_extraction():
 
     with (
         mock.patch.object(linto_task, "default_storage") as storage_mock,
-        mock.patch.object(
-            linto_task, "extract_audio_from_video"
-        ) as extract_mock,
+        mock.patch.object(linto_task, "extract_audio_from_video") as extract_mock,
         mock.patch.object(linto_task, "LinTO") as linto_cls,
     ):
         s3_client = mock.Mock()
