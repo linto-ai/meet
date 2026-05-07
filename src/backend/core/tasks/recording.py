@@ -65,13 +65,15 @@ async def _process_screen_recording_sync(recording_id):
     )
 
     owner_access = await sync_to_async(
-        lambda: models.RecordingAccess.objects.filter(
-            role=models.RoleChoices.OWNER,
-            recording_id=recording.id,
+        lambda: (
+            models.RecordingAccess.objects.filter(
+                role=models.RoleChoices.OWNER,
+                recording_id=recording.id,
+            )
+            .select_related("user")
+            .order_by("created_at")
+            .first()
         )
-        .select_related("user")
-        .order_by("created_at")
-        .first()
     )()
 
     if not owner_access:
@@ -142,12 +144,8 @@ async def _process_screen_recording_sync(recording_id):
                         "link": download_link,
                         "twake_drive_link": twake_drive_link,
                     }
-                    msg_html = render_to_string(
-                        "mail/html/screen_recording.html", ctx
-                    )
-                    msg_plain = render_to_string(
-                        "mail/text/screen_recording.txt", ctx
-                    )
+                    msg_html = render_to_string("mail/html/screen_recording.html", ctx)
+                    msg_plain = render_to_string("mail/text/screen_recording.txt", ctx)
                     subject = str(_("Your recording is ready"))
                     email_msg = EmailMultiAlternatives(
                         subject.capitalize(),

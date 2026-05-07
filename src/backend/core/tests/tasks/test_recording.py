@@ -15,9 +15,7 @@ pytestmark = pytest.mark.django_db
 @pytest.fixture
 def s3_download():
     """Patch MinIO download to return fake MP4 bytes."""
-    with mock.patch.object(
-        recording_task, "default_storage"
-    ) as storage_mock:
+    with mock.patch.object(recording_task, "default_storage") as storage_mock:
         s3_client = mock.Mock()
         response = {"Body": mock.Mock(read=mock.Mock(return_value=b"fake mp4"))}
         s3_client.get_object.return_value = response
@@ -35,9 +33,7 @@ def owner_user():
 @pytest.fixture
 def screen_recording(owner_user):
     """Create a screen_recording with an owner access."""
-    rec = factories.RecordingFactory(
-        mode=models.RecordingModeChoices.SCREEN_RECORDING
-    )
+    rec = factories.RecordingFactory(mode=models.RecordingModeChoices.SCREEN_RECORDING)
     factories.RecordingAccessFactory(
         recording=rec, user=owner_user, role=models.RoleChoices.OWNER
     )
@@ -96,9 +92,7 @@ def test_no_owner_skips_everything(s3_download, settings):
     settings.CLOUDERY_URL = "https://cloudery"
     settings.CLOUDERY_TOKEN = "tok"
 
-    rec = factories.RecordingFactory(
-        mode=models.RecordingModeChoices.SCREEN_RECORDING
-    )
+    rec = factories.RecordingFactory(mode=models.RecordingModeChoices.SCREEN_RECORDING)
 
     with (
         mock.patch.object(
