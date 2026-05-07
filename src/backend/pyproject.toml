@@ -65,6 +65,7 @@ dependencies = [
     "urllib3==2.7.0",
     "phonenumbers==9.0.33",
     "linto==1.2.5",
+    "bleach==6.2.0",
 ]
 
 [project.urls]
