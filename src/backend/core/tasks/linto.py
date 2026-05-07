@@ -90,8 +90,8 @@ async def _process_linto_transcription_sync(recording_id):
 
     # 3. Upload + start transcription (SDK handles config generation)
     language = recording.options.get("language") or "*"
-    room_name = recording.room.name or "Meeting"
-    date_str = recording.created_at.strftime("%Y-%m-%d %H:%M")
+    meeting_time = recording.created_at.strftime("%d-%m-%Y_%H-%M")
+    conversation_name = f"Reunion_{meeting_time}"
 
     logger.info(
         "Uploading recording %s to LinTO Studio (lang=%s)",
@@ -106,7 +106,8 @@ async def _process_linto_transcription_sync(recording_id):
             number_of_speaker="0",
             language=language,
             enablePunctuation=True,
-            name=f"{room_name} - {date_str}",
+            name=conversation_name,
+            members_right=getattr(settings, "LINTO_STUDIO_MEMBERS_RIGHT", 0),
         )
     except RuntimeError as exc:
         logger.error(
@@ -154,6 +155,54 @@ async def _process_linto_transcription_sync(recording_id):
         len(media.full_text),
     )
 
+    conversation_id = media.response.get("_id", "")
+
+    # 5.1 Tag the conversation as Visio (failure does not block)
+    if conversation_id:
+        try:
+            tag_id = await linto.ensure_tag(
+                name=settings.LINTO_VISIO_TAG_NAME,
+                category_name=settings.LINTO_VISIO_TAG_CATEGORY,
+            )
+            if tag_id:
+                await linto.add_conversation_tag(conversation_id, tag_id)
+                logger.info(
+                    "Tagged conversation %s with %s for %s",
+                    conversation_id,
+                    settings.LINTO_VISIO_TAG_NAME,
+                    recording_id,
+                )
+            else:
+                logger.warning(
+                    "No tag id resolved for %s, skipping tag",
+                    recording_id,
+                )
+        except Exception:
+            logger.exception("Tag conversation error for %s, continuing", recording_id)
+
+    # 5.2 Move the conversation into the Visio folder (failure does not block)
+    if conversation_id:
+        try:
+            folder_id = await linto.ensure_folder(
+                name=settings.LINTO_VISIO_FOLDER_NAME,
+                visibility="private",
+            )
+            if folder_id:
+                await linto.move_to_folder(folder_id, conversation_id)
+                logger.info(
+                    "Moved conversation %s into folder %s for %s",
+                    conversation_id,
+                    settings.LINTO_VISIO_FOLDER_NAME,
+                    recording_id,
+                )
+            else:
+                logger.warning(
+                    "No folder id resolved for %s, skipping move",
+                    recording_id,
+                )
+        except Exception:
+            logger.exception("Move conversation error for %s, continuing", recording_id)
+
     # 5.5 Trigger LLM summary (failure does not block email)
     summary_result = {}
     if getattr(settings, "LINTO_LLM_SUMMARY_ENABLED", True):
@@ -165,7 +214,6 @@ async def _process_linto_transcription_sync(recording_id):
                     or services[0].get("route")
                     or services[0].get("name")
                 )
-                conversation_id = media.response.get("_id", "")
                 logger.info(
                     "Triggering LLM summary for %s (service=%s)",
                     recording_id,
@@ -219,7 +267,6 @@ async def _process_linto_transcription_sync(recording_id):
     # 5.6 Generate document attachment (failure does not block email)
     pdf_content = None
     pub_format = getattr(settings, "LINTO_PUBLICATION_FORMAT", "pdf")
-    conversation_id = media.response.get("_id", "")
 
     if summary_result.get("success") and summary_result.get("job_id"):
         # Summary available: export via publication template
