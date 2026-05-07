@@ -400,11 +400,11 @@ async def _process_linto_transcription_sync(recording_id):
         elif isinstance(c, str):
             summary_preview = c
 
-    # 5.8 Share conversation with room admin (failure does not block)
+    # 5.8 Share conversation with the user who triggered the recording
+    # (RecordingAccess role=OWNER is created for the trigger user in
+    # start_room_recording — not necessarily a room admin).
     owner_access = await sync_to_async(
-        lambda: (
-            recording.room.accesses.filter(role="owner").select_related("user").first()
-        )
+        lambda: recording.accesses.filter(role="owner").select_related("user").first()
     )()
 
     if owner_access and owner_access.user.email and conversation_id:
@@ -413,6 +413,7 @@ async def _process_linto_transcription_sync(recording_id):
                 conversation_id=conversation_id,
                 email=owner_access.user.email,
                 right=31,  # READ+COMMENT+WRITE+SHARE+DELETE (OWNER=32 is reserved)
+                notify=False,  # meet/ sends its own recap email — skip LinTO's
             )
             logger.info(
                 "Conversation shared with %s (right=31) for %s",
@@ -444,9 +445,10 @@ async def _process_linto_transcription_sync(recording_id):
                 domain = getattr(
                     settings, "TWAKE_INSTANCE_DOMAIN", "twake.linagora.com"
                 )
-                instance = getattr(
-                    settings, "TWAKE_DEV_INSTANCE_OVERRIDE", None
-                ) or f"{sub}.{domain}"
+                instance = (
+                    getattr(settings, "TWAKE_DEV_INSTANCE_OVERRIDE", None)
+                    or f"{sub}.{domain}"
+                )
 
                 drive_token = await get_drive_token(
                     cloudery_url=settings.CLOUDERY_URL,
@@ -554,10 +556,12 @@ async def _process_linto_transcription_sync(recording_id):
                 "Twake Drive upload error for %s, continuing", recording_id
             )
 
-    # 6. Send email with document to room participants
+    # 6. Send email to the user who triggered the recording (RecordingAccess
+    # role=OWNER is created for the trigger user in start_room_recording).
     accesses = await sync_to_async(
         lambda: list(
-            recording.room.accesses.select_related("user")
+            recording.accesses.filter(role="owner")
+            .select_related("user")
             .exclude(user__email__isnull=True)
             .exclude(user__email="")
         )
