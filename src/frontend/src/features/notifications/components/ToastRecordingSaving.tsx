@@ -1,5 +1,6 @@
 import { useToast } from '@react-aria/toast'
 import { useMemo, useRef } from 'react'
+import { useSnapshot } from 'valtio'
 import { Text } from '@/primitives'
 
 import { StyledToastContainer, ToastProps } from './Toast'
@@ -8,6 +9,7 @@ import { useTranslation } from 'react-i18next'
 import { useUser } from '@/features/auth'
 import { css } from '@/styled-system/css'
 import { RecordingMode } from '@/features/recording'
+import { recordingStore } from '@/stores/recording'
 
 export function ToastRecordingSaving({
   state,
@@ -18,6 +20,7 @@ export function ToastRecordingSaving({
   const { toastProps, contentProps } = useToast(props, state, ref)
 
   const { user } = useUser()
+  const { startedByMe } = useSnapshot(recordingStore)
 
   const modeLabel = useMemo(() => {
     const mode = props.toast.content.mode as RecordingMode
@@ -47,7 +50,7 @@ export function ToastRecordingSaving({
             whiteSpace: 'normal',
           })}
         >
-          {user?.email ? (
+          {startedByMe && user?.email ? (
             <span
               dangerouslySetInnerHTML={{
                 __html: t(`${modeLabel}.message`, {
