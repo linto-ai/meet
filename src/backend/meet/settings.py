@@ -866,6 +866,22 @@ class Base(Configuration):
     LINTO_STUDIO_FRONTEND_URL = values.Value(
         None, environ_name="LINTO_STUDIO_FRONTEND_URL", environ_prefix=None
     )
+    LINTO_VISIO_TAG_NAME = values.Value(
+        "Visio", environ_name="LINTO_VISIO_TAG_NAME", environ_prefix=None
+    )
+    LINTO_VISIO_TAG_CATEGORY = values.Value(
+        "Meeting", environ_name="LINTO_VISIO_TAG_CATEGORY", environ_prefix=None
+    )
+    LINTO_VISIO_FOLDER_NAME = values.Value(
+        "Visio", environ_name="LINTO_VISIO_FOLDER_NAME", environ_prefix=None
+    )
+    # Default org-member rights on uploaded conversations. 0 = no rights
+    # (only MAINTAINER+ and explicitly shared users see it). 1 = READ.
+    LINTO_STUDIO_MEMBERS_RIGHT = values.IntegerValue(
+        0,
+        environ_name="LINTO_STUDIO_MEMBERS_RIGHT",
+        environ_prefix=None,
+    )
 
     # Twake Drive integration (Cloudery + Cozy Stack)
     CLOUDERY_URL = values.Value(None, environ_name="CLOUDERY_URL", environ_prefix=None)
