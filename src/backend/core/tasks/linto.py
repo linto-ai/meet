@@ -10,6 +10,8 @@ from django.template.loader import render_to_string
 from django.utils.translation import get_language, override
 from django.utils.translation import gettext_lazy as _
 
+import bleach
+import markdown as markdown_lib
 from asgiref.sync import async_to_sync, sync_to_async
 
 from core import models
@@ -18,6 +20,43 @@ from core.services.audio_extract import extract_audio_from_video
 from core.tasks._task import task
 
 logger = logging.getLogger(__name__)
+
+_SUMMARY_HTML_TAGS = [
+    "p",
+    "br",
+    "strong",
+    "em",
+    "b",
+    "i",
+    "u",
+    "ul",
+    "ol",
+    "li",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "blockquote",
+    "code",
+    "pre",
+    "a",
+]
+_SUMMARY_HTML_ATTRS = {"a": ["href", "title"]}
+
+
+def _render_summary_html(text):
+    """Render LinTO summary markdown to a sanitized HTML fragment."""
+    if not text:
+        return None
+    html = markdown_lib.markdown(text, extensions=["extra", "sane_lists", "nl2br"])
+    return bleach.clean(
+        html,
+        tags=_SUMMARY_HTML_TAGS,
+        attributes=_SUMMARY_HTML_ATTRS,
+        strip=True,
+    )
 
 
 @task
@@ -544,6 +583,7 @@ async def _process_linto_transcription_sync(recording_id):
                             user.timezone
                         ).strftime("%H:%M"),
                         "summary_preview": summary_preview,
+                        "summary_preview_html": _render_summary_html(summary_preview),
                         "twake_drive_link": twake_drive_link,
                         "has_pdf_attachment": (
                             pdf_content is not None and not twake_drive_link

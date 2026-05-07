@@ -20,3 +20,20 @@ if [ ! -d "${DIR_MAILS}"text/ ]; then
 fi
 
 mv "${DIR_MAILS}"html/*.txt "${DIR_MAILS}"text/;
+
+# Plain-text fallback for summary_preview_html: raw HTML in a .txt mail is
+# unreadable, so substitute the markdown source variable.
+TRANSCRIPTION_TXT="${DIR_MAILS}text/transcription.txt"
+if [ -f "${TRANSCRIPTION_TXT}" ]; then
+  python3 -c "
+import re, sys
+p = sys.argv[1]
+with open(p) as f: s = f.read()
+s = re.sub(
+    r'\{\{ summary_preview_html\|safe \}\}',
+    '{% if summary_preview %}{{ summary_preview|truncatewords:100 }}{% endif %}',
+    s,
+)
+open(p, 'w').write(s)
+" "${TRANSCRIPTION_TXT}"
+fi
