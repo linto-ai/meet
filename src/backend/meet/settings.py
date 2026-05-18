@@ -752,6 +752,31 @@ class Base(Configuration):
     RECORDING_STORAGE_EVENT_TOKEN = SecretFileValue(
         None, environ_name="RECORDING_STORAGE_EVENT_TOKEN", environ_prefix=None
     )
+    # Polling fallback for S3 backends without native bucket notifications
+    # (e.g. OVH Object Storage). Disabled by default — opt-in alternative to
+    # the storage-hook webhook.
+    RECORDING_STORAGE_POLLING_ENABLED = values.BooleanValue(
+        False,
+        environ_name="RECORDING_STORAGE_POLLING_ENABLED",
+        environ_prefix=None,
+    )
+    RECORDING_STORAGE_POLLING_INTERVAL = values.IntegerValue(
+        60,
+        environ_name="RECORDING_STORAGE_POLLING_INTERVAL",
+        environ_prefix=None,
+    )
+    RECORDING_STORAGE_POLLING_BATCH_SIZE = values.IntegerValue(
+        100,
+        environ_name="RECORDING_STORAGE_POLLING_BATCH_SIZE",
+        environ_prefix=None,
+    )
+    # Ignore recordings older than this lookback window — bounds DB cost and
+    # avoids re-checking zombie recordings stuck in ACTIVE for days.
+    RECORDING_STORAGE_POLLING_LOOKBACK_HOURS = values.IntegerValue(
+        24,
+        environ_name="RECORDING_STORAGE_POLLING_LOOKBACK_HOURS",
+        environ_prefix=None,
+    )
     # Number of days before recordings expire - must be synced with bucket lifecycle policy
     # Set to None for no expiration
     RECORDING_EXPIRATION_DAYS = values.IntegerValue(
