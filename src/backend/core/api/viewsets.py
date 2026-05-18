@@ -783,16 +783,7 @@ class RecordingViewSet(
 
         # Attempt to notify external services about the recording
         # This is a non-blocking operation - failures are logged but don't interrupt the flow
-        notification_succeeded = notification_service.notify_external_services(
-            recording
-        )
-
-        recording.status = (
-            models.RecordingStatusChoices.NOTIFICATION_SUCCEEDED
-            if notification_succeeded
-            else models.RecordingStatusChoices.SAVED
-        )
-        recording.save()
+        notification_service.notify_and_update_status(recording)
 
         return drf_response.Response(
             {"message": "Event processed."},

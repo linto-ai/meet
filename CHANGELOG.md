@@ -8,6 +8,11 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- ✨(backend) add optional S3 bucket polling for storage backends
+  without native event notifications
+
 ### Changed
 
 - ⬆️(dependencies) update python dependencies
