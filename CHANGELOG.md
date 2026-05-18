@@ -101,6 +101,8 @@ and this project adheres to
 - 🩹(frontend) enable screen share button in PiP #1458
 - 🐛(backend) support unencoded S3 notification object keys #1455
 - ✨(frontend) prioritize screen share in picture-in-picture layout #1467
+- ✨(backend) add optional S3 bucket polling for storage backends
+  without native event notifications
 
 ### Changed
 
