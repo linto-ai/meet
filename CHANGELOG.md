@@ -12,6 +12,8 @@ and this project adheres to
 
 - ✨(fullstack)  allow participants to mute others based on room configuration
 - ✨(frontend) add synchronizer for room metadata updates
+- ✨(backend) add optional S3 bucket polling for storage backends
+  without native event notifications
 
 ### Changed 
 

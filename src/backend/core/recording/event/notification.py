@@ -41,6 +41,21 @@ def get_recording_download_base_url() -> str:
 class NotificationService:
     """Service for processing recordings and notifying external services."""
 
+    def notify_and_update_status(self, recording) -> bool:
+        """Notify external services then persist the resulting recording status.
+
+        Centralizes the post-notification status transition shared by the
+        storage-hook webhook and the polling fallback.
+        """
+        succeeded = self.notify_external_services(recording)
+        recording.status = (
+            models.RecordingStatusChoices.NOTIFICATION_SUCCEEDED
+            if succeeded
+            else models.RecordingStatusChoices.SAVED
+        )
+        recording.save(update_fields=["status", "updated_at"])
+        return succeeded
+
     def notify_external_services(self, recording):
         """Process a recording based on its mode."""
 
