@@ -1,0 +1,71 @@
+name: Build and push images to GHCR
+
+on:
+  push:
+    branches:
+      - linto
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  REGISTRY_NAMESPACE: linto-ai
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: meet-backend
+            context: .
+            dockerfile: Dockerfile
+            target: backend-production
+          - image: meet-frontend
+            context: .
+            dockerfile: src/frontend/Dockerfile
+            target: frontend-production
+          - image: meet-frontend-dinum
+            context: .
+            dockerfile: docker/dinum-frontend/Dockerfile
+            target: frontend-production
+          - image: meet-summary
+            context: ./src/summary
+            dockerfile: src/summary/Dockerfile
+            target: production
+          - image: meet-agents
+            context: ./src/agents
+            dockerfile: src/agents/Dockerfile
+            target: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Compute short SHA (8 chars)
+        run: echo "SHORT_SHA=$(git rev-parse --short=8 HEAD)" >> "$GITHUB_ENV"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          target: ${{ matrix.target }}
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/${{ matrix.image }}:${{ env.SHORT_SHA }}
+            ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/${{ matrix.image }}:latest
