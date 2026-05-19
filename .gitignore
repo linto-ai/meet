@@ -83,3 +83,6 @@ docker/livekit/out
 
 # LiveKit CA configuration
 docker/livekit/rootCA.pem
+
+# Celery beat schedule (created at runtime by 'celery worker -B')
+src/backend/celerybeat-schedule*
