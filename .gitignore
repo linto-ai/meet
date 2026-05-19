@@ -90,3 +90,6 @@ docker/livekit/rootCA.pem
 # NixOS
 .devenv
 .pre-commit-config.yaml
+
+# Celery beat schedule (created at runtime by 'celery worker -B')
+src/backend/celerybeat-schedule*
