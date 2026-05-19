@@ -73,6 +73,14 @@ def poll_storage_for_new_recordings() -> int:
         ).order_by("created_at")[:batch_size]
     )
 
+    logger.info(
+        "Storage polling tick: %d savable recording(s) in last %dh "
+        "(batch_size=%d)",
+        len(candidates),
+        settings.RECORDING_STORAGE_POLLING_LOOKBACK_HOURS,
+        batch_size,
+    )
+
     if not candidates:
         return 0
 
@@ -80,22 +88,40 @@ def poll_storage_for_new_recordings() -> int:
     bucket = default_storage.bucket_name
 
     processed = 0
+    missing = 0
     for recording in candidates:
         try:
             exists = _object_exists(s3_client, bucket, recording.key)
         except (BotoCoreError, ClientError):
             logger.exception(
-                "Storage polling HEAD failed for recording %s", recording.id
+                "Storage polling HEAD failed for recording %s (key=%s)",
+                recording.id,
+                recording.key,
             )
             continue
 
         if not exists:
+            missing += 1
+            logger.debug(
+                "Storage polling: %s not yet in bucket (key=%s)",
+                recording.id,
+                recording.key,
+            )
             continue
 
+        logger.info(
+            "Storage polling: notifying recording %s (key=%s)",
+            recording.id,
+            recording.key,
+        )
         notification_service.notify_and_update_status(recording)
         processed += 1
 
-    if processed:
-        logger.info("Storage polling notified %d recording(s)", processed)
+    logger.info(
+        "Storage polling done: notified=%d, awaiting_upload=%d, total=%d",
+        processed,
+        missing,
+        len(candidates),
+    )
 
     return processed
