@@ -28,6 +28,10 @@ app.autodiscover_tasks()
 # Registered only when explicitly enabled, so default deployments are
 # unaffected and `celery beat` is not required.
 if settings.RECORDING_STORAGE_POLLING_ENABLED:
+    # Eager import so the worker registers the task even though no other
+    # module imports it (autodiscovery only walks installed app modules).
+    import core.tasks.storage_polling  # noqa: F401  pylint: disable=unused-import
+
     app.conf.beat_schedule = {
         **app.conf.beat_schedule,
         "poll-storage-for-recordings": {
