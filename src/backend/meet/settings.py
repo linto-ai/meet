@@ -892,10 +892,13 @@ class Base(Configuration):
         None, environ_name="LINTO_STUDIO_FRONTEND_URL", environ_prefix=None
     )
     LINTO_VISIO_TAG_NAME = values.Value(
-        "Visio", environ_name="LINTO_VISIO_TAG_NAME", environ_prefix=None
+        "Meeting", environ_name="LINTO_VISIO_TAG_NAME", environ_prefix=None
     )
+    # "tags" is the built-in LinTO Studio category whose tags show up on
+    # media cards and in filters; any other category falls under "labels"
+    # (metadata-only, not displayed as a tag chip).
     LINTO_VISIO_TAG_CATEGORY = values.Value(
-        "Meeting", environ_name="LINTO_VISIO_TAG_CATEGORY", environ_prefix=None
+        "tags", environ_name="LINTO_VISIO_TAG_CATEGORY", environ_prefix=None
     )
     LINTO_VISIO_FOLDER_NAME = values.Value(
         "Visio", environ_name="LINTO_VISIO_FOLDER_NAME", environ_prefix=None
