@@ -517,7 +517,8 @@ async def _process_linto_transcription_sync(recording_id):
                 frontend_url = getattr(settings, "LINTO_STUDIO_FRONTEND_URL", None)
                 if frontend_url and conversation_id:
                     shortcut_url = (
-                        f"{frontend_url}/interface/conversations/{conversation_id}"
+                        f"{frontend_url}/interface/conversations/"
+                        f"{conversation_id}/transcription"
                     )
                     shortcut_content = f"[InternetShortcut]\nURL={shortcut_url}\n"
                     await save_file(
