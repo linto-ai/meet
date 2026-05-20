@@ -28,7 +28,8 @@ services:
       - GARAGE_DEFAULT_SECRET_KEY=meet-secret-access-key
       - GARAGE_DEFAULT_BUCKET=meet-media-storage
     ports:
-      - '127.0.0.1:9000:9000'
+      # Override locally via .env (MINIO_API_PORT) to avoid port conflicts
+      - '127.0.0.1:${MINIO_API_PORT:-9000}:9000'
     healthcheck:
       test: [ "CMD", "/garage", "health" ]
       interval: 1s
