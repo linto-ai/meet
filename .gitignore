@@ -88,3 +88,7 @@ docker/livekit/rootCA.pem
 /src/frontend/rollup-plugin-visualizer/*
 # Celery beat schedule (created at runtime by 'celery worker -B')
 src/backend/celerybeat-schedule*
+
+# Claude Code
+.claude/
+CLAUDE.md
