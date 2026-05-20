@@ -86,3 +86,7 @@ docker/livekit/rootCA.pem
 
 # Celery beat schedule (created at runtime by 'celery worker -B')
 src/backend/celerybeat-schedule*
+
+# Claude Code
+.claude/
+CLAUDE.md
