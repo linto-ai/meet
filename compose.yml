@@ -22,8 +22,8 @@ services:
       - MINIO_ROOT_USER=meet
       - MINIO_ROOT_PASSWORD=password
     ports:
-      - '9000:9000'
-      - '9001:9001'
+      - '${MINIO_API_PORT:-9000}:9000'
+      - '${MINIO_CONSOLE_PORT:-9001}:9001'
     healthcheck:
       test: [ "CMD", "mc", "ready", "local" ]
       interval: 1s
