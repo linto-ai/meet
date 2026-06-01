@@ -1,0 +1,37 @@
+{
+  "title": "Thông báo pháp lý",
+  "creator": {
+    "title": "Nhà xuất bản",
+    "body": "Dịch vụ Visio được xuất bản bởi Cục Số liên bộ của Nhà nước (DINUM) đặt tại:",
+    "contact": {
+      "title": "Thông tin liên hệ",
+      "address": "20 avenue de Ségur",
+      "city": "75007 Paris",
+      "phone": "ĐT lễ tân: 01.71.21.01.70",
+      "siret": "SIRET: 12000101100010 (ban tổng thư ký chính phủ)",
+      "siren": "SIREN: 120 001 011"
+    }
+  },
+  "director": {
+    "title": "Giám đốc xuất bản",
+    "body": "Giám đốc xuất bản là bà Stéphanie Schaer, Giám đốc Số liên bộ."
+  },
+  "hosting": {
+    "title": "Lưu trữ",
+    "body": "Dịch vụ được lưu trữ bởi Outscale West-1 CloudGouv SecNumCloud đặt tại Pháp."
+  },
+  "accessibility": {
+    "title": "Khả năng tiếp cận",
+    "body": "Việc tuân thủ các tiêu chuẩn về khả năng tiếp cận số là mục tiêu trong tương lai. Trang web chưa được kiểm định. Tuy nhiên, đội ngũ nỗ lực tạo ra một trang web dễ tiếp cận với mọi người bằng cách tuân theo các khuyến nghị của RGAA.",
+    "more": "Để biết thêm thông tin: ",
+    "link": "liên kết đến trang về khả năng tiếp cận",
+    "status": "Tình trạng khả năng tiếp cận: không tuân thủ"
+  },
+  "reuse": {
+    "title": "Tái sử dụng nội dung và liên kết",
+    "body1": "Trừ khi có đề cập rõ ràng về quyền sở hữu trí tuệ thuộc về bên thứ ba, nội dung của trang web này được cung cấp theo ",
+    "license": "giấy phép mở Etalab 2.0",
+    "body2": "Đặc biệt bạn được tự do sao chép, sao lưu, sửa đổi, trích xuất, chuyển đổi, truyền đạt, phân phối, phân phối lại, xuất bản, truyền tải và khai thác chúng với điều kiện bạn ghi rõ nguồn, ngày cập nhật cuối cùng và không gây hiểu lầm cho bên thứ ba về thông tin chứa trong đó.",
+    "body3": "Bất kỳ trang web công cộng hoặc tư nhân nào đều được phép thiết lập, mà không cần sự cho phép trước, một liên kết (bao gồm liên kết sâu) đến thông tin được phổ biến trên trang web này."
+  }
+}
