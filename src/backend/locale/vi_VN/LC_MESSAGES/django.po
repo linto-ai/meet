@@ -1,0 +1,682 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-04-22 14:04+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: vi\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#: core/admin.py:29
+msgid "Personal info"
+msgstr "Thông tin cá nhân"
+
+#: core/admin.py:42
+msgid "Permissions"
+msgstr "Quyền"
+
+#: core/admin.py:54
+msgid "Important dates"
+msgstr "Ngày quan trọng"
+
+#: core/admin.py:132 core/admin.py:275
+msgid "No owner"
+msgstr "Không có chủ sở hữu"
+
+#: core/admin.py:135 core/admin.py:278
+msgid "Multiple owners"
+msgstr "Nhiều chủ sở hữu"
+
+#: core/admin.py:148
+msgid "Resend notification to external service"
+msgstr "Gửi lại thông báo đến dịch vụ bên ngoài"
+
+#: core/admin.py:171
+#, python-format
+msgid "Failed to notify for recording %(id)s"
+msgstr "Không thể gửi thông báo cho bản ghi %(id)s"
+
+#: core/admin.py:179
+#, python-format
+msgid "Failed to notify for recording %(id)s: %(error)s"
+msgstr "Không thể gửi thông báo cho bản ghi %(id)s: %(error)s"
+
+#: core/admin.py:187
+#, python-format
+msgid "Successfully sent notifications for %(count)s recording(s)."
+msgstr "Đã gửi thành công thông báo cho %(count)s bản ghi."
+
+#: core/admin.py:195
+#, python-format
+msgid "Skipped %(count)s expired recording(s)."
+msgstr "Đã bỏ qua %(count)s bản ghi đã hết hạn."
+
+#: core/admin.py:200
+msgid "Mark selected recordings as 'Failed to Stop'"
+msgstr "Đánh dấu các bản ghi đã chọn là 'Không thể dừng'"
+
+#: core/admin.py:218
+#, python-format
+msgid "%(count)s recording(s) successfully marked as 'Failed to Stop'."
+msgstr "Đã đánh dấu thành công %(count)s bản ghi là 'Không thể dừng'."
+
+#: core/admin.py:226
+#, fuzzy, python-format
+#| msgid "Skipped %(count)s expired recording(s)."
+msgid "Skipped %(count)s recording(s) with an ineligible status."
+msgstr "Đã bỏ qua %(count)s bản ghi có trạng thái không hợp lệ."
+
+#: core/admin.py:342
+msgid "No scopes"
+msgstr "Không có phạm vi"
+
+#: core/admin.py:344
+msgid "Scopes"
+msgstr "Phạm vi"
+
+#: core/api/filters.py:25
+msgid "Creator is me"
+msgstr "Người tạo là tôi"
+
+#: core/api/serializers.py:88
+msgid "You must be administrator or owner of a room to add accesses to it."
+msgstr "Bạn phải là quản trị viên hoặc chủ sở hữu của phòng để thêm quyền truy cập vào phòng."
+
+#: core/api/serializers.py:538
+msgid "This file extension is not allowed."
+msgstr "Phần mở rộng tệp này không được phép."
+
+#: core/api/viewsets.py:987
+msgid "You have reached the maximum number of files for this type."
+msgstr "Bạn đã đạt đến số lượng tệp tối đa cho loại này."
+
+#: core/models.py:37
+msgid "Member"
+msgstr "Thành viên"
+
+#: core/models.py:38
+msgid "Administrator"
+msgstr "Quản trị viên"
+
+#: core/models.py:39
+msgid "Owner"
+msgstr "Chủ sở hữu"
+
+#: core/models.py:55
+msgid "Initiated"
+msgstr "Đã khởi tạo"
+
+#: core/models.py:56
+msgid "Active"
+msgstr "Đang hoạt động"
+
+#: core/models.py:57
+msgid "Stopped"
+msgstr "Đã dừng"
+
+#: core/models.py:58
+msgid "Saved"
+msgstr "Đã lưu"
+
+#: core/models.py:59
+msgid "Aborted"
+msgstr "Đã hủy bỏ"
+
+#: core/models.py:60
+msgid "Failed to Start"
+msgstr "Không thể bắt đầu"
+
+#: core/models.py:61
+msgid "Failed to Stop"
+msgstr "Không thể dừng"
+
+#: core/models.py:62
+msgid "Notification succeeded"
+msgstr "Thông báo thành công"
+
+#: core/models.py:89
+msgid "SCREEN_RECORDING"
+msgstr "SCREEN_RECORDING"
+
+#: core/models.py:90
+msgid "TRANSCRIPT"
+msgstr "TRANSCRIPT"
+
+#: core/models.py:96
+msgid "Public Access"
+msgstr "Truy cập công khai"
+
+#: core/models.py:97
+msgid "Trusted Access"
+msgstr "Truy cập tin cậy"
+
+#: core/models.py:98
+msgid "Restricted Access"
+msgstr "Truy cập hạn chế"
+
+#: core/models.py:110
+msgid "id"
+msgstr "id"
+
+#: core/models.py:111
+msgid "primary key for the record as UUID"
+msgstr "khóa chính của bản ghi dưới dạng UUID"
+
+#: core/models.py:117
+msgid "created on"
+msgstr "được tạo vào"
+
+#: core/models.py:118
+msgid "date and time at which a record was created"
+msgstr "ngày và giờ mà bản ghi được tạo"
+
+#: core/models.py:123
+msgid "updated on"
+msgstr "được cập nhật vào"
+
+#: core/models.py:124
+msgid "date and time at which a record was last updated"
+msgstr "ngày và giờ mà bản ghi được cập nhật lần cuối"
+
+#: core/models.py:144
+msgid ""
+"Enter a valid sub. This value may contain only letters, numbers, and @/./+/-/"
+"_ characters."
+msgstr ""
+"Nhập một sub hợp lệ. Giá trị này chỉ có thể chứa các chữ cái, chữ số và các ký "
+"tự @/./+/-/_."
+
+#: core/models.py:150
+msgid "sub"
+msgstr "sub"
+
+#: core/models.py:152
+msgid ""
+"Optional for pending users; required upon account activation. 255 characters "
+"or fewer. Letters, numbers, and @/./+/-/_ characters only."
+msgstr ""
+"Tùy chọn đối với người dùng đang chờ; bắt buộc khi kích hoạt tài khoản. Tối đa "
+"255 ký tự. Chỉ chấp nhận chữ cái, chữ số và các ký tự @/./+/-/_."
+
+#: core/models.py:161
+msgid "identity email address"
+msgstr "địa chỉ email định danh"
+
+#: core/models.py:166
+msgid "admin email address"
+msgstr "địa chỉ email quản trị"
+
+#: core/models.py:168
+msgid "full name"
+msgstr "họ và tên"
+
+#: core/models.py:170
+msgid "short name"
+msgstr "tên rút gọn"
+
+#: core/models.py:176
+msgid "language"
+msgstr "ngôn ngữ"
+
+#: core/models.py:177
+msgid "The language in which the user wants to see the interface."
+msgstr "Ngôn ngữ mà người dùng muốn hiển thị giao diện."
+
+#: core/models.py:183
+msgid "The timezone in which the user wants to see times."
+msgstr "Múi giờ mà người dùng muốn hiển thị thời gian."
+
+#: core/models.py:186
+msgid "device"
+msgstr "thiết bị"
+
+#: core/models.py:188
+msgid "Whether the user is a device or a real user."
+msgstr "Người dùng là một thiết bị hay là người dùng thực."
+
+#: core/models.py:191
+msgid "staff status"
+msgstr "trạng thái nhân viên"
+
+#: core/models.py:193
+msgid "Whether the user can log into this admin site."
+msgstr "Người dùng có thể đăng nhập vào trang quản trị này hay không."
+
+#: core/models.py:196
+msgid "active"
+msgstr "đang hoạt động"
+
+#: core/models.py:199
+msgid ""
+"Whether this user should be treated as active. Unselect this instead of "
+"deleting accounts."
+msgstr ""
+"Người dùng này có được coi là đang hoạt động hay không. Bỏ chọn mục này thay "
+"vì xóa tài khoản."
+
+#: core/models.py:212
+msgid "user"
+msgstr "người dùng"
+
+#: core/models.py:213
+msgid "users"
+msgstr "người dùng"
+
+#: core/models.py:272
+msgid "Resource"
+msgstr "Tài nguyên"
+
+#: core/models.py:273
+msgid "Resources"
+msgstr "Tài nguyên"
+
+#: core/models.py:331
+msgid "Resource access"
+msgstr "Quyền truy cập tài nguyên"
+
+#: core/models.py:332
+msgid "Resource accesses"
+msgstr "Quyền truy cập tài nguyên"
+
+#: core/models.py:338
+msgid "Resource access with this User and Resource already exists."
+msgstr "Quyền truy cập tài nguyên với Người dùng và Tài nguyên này đã tồn tại."
+
+#: core/models.py:394
+msgid "Visio room configuration"
+msgstr "Cấu hình phòng Visio"
+
+#: core/models.py:395
+msgid "Values for Visio parameters to configure the room."
+msgstr "Các giá trị cho tham số Visio để cấu hình phòng."
+
+#: core/models.py:402
+msgid "Room PIN code"
+msgstr "Mã PIN của phòng"
+
+#: core/models.py:403
+msgid "Unique n-digit code that identifies this room in telephony mode."
+msgstr "Mã n chữ số duy nhất để nhận diện phòng này trong chế độ điện thoại."
+
+#: core/models.py:409 core/models.py:563
+msgid "Room"
+msgstr "Phòng"
+
+#: core/models.py:410
+msgid "Rooms"
+msgstr "Phòng"
+
+#: core/models.py:574
+msgid "Worker ID"
+msgstr "ID worker"
+
+#: core/models.py:576
+msgid ""
+"Enter an identifier for the worker recording.This ID is retained even when "
+"the worker stops, allowing for easy tracking."
+msgstr ""
+"Nhập một định danh cho worker ghi hình. ID này được giữ lại ngay cả khi worker "
+"dừng, giúp dễ dàng theo dõi."
+
+#: core/models.py:584
+msgid "Recording mode"
+msgstr "Chế độ ghi"
+
+#: core/models.py:585
+msgid "Defines the mode of recording being called."
+msgstr "Xác định chế độ ghi đang được gọi."
+
+#: core/models.py:590 core/models.py:591
+msgid "Recording options"
+msgstr "Tùy chọn ghi"
+
+#: core/models.py:597
+msgid "Recording"
+msgstr "Bản ghi"
+
+#: core/models.py:598
+msgid "Recordings"
+msgstr "Bản ghi"
+
+#: core/models.py:706
+msgid "Recording/user relation"
+msgstr "Quan hệ bản ghi/người dùng"
+
+#: core/models.py:707
+msgid "Recording/user relations"
+msgstr "Quan hệ bản ghi/người dùng"
+
+#: core/models.py:713
+msgid "This user is already in this recording."
+msgstr "Người dùng này đã có trong bản ghi này."
+
+#: core/models.py:719
+msgid "This team is already in this recording."
+msgstr "Nhóm này đã có trong bản ghi này."
+
+#: core/models.py:725
+msgid "Either user or team must be set, not both."
+msgstr "Phải đặt người dùng hoặc nhóm, không phải cả hai."
+
+#: core/models.py:742
+#, fuzzy
+#| msgid "created on"
+msgid "Create rooms"
+msgstr "Tạo phòng"
+
+#: core/models.py:743
+msgid "List rooms"
+msgstr "Liệt kê phòng"
+
+#: core/models.py:744
+msgid "Retrieve room details"
+msgstr "Lấy chi tiết phòng"
+
+#: core/models.py:745
+#, fuzzy
+#| msgid "updated on"
+msgid "Update rooms"
+msgstr "Cập nhật phòng"
+
+#: core/models.py:746
+msgid "Delete rooms"
+msgstr "Xóa phòng"
+
+#: core/models.py:759
+msgid "Application name"
+msgstr "Tên ứng dụng"
+
+#: core/models.py:760
+msgid "Descriptive name for this application."
+msgstr "Tên mô tả cho ứng dụng này."
+
+#: core/models.py:770
+msgid "Hashed on Save. Copy it now if this is a new secret."
+msgstr "Được băm khi Lưu. Hãy sao chép ngay bây giờ nếu đây là khóa bí mật mới."
+
+#: core/models.py:781
+msgid "Application"
+msgstr "Ứng dụng"
+
+#: core/models.py:782
+msgid "Applications"
+msgstr "Ứng dụng"
+
+#: core/models.py:805
+msgid "Enter a valid domain"
+msgstr "Nhập một tên miền hợp lệ"
+
+#: core/models.py:808
+msgid "Domain"
+msgstr "Tên miền"
+
+#: core/models.py:809
+msgid "Email domain this application can act on behalf of."
+msgstr "Tên miền email mà ứng dụng này có thể thay mặt."
+
+#: core/models.py:821
+msgid "Application domain"
+msgstr "Tên miền ứng dụng"
+
+#: core/models.py:822
+msgid "Application domains"
+msgstr "Tên miền ứng dụng"
+
+#: core/models.py:840
+#, fuzzy
+#| msgid "Recording"
+msgid "Pending"
+msgstr "Đang chờ"
+
+#: core/models.py:848
+msgid "Ready"
+msgstr "Sẵn sàng"
+
+#: core/models.py:854
+msgid "Background image"
+msgstr "Hình nền"
+
+#: core/models.py:866
+msgid "title"
+msgstr "tiêu đề"
+
+#: core/models.py:890
+msgid "Malware detection info when the analysis status is unsafe."
+msgstr "Thông tin phát hiện phần mềm độc hại khi trạng thái phân tích không an toàn."
+
+#: core/models.py:895
+msgid "File"
+msgstr "Tệp"
+
+#: core/models.py:896
+msgid "Files"
+msgstr "Tệp"
+
+#: core/models.py:1000
+#, fuzzy
+#| msgid "This user is already in this recording."
+msgid "This file is already hard deleted."
+msgstr "Tệp này đã bị xóa vĩnh viễn."
+
+#: core/models.py:1010
+msgid "To hard delete a file, it must first be soft deleted."
+msgstr "Để xóa vĩnh viễn một tệp, trước tiên tệp đó phải được xóa tạm."
+
+#: core/recording/event/notification.py:153 core/tasks/recording.py:151
+msgid "Your recording is ready"
+msgstr "Bản ghi của bạn đã sẵn sàng"
+
+#: core/services/invitation.py:44
+#, python-brace-format
+msgid "Video call in progress: {sender.email} is waiting for you to connect"
+msgstr "Cuộc gọi video đang diễn ra: {sender.email} đang chờ bạn kết nối"
+
+#: core/tasks/linto.py:505
+#, fuzzy
+#| msgid "Your recording is ready"
+msgid "Your meeting transcription is ready"
+msgstr "Bản chép lời cuộc họp của bạn đã sẵn sàng"
+
+#: core/templates/mail/html/invitation.html:159
+#: core/templates/mail/html/screen_recording.html:159
+#: core/templates/mail/html/transcription.html:159
+#: core/templates/mail/text/invitation.txt:3
+#: core/templates/mail/text/screen_recording.txt:3
+#: core/templates/mail/text/transcription.txt:3
+msgid "Logo email"
+msgstr "Logo email"
+
+#: core/templates/mail/html/invitation.html:189
+#: core/templates/mail/text/invitation.txt:5
+msgid "invites you to join an ongoing video call"
+msgstr "mời bạn tham gia một cuộc gọi video đang diễn ra"
+
+#: core/templates/mail/html/invitation.html:200
+#: core/templates/mail/text/invitation.txt:7
+msgid "JOIN THE CALL"
+msgstr "THAM GIA CUỘC GỌI"
+
+#: core/templates/mail/html/invitation.html:227
+#: core/templates/mail/text/invitation.txt:13
+msgid ""
+"If you can't click the button, copy and paste the URL into your browser to "
+"join the call."
+msgstr ""
+"Nếu bạn không thể nhấp vào nút, hãy sao chép và dán URL vào trình duyệt của "
+"bạn để tham gia cuộc gọi."
+
+#: core/templates/mail/html/invitation.html:235
+#: core/templates/mail/text/invitation.txt:15
+msgid "Tips for a better experience:"
+msgstr "Mẹo để có trải nghiệm tốt hơn:"
+
+#: core/templates/mail/html/invitation.html:237
+#: core/templates/mail/text/invitation.txt:17
+msgid "Use Chrome or Firefox for better call quality"
+msgstr "Sử dụng Chrome hoặc Firefox để có chất lượng cuộc gọi tốt hơn"
+
+#: core/templates/mail/html/invitation.html:238
+#: core/templates/mail/text/invitation.txt:18
+msgid "Test your microphone and camera before joining"
+msgstr "Kiểm tra micrô và máy ảnh của bạn trước khi tham gia"
+
+#: core/templates/mail/html/invitation.html:239
+#: core/templates/mail/text/invitation.txt:19
+msgid "Make sure you have a stable internet connection"
+msgstr "Đảm bảo bạn có kết nối internet ổn định"
+
+#: core/templates/mail/html/invitation.html:248
+#: core/templates/mail/html/screen_recording.html:260
+#: core/templates/mail/html/transcription.html:243
+#: core/templates/mail/text/invitation.txt:21
+#: core/templates/mail/text/screen_recording.txt:31
+#: core/templates/mail/text/transcription.txt:26
+#, python-format
+msgid " Thank you for using %(brandname)s. "
+msgstr " Cảm ơn bạn đã sử dụng %(brandname)s. "
+
+#: core/templates/mail/html/screen_recording.html:188
+#: core/templates/mail/text/screen_recording.txt:6
+msgid "Your recording is ready!"
+msgstr "Bản ghi của bạn đã sẵn sàng!"
+
+#: core/templates/mail/html/screen_recording.html:195
+#: core/templates/mail/text/screen_recording.txt:8
+#, python-format
+msgid ""
+" Your recording of \"%(room_name)s\" on %(recording_date)s at "
+"%(recording_time)s is now ready to download. "
+msgstr ""
+" Bản ghi của bạn về \"%(room_name)s\" vào ngày %(recording_date)s lúc "
+"%(recording_time)s hiện đã sẵn sàng để tải xuống. "
+
+#: core/templates/mail/html/screen_recording.html:195
+#: core/templates/mail/text/screen_recording.txt:8
+#, python-format
+msgid " The recording will expire in %(days)s days. "
+msgstr " Bản ghi sẽ hết hạn sau %(days)s ngày. "
+
+#: core/templates/mail/html/screen_recording.html:200
+#: core/templates/mail/text/screen_recording.txt:9
+msgid ""
+" Sharing the recording via link is not yet available. Only organizers can "
+"download it. "
+msgstr ""
+" Việc chia sẻ bản ghi qua liên kết chưa khả dụng. Chỉ người tổ chức mới có thể "
+"tải xuống. "
+
+#: core/templates/mail/html/screen_recording.html:206
+#: core/templates/mail/text/screen_recording.txt:11
+msgid "To keep this recording permanently:"
+msgstr "Để giữ bản ghi này vĩnh viễn:"
+
+#: core/templates/mail/html/screen_recording.html:208
+#: core/templates/mail/text/screen_recording.txt:13
+msgid "Click the \"Open\" button below "
+msgstr "Nhấp vào nút \"Mở\" bên dưới "
+
+#: core/templates/mail/html/screen_recording.html:209
+#: core/templates/mail/text/screen_recording.txt:14
+msgid "Use the \"Download\" button in the interface "
+msgstr "Sử dụng nút \"Tải xuống\" trong giao diện "
+
+#: core/templates/mail/html/screen_recording.html:210
+#: core/templates/mail/text/screen_recording.txt:15
+msgid "Save the file to your preferred location"
+msgstr "Lưu tệp vào vị trí bạn muốn"
+
+#: core/templates/mail/html/screen_recording.html:216
+#: core/templates/mail/text/screen_recording.txt:18
+#, fuzzy
+#| msgid "Your recording is ready"
+msgid " Your recording is saved in Twake Drive. "
+msgstr " Bản ghi của bạn đã được lưu trong Twake Drive. "
+
+#: core/templates/mail/html/screen_recording.html:225
+#: core/templates/mail/html/transcription.html:216
+#: core/templates/mail/text/screen_recording.txt:20
+#: core/templates/mail/text/transcription.txt:17
+msgid "Open in Twake Drive"
+msgstr "Mở trong Twake Drive"
+
+#: core/templates/mail/html/screen_recording.html:237
+#: core/templates/mail/text/screen_recording.txt:24
+msgid "Download directly"
+msgstr "Tải xuống trực tiếp"
+
+#: core/templates/mail/html/screen_recording.html:245
+#: core/templates/mail/html/transcription.html:228
+#: core/templates/mail/text/screen_recording.txt:27
+#: core/templates/mail/text/transcription.txt:22
+#, python-format
+msgid ""
+" If you have any questions or need assistance, please contact our support "
+"team at %(support_email)s. "
+msgstr ""
+" Nếu bạn có bất kỳ câu hỏi nào hoặc cần hỗ trợ, vui lòng liên hệ với đội ngũ hỗ "
+"trợ của chúng tôi tại %(support_email)s. "
+
+#: core/templates/mail/html/transcription.html:188
+#: core/templates/mail/text/transcription.txt:6
+#, fuzzy
+#| msgid "Your recording is ready!"
+msgid "Your meeting transcription is ready!"
+msgstr "Bản chép lời cuộc họp của bạn đã sẵn sàng!"
+
+#: core/templates/mail/html/transcription.html:195
+#: core/templates/mail/text/transcription.txt:8
+#, fuzzy, python-format
+#| msgid ""
+#| " Your recording of \"%(room_name)s\" on %(recording_date)s at "
+#| "%(recording_time)s is now ready to download. "
+msgid ""
+" The transcription and summary of \"%(room_name)s\" on %(recording_date)s at "
+"%(recording_time)s are now available. "
+msgstr ""
+" Bản chép lời và bản tóm tắt của \"%(room_name)s\" vào ngày %(recording_date)s "
+"lúc %(recording_time)s hiện đã có sẵn. "
+
+#: core/templates/mail/html/transcription.html:201
+#: core/templates/mail/text/transcription.txt:10
+msgid "Summary preview:"
+msgstr "Xem trước bản tóm tắt:"
+
+#: core/templates/mail/html/transcription.html:207
+#: core/templates/mail/text/transcription.txt:15
+msgid " The meeting files are available in your Twake Drive. "
+msgstr " Các tệp cuộc họp có sẵn trong Twake Drive của bạn. "
+
+#: core/templates/mail/html/transcription.html:224
+#: core/templates/mail/text/transcription.txt:20
+msgid " A PDF summary is attached to this email. "
+msgstr " Một bản tóm tắt PDF được đính kèm trong email này. "
+
+#: meet/settings.py:223
+msgid "English"
+msgstr "Tiếng Anh"
+
+#: meet/settings.py:224
+msgid "French"
+msgstr "Tiếng Pháp"
+
+#: meet/settings.py:225
+msgid "Dutch"
+msgstr "Tiếng Hà Lan"
+
+#: meet/settings.py:226
+msgid "German"
+msgstr "Tiếng Đức"
+
+#~ msgid "Open"
+#~ msgstr "Open"

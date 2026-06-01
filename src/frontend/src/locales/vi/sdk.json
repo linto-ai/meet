@@ -1,0 +1,10 @@
+{
+  "createMeeting": {
+    "createButton": "Tạo",
+    "joinButton": "Tham gia với Visio",
+    "copyLinkTooltip": "Sao chép liên kết",
+    "resetLabel": "Đặt lại",
+    "participantLimit": "Tối đa 150 người tham gia.",
+    "popupBlocked": "Cửa sổ bật lên đã bị chặn. Vui lòng cho phép cửa sổ bật lên cho trang web này."
+  }
+}

@@ -1,0 +1,129 @@
+{
+  "title": "Điều khoản sử dụng Visio",
+  "articles": {
+    "article1": {
+      "title": "1. Phạm vi",
+      "content": "Tài liệu này xác định các điều khoản sử dụng Visio (sau đây gọi là “Visio” hoặc “ứng dụng”), một ứng dụng họp trực tuyến được thiết kế riêng cho các cơ quan hành chính Nhà nước và các tổ chức dưới sự giám sát của họ."
+    },
+    "article2": {
+      "title": "2. Mục đích của ứng dụng",
+      "content": "Visio giúp thúc đẩy sự hợp tác giữa các nhóm thuộc cơ quan hành chính Nhà nước và các tổ chức dưới sự giám sát của họ, hỗ trợ làm việc từ xa, và tạo điều kiện tổ chức các cuộc họp, hội nghị hoặc các buổi đào tạo.",
+      "paragraphs": [
+        "Visio được phát triển và vận hành bởi Cục Số liên bộ (DINUM).",
+        "Ứng dụng được DINUM cung cấp cho các cơ quan hành chính Nhà nước và các tổ chức dưới sự giám sát của họ, để sử dụng bởi các nhân viên, đối tác và nhà cung cấp dịch vụ được mời của họ.",
+        "Mọi việc sử dụng Visio phải tuân thủ các điều khoản sử dụng này và, nếu có, chính sách sử dụng của cơ quan giám sát liên quan."
+      ]
+    },
+    "article3": {
+      "title": "3. Định nghĩa",
+      "paragraphs": [
+        "Visio là sản phẩm có cách sử dụng được mô tả trong các điều khoản này và được trình bày trên trang sau: https://visio.numerique.gouv.fr.",
+        "Người dùng Visio là bất kỳ ai sử dụng Visio cho mục đích giao tiếp họp trực tuyến, dù họ là nhân viên, đối tác hay nhà cung cấp dịch vụ của các cơ quan liên quan. Cơ quan giám sát là cơ quan hành chính Nhà nước hoặc tổ chức dưới sự giám sát của Nhà nước cung cấp Visio cho các nhân viên, đối tác hoặc nhà cung cấp dịch vụ của mình.",
+        "Người tổ chức phòng là những người dùng chịu trách nhiệm về một phòng họp trực tuyến sau khi đăng nhập qua ProConnect."
+      ]
+    },
+    "article4": {
+      "title": "4. Truy cập ứng dụng",
+      "definition": "Visio được cơ quan giám sát của họ cung cấp cho người dùng. Sau đó, người tổ chức có thể chia sẻ liên kết cấp quyền truy cập vào phòng với bất kỳ ai, dưới trách nhiệm của họ."
+    },
+    "article5": {
+      "title": "5. Tính năng",
+      "sections": {
+        "section1": {
+          "title": "5.1. Các tính năng dành cho người tổ chức",
+          "content": "Visio cho phép nhân viên của các cơ quan hành chính Nhà nước và các tổ chức dưới sự giám sát của họ tạo một phòng họp trực tuyến từ một máy trạm tiêu chuẩn, liên kết với tài khoản ProConnect của họ.",
+          "paragraph1": "Bất kỳ nhân viên Nhà nước hoặc nhân viên của một tổ chức dưới sự giám sát của Nhà nước nào, có hoạt động phù hợp với việc sử dụng Visio hoặc không phải tuân theo các nghĩa vụ bảo mật hay bí mật nghề nghiệp cụ thể, đều có thể tạo và tổ chức một cuộc họp trực tuyến. Sau đó, họ có thể chia sẻ liên kết cuộc họp với những người khác, người dùng, dù họ có thuộc cơ quan hành chính hay không.",
+          "paragraph2": "Vì mục đích này, mỗi người tổ chức phòng có thể:",
+          "capabilities": [
+            "Bảo vệ quyền truy cập vào phòng bằng phòng chờ;",
+            "Cho phép từng người dùng vào phòng;",
+            "Tắt micro và máy ảnh của người dùng;",
+            "Xóa một người dùng khỏi phòng;",
+            "Sử dụng công cụ chép lời cuộc họp sau khi được sự đồng ý của người dùng, dưới trách nhiệm của họ."
+          ],
+          "paragraph3": "Chỉ những nhân viên có tài khoản ProConnect thuộc một miền được phép tổ chức phòng trên Visio hoặc không phải tuân theo các nghĩa vụ bảo mật hay bí mật nghề nghiệp cụ thể mới có thể sử dụng hoặc kiểm soát ứng dụng và các tính năng của nó.",
+          "paragraph4": "Công cụ chép lời tự động có thể được người tổ chức sử dụng từ menu cài đặt phòng. Người tổ chức chịu trách nhiệm đảm bảo sự đồng ý của người dùng tham gia cuộc họp được chép lời. Ngôn ngữ chép lời có thể được thay đổi từ cùng menu này. Khi kết thúc cuộc họp, một liên kết được gửi đến người tổ chức để truy cập bản chép lời được lưu trữ trong công cụ có tên Docs do DINUM vận hành."
+        },
+        "section2": {
+          "title": "5.2. Các tính năng dành cho người dùng",
+          "content": "Visio cho phép bất kỳ người dùng nào, dù là công chức hay không, tham gia bất kỳ phòng Visio nào mà họ được người tổ chức mời và tận hưởng các tính năng của nó.",
+          "paragraph": "Vì mục đích này, mỗi người dùng có thể:",
+          "capabilities": [
+            "Cung cấp tên hiển thị khi vào phòng;",
+            "Giao tiếp từ xa qua âm thanh và/hoặc video;",
+            "Chia sẻ màn hình của họ;",
+            "Trao đổi tin nhắn trong phiên một cách công khai với tất cả người dùng trong phòng;",
+            "Truy cập thông tin kỹ thuật về phòng và các tính năng về khả năng tiếp cận;",
+            "Bật hoặc tắt máy ảnh và/hoặc micro của họ bất cứ lúc nào;",
+            "Bảo vệ sự riêng tư của môi trường xung quanh khi bật máy ảnh bằng cách chọn và kích hoạt một hình nền trước khi vào phòng hoặc trong cuộc họp trực tuyến."
+          ]
+        }
+      }
+    },
+    "article6": {
+      "title": "6. Cam kết và trách nhiệm của người dùng",
+      "sections": {
+        "section1": {
+          "title": "6.1 Các mục đích sử dụng được phép",
+          "paragraphs": [
+            "Visio được cung cấp để tạo điều kiện trao đổi chuyên môn giữa nhân viên của các cơ quan hành chính Nhà nước và các tổ chức dưới sự giám sát của họ với các cộng tác viên bên ngoài.",
+            "Người dùng chịu trách nhiệm về hình ảnh và âm thanh mà họ làm cho có thể truy cập được trong phòng họp trực tuyến. Trách nhiệm này áp dụng cả với những gì máy ảnh hoặc micro của họ có thể phát đi và với những gì thiết bị của họ có thể làm cho bên thứ ba truy cập được. Vì vậy, người dùng phải sử dụng ứng dụng trong môi trường chuyên nghiệp và không được tiết lộ cho bên thứ ba bất kỳ thông tin nào thuộc nghĩa vụ bảo mật nghề nghiệp (ví dụ: sử dụng bộ lọc riêng tư, tai nghe, v.v.).",
+            "Người dùng chịu trách nhiệm về dữ liệu hoặc nội dung mà họ nhập vào dịch vụ tin nhắn của phòng. Họ phải đảm bảo rằng chỉ những tin nhắn phù hợp mới được nhập vào."
+          ]
+        },
+        "section2": {
+          "title": "6.2 Các mục đích sử dụng bị cấm",
+          "paragraphs": [
+            "Người dùng cam kết không nhập vào dịch vụ tin nhắn của phòng Visio, hoặc làm cho có thể truy cập được qua hình ảnh hoặc âm thanh, bất kỳ nội dung hoặc thông tin nào vi phạm các luật và quy định hiện hành."
+          ]
+        }
+      }
+    },
+    "article7": {
+      "title": "7. Cam kết và trách nhiệm của DINUM",
+      "sections": {
+        "section1": {
+          "title": "7.1. Bảo mật ứng dụng",
+          "paragraphs": [
+            "DINUM cam kết bảo mật Visio, đặc biệt bằng cách thực hiện mọi biện pháp cần thiết để đảm bảo tính bảo mật và sự riêng tư của các trao đổi.",
+            "Ứng dụng được chứng nhận theo các điều kiện được quy định bởi Nghị định số 2010-112 đã sửa đổi."
+          ]
+        },
+        "section2": {
+          "title": "7.2. Truy cập ứng dụng",
+          "paragraphs": [
+            "DINUM cam kết cung cấp các phương tiện cần thiết và hợp lý để đảm bảo truy cập liên tục vào ứng dụng.",
+            "Ứng dụng khả dụng 24/7, ngoại trừ thời gian bảo trì.",
+            "DINUM hướng tới tỷ lệ khả dụng hàng năm của ứng dụng là 99,5%, không tính thời gian ngừng hoạt động theo kế hoạch. Trong trường hợp xảy ra sự cố hoặc bảo trì, DINUM hướng tới thời gian khôi phục là 72 giờ ngoài giờ làm việc.",
+            "Trong khuôn khổ bảo trì môi trường vận hành của ứng dụng, DINUM bảo lưu quyền tạm ngừng hoạt động của ứng dụng. Bất cứ khi nào có thể, người dùng sẽ được thông báo trước ít nhất 48 giờ. Trong các trường hợp khẩn cấp, việc tạm ngừng này có thể xảy ra mà không cần thông báo trước.",
+            "Những lần ngừng hoạt động ngoại lệ này có thể cần thiết, ví dụ, cho các hoạt động quản lý dữ liệu, phát hành phiên bản hoặc thay đổi kiến trúc.",
+            "Việc ứng dụng không khả dụng không cho người dùng quyền được bồi thường dưới bất kỳ hình thức nào."
+          ]
+        },
+        "section3": {
+          "title": "7.3. Quản lý hỗ trợ",
+          "paragraphs": [
+            "DINUM cung cấp hỗ trợ cấp một cho người dùng, chỉ về các khía cạnh kỹ thuật của ứng dụng.",
+            "Có thể liên hệ với bộ phận hỗ trợ này qua biểu mẫu liên hệ trực tuyến.",
+            "Thời gian phản hồi mục tiêu cho các yêu cầu là hai ngày làm việc kể từ khi gửi email; thời gian này có thể thay đổi tùy thuộc vào độ phức tạp và số lượng yêu cầu cần xử lý."
+          ]
+        },
+        "section4": {
+          "title": "7.4. Giám sát việc sử dụng ứng dụng",
+          "paragraphs": [
+            "DINUM bảo lưu quyền tạm ngừng hoặc xóa tài khoản người dùng không tuân thủ các điều khoản sử dụng này, mà không ảnh hưởng đến bất kỳ hành động truy cứu trách nhiệm hình sự hoặc dân sự nào có thể được áp dụng đối với người liên quan. Thông tin có thể được chuyển đến cơ quan giám sát của người dùng, là cơ quan chịu trách nhiệm cung cấp ứng dụng.",
+            "Việc tạm ngừng hoặc thu hồi một hoặc nhiều tài khoản không làm phát sinh bất kỳ khoản bồi thường nào dưới bất kỳ hình thức nào."
+          ]
+        },
+        "section5": {
+          "title": "7.5. Mã nguồn mở và giấy phép",
+          "content": "Mã nguồn của dịch vụ là mã nguồn mở và có sẵn tại đây: https://github.com/suitenumerique/meet. Nội dung do DINUM cung cấp được cấp phép theo Giấy phép mở 2.0, ngoại trừ các logo và hình ảnh đồ họa hoặc hình ảnh nhiếp ảnh, có thể được điều chỉnh bởi giấy phép riêng của chúng."
+        }
+      }
+    },
+    "article8": {
+      "title": "8. Thay đổi các điều khoản sử dụng",
+      "content": "Các điều khoản của những điều kiện sử dụng này có thể được sửa đổi hoặc bổ sung bất cứ lúc nào, mà không cần thông báo, tùy thuộc vào những thay đổi đối với dịch vụ, sự phát triển của pháp luật, hoặc vì bất kỳ lý do nào khác được cho là cần thiết.\nNhững thay đổi và cập nhật này có hiệu lực ràng buộc đối với người dùng, do đó người dùng phải thường xuyên tham khảo mục này để xác minh các điều khoản hiện hành."
+    }
+  }
+}

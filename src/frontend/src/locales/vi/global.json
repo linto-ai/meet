@@ -1,0 +1,61 @@
+{
+  "backToHome": "Quay lại màn hình chính",
+  "cancel": "Hủy",
+  "closeDialog": "Đóng hộp thoại",
+  "error": {
+    "heading": "Đã xảy ra lỗi khi tải trang"
+  },
+  "feedback": {
+    "context": "Phản hồi của bạn định hình sản phẩm!",
+    "cta": "Chia sẻ phản hồi của bạn - tab mới"
+  },
+  "forbidden": {
+    "heading": "Bạn không có quyền xem trang này"
+  },
+  "loading": "Đang tải…",
+  "loggedInUserTooltip": "Đã đăng nhập với tên ",
+  "login": {
+    "buttonLabel": "Đăng nhập",
+    "proconnectButtonLabel": "Đăng nhập bằng ProConnect",
+    "proconnectLinkLabel": "ProConnect là gì? - tab mới",
+    "proconnectLink": "ProConnect là gì?"
+  },
+  "logout": "Đăng xuất",
+  "notFound": {
+    "heading": "Kiểm tra mã cuộc họp của bạn",
+    "body": "Kiểm tra rằng bạn đã nhập đúng mã cuộc họp trong URL. Ví dụ:"
+  },
+  "selected": "đã chọn",
+  "submit": "OK",
+  "footer": {
+    "links": {
+      "legifrance": "legifrance.gouv.fr",
+      "infogouv": "info.gouv.fr",
+      "servicepublic": "service-public.fr",
+      "datagouv": "data.gouv.fr",
+      "legalsTerms": "Thông báo pháp lý",
+      "data": "Dữ liệu cá nhân và Cookie",
+      "accessibility": "Khả năng tiếp cận: không tuân thủ",
+      "ariaLabel": "cửa sổ mới",
+      "codeAnnotation": "Mã của chúng tôi là mã nguồn mở và có sẵn tại đây",
+      "code": "Kho mã nguồn mở",
+      "technicalDetails": "Thông báo kỹ thuật",
+      "termsOfService": "Điều khoản dịch vụ"
+    },
+    "mentions": "Trừ khi có quy định khác, nội dung của trang web này được cung cấp theo",
+    "license": "giấy phép etalab 2.0"
+  },
+  "loginHint": {
+    "title": "Đăng nhập bằng tài khoản của bạn",
+    "body": "Thay vì chờ đợi, hãy đăng nhập bằng tài khoản của bạn.",
+    "button": {
+      "ariaLabel": "Đóng gợi ý",
+      "label": "OK"
+    }
+  },
+  "skipLink": "Chuyển đến nội dung chính",
+  "clipboardContent": {
+    "url": "Để tham gia cuộc họp trực tuyến, hãy nhấp vào liên kết này: {{roomUrl}}",
+    "numberAndPin": "Để tham gia qua điện thoại, hãy gọi {{phoneNumber}} và nhập mã này: {{pinCode}}"
+  }
+}
