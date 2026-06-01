@@ -1,0 +1,693 @@
+{
+  "feedback": {
+    "heading": {
+      "normal": "Bạn đã rời khỏi cuộc họp",
+      "duplicateIdentity": "Bạn đã tham gia cuộc họp từ một thiết bị khác",
+      "participantRemoved": "Bạn đã bị quản trị viên xóa khỏi cuộc họp"
+    },
+    "home": "Trở về trang chủ",
+    "back": "Tham gia lại cuộc họp"
+  },
+  "selectDevice": {
+    "loading": "Đang tải…",
+    "select": "Chọn một giá trị",
+    "permissionsNeeded": "Cần quyền",
+    "settings": {
+      "audio": "Cài đặt âm thanh",
+      "video": "Cài đặt video"
+    },
+    "effects": "Hình nền và hiệu ứng",
+    "videoinput": {
+      "choose": "Chọn máy ảnh",
+      "permissionsNeeded": "Chọn máy ảnh - cần quyền",
+      "disable": "Tắt máy ảnh",
+      "enable": "Bật máy ảnh",
+      "turnedOff": "Đã tắt máy ảnh",
+      "turnedOn": "Đã bật máy ảnh",
+      "label": "Máy ảnh",
+      "placeholder": "Bật máy ảnh để xem bản xem trước"
+    },
+    "audioinput": {
+      "choose": "Chọn micro",
+      "permissionsNeeded": "Chọn micro - cần quyền",
+      "disable": "Tắt micro",
+      "enable": "Bật micro",
+      "turnedOff": "Đã tắt micro",
+      "turnedOn": "Đã bật micro",
+      "label": "Micro"
+    },
+    "audiooutput": {
+      "choose": "Chọn loa",
+      "permissionsNeeded": "Chọn loa - cần quyền"
+    }
+  },
+  "join": {
+    "effects": {
+      "description": "Áp dụng hình nền và hiệu ứng",
+      "title": "Hiệu ứng",
+      "subTitle": "Cấu hình hiệu ứng cho máy ảnh của bạn."
+    },
+    "heading": "Tham gia cuộc họp?",
+    "joinLabel": "Tham gia",
+    "joinMeeting": "Tham gia cuộc họp",
+    "toggleOff": "Nhấp để tắt",
+    "toggleOn": "Nhấp để bật",
+    "usernameHint": "Hiển thị cho những người tham gia khác",
+    "usernameLabel": "Tên của bạn",
+    "errors": {
+      "usernameEmpty": "Tên của bạn không được để trống"
+    },
+    "cameraDisabled": "Máy ảnh đã bị tắt.",
+    "cameraStarting": "Máy ảnh đang khởi động…",
+    "cameraNotGranted": "Bạn có muốn người khác có thể nhìn thấy bạn trong cuộc họp không?",
+    "cameraAndMicNotGranted": "Bạn có muốn người khác có thể nhìn thấy và nghe thấy bạn trong cuộc họp không?",
+    "permissionsButton": {
+      "cameraAndMicNotGranted": "Cho phép truy cập máy ảnh và micro",
+      "cameraNotGranted": "Cho phép truy cập máy ảnh"
+    },
+    "videoPreview": {
+      "enabled": "Đã bật xem trước video",
+      "disabled": "Đã tắt xem trước video"
+    },
+    "waiting": {
+      "title": "Đang yêu cầu tham gia...",
+      "body": "Bạn sẽ có thể tham gia cuộc gọi này khi có người cho phép bạn"
+    },
+    "denied": {
+      "title": "Bạn không thể tham gia cuộc gọi này",
+      "body": "Yêu cầu tham gia của bạn đã bị từ chối."
+    },
+    "timeoutInvite": {
+      "title": "Bạn không thể tham gia cuộc gọi này",
+      "body": "Không có ai phản hồi yêu cầu của bạn"
+    }
+  },
+  "leaveRoomPrompt": "Điều này sẽ khiến bạn rời khỏi cuộc họp.",
+  "shareDialog": {
+    "copy": "Sao chép thông tin",
+    "copyUrl": "Sao chép liên kết",
+    "copied": "Đã sao chép thông tin vào bộ nhớ tạm",
+    "heading": "Cuộc họp của bạn đã sẵn sàng",
+    "description": "Chia sẻ liên kết này với những người bạn muốn mời vào cuộc họp.",
+    "permissions": "Những người có liên kết này không cần sự cho phép của bạn để tham gia cuộc họp.",
+    "closeDialog": "Đóng hộp thoại",
+    "phone": {
+      "call": "Gọi:",
+      "pinCode": "Mã:"
+    }
+  },
+  "pagination": {
+    "count": "{{currentPage}} trên {{totalPageCount}}",
+    "next": "trang tiếp theo",
+    "previous": "trang trước"
+  },
+  "mediaErrorDialog": {
+    "DeviceInUse": {
+      "title": {
+        "audioinput": "Kích hoạt micro thất bại",
+        "videoinput": "Kích hoạt máy ảnh thất bại"
+      },
+      "body": {
+        "audioinput": "Micro của bạn đang được sử dụng bởi một tab hoặc ứng dụng khác, khiến nó không thể được kích hoạt trong cuộc gọi video này. Nếu muốn, hãy đóng tab hoặc ứng dụng kia để sử dụng nó ở đây.",
+        "videoinput": "Máy ảnh của bạn đang được sử dụng bởi một tab hoặc ứng dụng khác, khiến nó không thể được kích hoạt trong cuộc gọi video này. Nếu muốn, hãy đóng tab hoặc ứng dụng kia để sử dụng nó ở đây."
+      }
+    },
+    "close": "OK"
+  },
+  "permissionErrorDialog": {
+    "heading": {
+      "camera": "{{appTitle}} không được phép sử dụng máy ảnh của bạn",
+      "microphone": "{{appTitle}} không được phép sử dụng micro của bạn",
+      "cameraAndMicrophone": "{{appTitle}} không được phép sử dụng micro hoặc máy ảnh của bạn",
+      "default": "{{appTitle}} không được phép sử dụng một số quyền nhất định"
+    },
+    "body": {
+      "openMenu": {
+        "others": "Nhấp vào biểu tượng cài đặt ICON_PLACEHOLDER trên thanh địa chỉ của trình duyệt",
+        "safari": "Nhấp vào menu 'Safari', và mở 'Cài đặt cho {{appDomain}}'."
+      },
+      "details": {
+        "camera": "Cho phép truy cập máy ảnh",
+        "microphone": "Cho phép truy cập micro",
+        "cameraAndMicrophone": "Cho phép truy cập máy ảnh và micro",
+        "default": "Bật các quyền cần thiết."
+      }
+    }
+  },
+  "permissionsButton": {
+    "tooltip": "Thêm thông tin",
+    "ariaLabel": "Sự cố về quyền. Hiển thị thêm thông tin"
+  },
+  "error": {
+    "createRoom": {
+      "heading": "Yêu cầu xác thực",
+      "body": "Phòng này chưa được tạo. Vui lòng xác thực để tạo nó hoặc chờ một người dùng đã xác thực thực hiện."
+    },
+    "screenShare": {
+      "title": "Không thể chia sẻ màn hình của bạn",
+      "ariaLabel": "Không thể chia sẻ màn hình của bạn",
+      "message": "Trình duyệt của bạn có thể không được phép ghi màn hình trên máy tính của bạn.",
+      "macInstructions": "Đi đến",
+      "macSystemPreferences": "Tùy chọn hệ thống",
+      "helpLinkText": "Để tìm hiểu thêm, hãy xem",
+      "helpLinkLabel": "Sự cố trình bày",
+      "closeButton": "Bỏ qua",
+      "newTab": "Cửa sổ mới"
+    }
+  },
+  "isIdleDisconnectModal": {
+    "title": "Bạn còn đó không?",
+    "body": "Bạn là người tham gia duy nhất. Cuộc gọi này sẽ kết thúc sau {{duration}}. Bạn có muốn tiếp tục cuộc gọi không?",
+    "settingsPrefix": "Để ngừng nhìn thấy thông báo này, hãy đi đến",
+    "settingsLink": "Cài đặt > Chung",
+    "settingsSuffix": ".",
+    "stayButton": "Tiếp tục cuộc gọi",
+    "leaveButton": "Rời ngay",
+    "countdownAnnouncement": "Cuộc gọi kết thúc sau {{duration}}."
+  },
+  "controls": {
+    "microphone": "Micro",
+    "camera": "Máy ảnh",
+    "chat": {
+      "open": "Đóng trò chuyện",
+      "closed": "Mở trò chuyện",
+      "input": {
+        "textArea": {
+          "label": "Nhập tin nhắn",
+          "placeholder": "Nhập tin nhắn"
+        },
+        "button": {
+          "label": "Gửi tin nhắn"
+        }
+      }
+    },
+    "info": {
+      "open": "Ẩn thông tin",
+      "closed": "Hiển thị thông tin"
+    },
+    "hand": {
+      "raise": "Giơ tay",
+      "lower": "Hạ tay"
+    },
+    "subtitles": {
+      "closed": "Hiển thị phụ đề",
+      "open": "Ẩn phụ đề"
+    },
+    "screenShare": {
+      "start": "Chia sẻ màn hình",
+      "stop": "Dừng chia sẻ màn hình"
+    },
+    "leave": "Rời đi",
+    "participants": {
+      "open": "Ẩn mọi người",
+      "closed": "Xem mọi người",
+      "count_other": "{{count}} người tham gia"
+    },
+    "tools": {
+      "open": "Ẩn thêm công cụ",
+      "closed": "Hiển thị thêm công cụ"
+    },
+    "admin": {
+      "open": "Ẩn quản trị",
+      "closed": "Mở quản trị"
+    },
+    "moreOptions": "Thêm tùy chọn",
+    "reactions": {
+      "button": "Gửi cảm xúc",
+      "send": "Gửi cảm xúc {{emoji}}",
+      "announce": "{{name}} : {{emoji}}",
+      "you": "bạn",
+      "emojis": {
+        "thumbs-up": "ngón tay cái hướng lên",
+        "thumbs-down": "ngón tay cái hướng xuống",
+        "clapping-hands": "vỗ tay",
+        "red-heart": "trái tim đỏ",
+        "face-with-tears-of-joy": "mặt cười ra nước mắt",
+        "face-with-open-mouth": "mặt ngạc nhiên",
+        "party-popper": "pháo giấy",
+        "folded-hands": "chắp tay"
+      }
+    }
+  },
+  "options": {
+    "buttonLabel": "Thêm tùy chọn",
+    "items": {
+      "feedback": "Gửi phản hồi cho chúng tôi",
+      "settings": "Cài đặt",
+      "screenRecording": "Ghi màn hình",
+      "transcript": "Chép lời",
+      "username": "Cập nhật tên của bạn",
+      "effects": "Hình nền và hiệu ứng",
+      "switchCamera": "Chuyển máy ảnh",
+      "fullscreen": {
+        "enter": "Toàn màn hình",
+        "exit": "Thoát chế độ toàn màn hình"
+      },
+      "support": "Liên hệ hỗ trợ"
+    }
+  },
+  "effects": {
+    "activateCamera": "Máy ảnh của bạn đã bị tắt. Chọn một tùy chọn để bật nó.",
+    "cameraDisabled": "Máy ảnh của bạn đã bị tắt.",
+    "notAvailable": "Hiệu ứng video sẽ sớm khả dụng trên trình duyệt của bạn. Chúng tôi đang nỗ lực thực hiện! Trong thời gian chờ đợi, bạn có thể sử dụng Google Chrome để có hiệu suất tốt nhất hoặc Firefox :(",
+    "heading": "Làm mờ",
+    "clear": "Tắt hiệu ứng",
+    "blur": {
+      "title": "Làm mờ hình nền",
+      "status": {
+        "none": "Hình nền rõ.",
+        "light": "Hình nền hơi mờ.",
+        "strong": "Hình nền mờ mạnh."
+      },
+      "light": {
+        "apply": "Làm mờ nhẹ hình nền của bạn",
+        "clear": "Tắt làm mờ"
+      },
+      "normal": {
+        "apply": "Làm mờ hình nền của bạn",
+        "clear": "Tắt làm mờ"
+      }
+    },
+    "virtual": {
+      "title": "Hình nền ảo",
+      "selectedLabel": "Hình nền đã áp dụng:",
+      "apply": "Thay thế hình nền của bạn:",
+      "personal": {
+        "title": "Hình nền của tôi",
+        "selectFileTooltip": "Chọn một tệp ảnh để dùng làm hình nền cá nhân",
+        "notLoggedInWarning": "Bạn chưa đăng nhập, hình nền cá nhân sẽ không được lưu từ cuộc họp này sang cuộc họp khác.",
+        "warningUploadDisabled": "Hình nền cá nhân hiện không được lưu từ cuộc họp này sang cuộc họp khác.",
+        "uploadLimitReached": "Bạn không thể tải lên thêm hình nền cá nhân.",
+        "uploadInProgress": "Đang tải lên ảnh…",
+        "errors": {
+          "close": "Đóng",
+          "file_too_large": {
+            "title": "Tệp quá lớn",
+            "description": "Tệp quá lớn. Vui lòng chọn một tệp nhỏ hơn {{maxSize, number}} MB."
+          },
+          "invalid_file_type": {
+            "title": "Loại tệp không hợp lệ",
+            "description": "Loại tệp không được hỗ trợ. Vui lòng chọn một tệp {{allowedExtension, list(type: 'disjunction')}}."
+          }
+        }
+      },
+      "presets": {
+        "title": "Gợi ý",
+        "descriptions": {
+          "0": "Đồ nội thất gỗ có rãnh",
+          "1": "Phòng họp",
+          "2": "Gác lửng với vách kính đen",
+          "3": "Phòng ăn",
+          "4": "Kệ gỗ",
+          "5": "Cầu thang gỗ",
+          "6": "Thư viện màu xám",
+          "7": "Quầy cà phê"
+        }
+      }
+    },
+    "faceLandmarks": {
+      "title": "Hiệu ứng hình ảnh",
+      "glasses": {
+        "apply": "Thêm kính",
+        "clear": "Bỏ kính"
+      },
+      "french": {
+        "apply": "Thêm nét Pháp",
+        "clear": "Bỏ nét Pháp"
+      }
+    }
+  },
+  "sidePanel": {
+    "ariaLabel": "Bảng bên - {{title}}",
+    "backToTools": "Quay lại công cụ cuộc họp",
+    "heading": {
+      "participants": "Người tham gia",
+      "effects": "Hình nền và hiệu ứng",
+      "chat": "Tin nhắn trong cuộc trò chuyện",
+      "transcript": "Chép lời",
+      "screenRecording": "Ghi",
+      "admin": "Cài đặt quản trị",
+      "tools": "Thêm công cụ",
+      "info": "Thông tin cuộc họp"
+    },
+    "content": {
+      "participants": "người tham gia",
+      "effects": "hình nền và hiệu ứng",
+      "chat": "tin nhắn",
+      "transcript": "chép lời",
+      "screenRecording": "ghi",
+      "admin": "cài đặt quản trị",
+      "tools": "thêm công cụ",
+      "info": "thông tin cuộc họp"
+    },
+    "closeButton": "Ẩn {{content}}"
+  },
+  "chat": {
+    "disclaimer": "Tin nhắn chỉ hiển thị cho người tham gia tại thời điểm chúng được gửi. Tất cả tin nhắn sẽ bị xóa khi kết thúc cuộc gọi.",
+    "messagesLog": "Tin nhắn trò chuyện"
+  },
+  "moreTools": {
+    "body": "Truy cập thêm công cụ để nâng cao các cuộc họp của bạn.",
+    "linkAriaLabel": "Mở tài liệu về công cụ - mở trong cửa sổ mới",
+    "moreLink": "Mở tài liệu",
+    "tools": {
+      "transcript": {
+        "title": "Chép lời",
+        "body": "Biến cuộc họp thành văn bản."
+      },
+      "screenRecording": {
+        "title": "Ghi",
+        "body": "Lưu cuộc họp dưới dạng video."
+      }
+    }
+  },
+  "info": {
+    "roomInformation": {
+      "title": "Thông tin kết nối",
+      "button": {
+        "ariaLabel": "Sao chép thông tin từ cuộc họp của bạn",
+        "copy": "Sao chép thông tin",
+        "copied": "Đã sao chép thông tin"
+      },
+      "phone": {
+        "call": "Gọi:",
+        "pinCode": "Mã:"
+      }
+    }
+  },
+  "transcript": {
+    "heading": "Chép lời cuộc họp của bạn với Trợ lý AI",
+    "body": "Chép lời lên đến {{max_duration}} thời gian họp.",
+    "bodyWithoutMaxDuration": "Chép lời cuộc họp của bạn không giới hạn.",
+    "details": {
+      "receiver": "Bản chép lời sẽ được gửi đến người tổ chức và đồng tổ chức.",
+      "destination": "Một tài liệu mới sẽ được tạo trên",
+      "destinationUnknown": "Một tài liệu mới sẽ được tạo",
+      "language": "Ngôn ngữ cuộc họp:",
+      "recording": "Đồng thời bắt đầu ghi"
+    },
+    "button": {
+      "start": "Bắt đầu chép lời cuộc họp",
+      "stop": "Dừng chép lời cuộc họp",
+      "saving": "Đang lưu…",
+      "starting": "Đang bắt đầu…",
+      "anotherModeStarted": "Đang ghi màn hình. Chuyển bảng và dừng nó."
+    },
+    "linkMore": "Mở tài liệu",
+    "linkAriaLabel": "Mở tài liệu về chép lời - mở trong cửa sổ mới",
+    "notAdminOrOwner": {
+      "heading": "Quyền truy cập bị hạn chế",
+      "body": "Vì lý do bảo mật, chỉ người tạo cuộc họp hoặc quản trị viên mới có thể bắt đầu chép lời (beta).",
+      "linkMore": "Mở tài liệu",
+      "linkAriaLabel": "Mở tài liệu về quyền truy cập chép lời - mở trong cửa sổ mới",
+      "dividerLabel": "HOẶC",
+      "login": {
+        "heading": "Yêu cầu đăng nhập",
+        "body": "Chỉ người tạo cuộc họp hoặc quản trị viên mới có thể bắt đầu chép lời. Đăng nhập để xác minh quyền của bạn."
+      },
+      "request": {
+        "heading": "Yêu cầu chép lời",
+        "body": "Người tổ chức sẽ được thông báo và có thể bật chép lời cho bạn.",
+        "buttonLabel": "Yêu cầu"
+      }
+    },
+    "premium": {
+      "heading": "Tính năng cao cấp",
+      "body": "Tính năng này dành riêng cho công chức. Nếu địa chỉ email của bạn không được phép, vui lòng liên hệ hỗ trợ để được cấp quyền truy cập.",
+      "linkMore": "Mở tài liệu",
+      "linkAriaLabel": "Mở tài liệu về quyền truy cập cao cấp - mở trong cửa sổ mới",
+      "dividerLabel": "HOẶC",
+      "login": {
+        "heading": "Bạn chưa đăng nhập!",
+        "body": "Bạn phải đăng nhập để sử dụng tính năng này. Vui lòng đăng nhập, rồi thử lại."
+      },
+      "request": {
+        "heading": "Yêu cầu chép lời",
+        "body": "Người tổ chức sẽ được thông báo và có thể bật chép lời cho bạn.",
+        "buttonLabel": "Yêu cầu"
+      }
+    }
+  },
+  "screenRecording": {
+    "heading": "Ghi cuộc gọi này để xem sau",
+    "body": "Ghi lên đến {{max_duration}} cuộc họp.",
+    "bodyWithoutMaxDuration": "Ghi cuộc họp của bạn không giới hạn.",
+    "linkMore": "Mở tài liệu",
+    "linkAriaLabel": "Mở tài liệu về ghi - mở trong cửa sổ mới",
+    "details": {
+      "receiver": "Bản ghi sẽ được gửi đến người tổ chức và đồng tổ chức.",
+      "destination": "Bản ghi này sẽ được lưu tạm thời trên máy chủ của chúng tôi",
+      "loading": "Đang bắt đầu ghi",
+      "linkMore": "Tìm hiểu thêm",
+      "transcription": "Chép lời bản ghi này"
+    },
+    "button": {
+      "start": "Bắt đầu ghi cuộc họp",
+      "stop": "Dừng ghi cuộc họp",
+      "saving": "Đang lưu…",
+      "starting": "Đang bắt đầu…",
+      "anotherModeStarted": "Đang chép lời. <br/> Chuyển bảng và dừng nó."
+    },
+    "notAdminOrOwner": {
+      "heading": "Quyền truy cập bị hạn chế",
+      "body": "Vì lý do bảo mật, chỉ người tạo cuộc họp hoặc quản trị viên mới có thể bắt đầu ghi (beta).",
+      "linkMore": "Mở tài liệu",
+      "linkAriaLabel": "Mở tài liệu về quyền truy cập ghi - mở trong cửa sổ mới",
+      "dividerLabel": "HOẶC",
+      "login": {
+        "heading": "Yêu cầu đăng nhập",
+        "body": "Chỉ người tạo cuộc họp hoặc quản trị viên mới có thể bắt đầu ghi màn hình. Đăng nhập để xác minh quyền của bạn."
+      },
+      "request": {
+        "heading": "Yêu cầu ghi",
+        "body": "Người tổ chức sẽ được thông báo và có thể bật ghi cho bạn.",
+        "buttonLabel": "Yêu cầu"
+      }
+    },
+    "durationMessage": "(giới hạn {{max_duration}}) "
+  },
+  "errorRecordingAlertDialog": {
+    "title": "Ghi thất bại",
+    "body": {
+      "stop": "Chúng tôi không thể dừng ghi. Vui lòng thử lại sau giây lát.",
+      "start": "Chúng tôi không thể bắt đầu ghi. Vui lòng thử lại sau giây lát."
+    },
+    "button": "OK"
+  },
+  "admin": {
+    "description": "Các cài đặt dành cho người tổ chức này cho phép bạn duy trì quyền kiểm soát cuộc họp của mình. Chỉ người tổ chức mới có thể truy cập các điều khiển này.",
+    "access": {
+      "title": "Quyền truy cập phòng",
+      "description": "Các cài đặt này cũng sẽ áp dụng cho các lần diễn ra trong tương lai của cuộc họp này.",
+      "type": "Các loại quyền truy cập cuộc họp",
+      "levels": {
+        "public": {
+          "label": "Mở",
+          "description": "Không ai cần yêu cầu để tham gia cuộc họp."
+        },
+        "trusted": {
+          "label": "Mở cho những người đáng tin cậy",
+          "description": "Những người đã xác thực không cần yêu cầu để tham gia cuộc họp."
+        },
+        "restricted": {
+          "label": "Hạn chế",
+          "description": "Những người chưa được mời vào cuộc họp phải yêu cầu để tham gia."
+        }
+      }
+    },
+    "moderation": {
+      "title": "Điều hành cuộc họp",
+      "description": "Các cài đặt này hạn chế các hành động mà người đóng góp có thể thực hiện trong cuộc họp.",
+      "microphone": {
+        "label": "Bật micro",
+        "description": ""
+      },
+      "camera": {
+        "label": "Bật video",
+        "description": ""
+      },
+      "screenshare": {
+        "label": "Chia sẻ màn hình của họ",
+        "description": "Việc tắt tùy chọn này sẽ ngăn người tham gia chia sẻ màn hình của họ, và mọi việc chia sẻ màn hình đang diễn ra sẽ bị dừng ngay lập tức."
+      }
+    },
+    "recording": {
+      "title": "Quyền ghi",
+      "description": "Kiểm soát ai có thể bắt đầu ghi và chép lời trong phòng này.",
+      "screenRecording": {
+        "label": "Ghi màn hình"
+      },
+      "transcript": {
+        "label": "Chép lời"
+      },
+      "levels": {
+        "adminOwner": {
+          "label": "Chỉ quản trị viên và chủ sở hữu",
+          "description": "Chỉ quản trị viên và chủ sở hữu của phòng này mới có thể bắt đầu tính năng này."
+        },
+        "authenticated": {
+          "label": "Tất cả người dùng đã xác thực",
+          "description": "Bất kỳ người dùng đã đăng nhập nào cũng có thể bắt đầu tính năng này."
+        }
+      }
+    }
+  },
+  "rating": {
+    "submit": "Gửi",
+    "question": "Bạn nghĩ gì về chất lượng cuộc gọi của bạn?",
+    "levels": {
+      "min": "rất kém",
+      "max": "xuất sắc"
+    }
+  },
+  "openFeedback": {
+    "question": "Chúng tôi có thể làm gì để cải thiện?",
+    "placeholder": "Mô tả lỗi hoặc chia sẻ đề xuất của bạn…",
+    "submit": "Gửi",
+    "skip": "Bỏ qua"
+  },
+  "confirmationMessage": {
+    "heading": "Cảm ơn bạn đã gửi",
+    "body": "Đội ngũ sản phẩm của chúng tôi dành thời gian xem xét cẩn thận phản hồi của bạn. Chúng tôi sẽ phản hồi bạn sớm nhất có thể."
+  },
+  "authenticationMessage": {
+    "heading": "Chúng tôi có thể liên hệ với bạn bằng cách nào?",
+    "placeholder": "Email của bạn",
+    "submit": "Gửi",
+    "ignore": "Bỏ qua"
+  },
+  "participants": {
+    "subheading": "Trong phòng",
+    "you": "Bạn",
+    "unknown": "Người tham gia không xác định",
+    "host": "Người tổ chức",
+    "contributors": "Người đóng góp",
+    "collapsable": {
+      "open": "Mở danh sách {{name}}",
+      "close": "Đóng danh sách {{name}}"
+    },
+    "muteYourself": "Tắt micro của bạn",
+    "muteParticipant": "Tắt micro của {{name}}",
+    "muteParticipantAlert": {
+      "heading": "Tắt micro {{name}}",
+      "description": "Tắt micro {{name}} cho tất cả người tham gia? {{name}} sẽ là người duy nhất có thể tự bật lại micro.",
+      "confirm": "Tắt micro",
+      "cancel": "Hủy"
+    },
+    "raisedHands": "Tay đã giơ",
+    "lowerParticipantHand": "Hạ tay của {{name}}",
+    "lowerParticipantsHand": "Hạ tất cả tay",
+    "muteParticipants": "Tắt tất cả micro",
+    "waiting": {
+      "title": "Phòng chờ",
+      "accept": {
+        "button": "Chấp nhận",
+        "label": "Chấp nhận {{name}} vào cuộc họp",
+        "all": "Chấp nhận tất cả"
+      },
+      "deny": {
+        "button": "Từ chối",
+        "label": "Từ chối {{name}} khỏi cuộc họp",
+        "all": "Từ chối tất cả"
+      }
+    },
+    "moreOptions": "Thêm tùy chọn"
+  },
+  "participantMenu": {
+    "remove": {
+      "label": "Xóa khỏi cuộc gọi",
+      "ariaLabel": "Xóa {{name}} khỏi cuộc gọi"
+    },
+    "unpin": {
+      "label": "Bỏ ghim",
+      "ariaLabel": "Bỏ ghim {{name}}"
+    },
+    "pin": {
+      "label": "Ghim",
+      "ariaLabel": "Ghim {{name}}"
+    }
+  },
+  "pinAnnouncements": {
+    "pin": "Video của {{name}} đã được ghim.",
+    "unpin": "Video của {{name}} không còn được ghim.",
+    "self": {
+      "pin": "Video của bạn đã được ghim.",
+      "unpin": "Video của bạn không còn được ghim."
+    }
+  },
+  "recordingStateToast": {
+    "transcript": {
+      "started": "Đang chép lời",
+      "starting": "Đang bắt đầu chép lời",
+      "stopping": "Đang dừng chép lời"
+    },
+    "screen_recording": {
+      "started": "Đang ghi",
+      "starting": "Đang bắt đầu ghi",
+      "stopping": "Đang dừng ghi"
+    },
+    "any": {
+      "started": "Đang ghi"
+    },
+    "limitReachedAlert": {
+      "title": "Đã vượt giới hạn ghi",
+      "description": "Bản ghi đã vượt quá thời lượng tối đa cho phép{{duration_message}}. Nó sẽ được lưu tự động ngay bây giờ.",
+      "durationMessage": " là {{duration}}",
+      "button": "OK"
+    }
+  },
+  "participantTileFocus": {
+    "containerLabel": "Tùy chọn cho {{name}}",
+    "toolbarHint": "{{shortcut}}: truy cập trực tiếp các phím tắt.",
+    "pin": {
+      "enable": "Ghim",
+      "disable": "Bỏ ghim"
+    },
+    "effects": "Áp dụng hình nền và hiệu ứng",
+    "muteParticipant": "Tắt micro {{name}}",
+    "fullScreen": "Toàn màn hình"
+  },
+  "shortcutsPanel": {
+    "title": "Phím tắt",
+    "categories": {
+      "navigation": "Điều hướng",
+      "media": "Phương tiện",
+      "interaction": "Tương tác"
+    },
+    "actions": {
+      "open-shortcuts": "Mở trợ giúp phím tắt",
+      "focus-toolbar": "Tập trung thanh công cụ dưới cùng",
+      "toggle-microphone": "Bật/tắt micro",
+      "toggle-camera": "Bật/tắt máy ảnh",
+      "push-to-talk": "Nhấn để nói (giữ để bật micro)",
+      "reaction": "Bảng cảm xúc emoji",
+      "fullscreen": "Bật/tắt toàn màn hình",
+      "recording": "Bật/tắt bảng ghi",
+      "raise-hand": "Giơ hoặc hạ tay",
+      "toggle-chat": "Bật/tắt trò chuyện",
+      "toggle-participants": "Bật/tắt người tham gia",
+      "open-shortcuts-settings": "Mở cài đặt phím tắt"
+    },
+    "sr": {
+      "control": "Control",
+      "command": "Command",
+      "alt": "Alt",
+      "option": "Option",
+      "shift": "Shift",
+      "plus": "cộng",
+      "hold": "Giữ {{key}}",
+      "noShortcut": "Không có phím tắt"
+    },
+    "visual": {
+      "hold": "Giữ {{key}}"
+    }
+  },
+  "fullScreenWarning": {
+    "message": "Để tránh hiển thị vòng lặp vô hạn, đừng chia sẻ toàn bộ màn hình của bạn. Thay vào đó, hãy chia sẻ một tab hoặc một cửa sổ khác.",
+    "stop": "Dừng trình bày",
+    "ignore": "Bỏ qua"
+  },
+  "participantTile": {
+    "screenShare": "Màn hình của {{name}}"
+  }
+}

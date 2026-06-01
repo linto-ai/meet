@@ -1,0 +1,34 @@
+{
+  "accessibility": {
+    "title": "Khả năng tiếp cận",
+    "introduction": "<i>Visio</i> cam kết làm cho các dịch vụ số của mình dễ tiếp cận, theo Điều 47 của Luật số 2005-102 ngày 11 tháng 2 năm 2005.",
+    "declaration": {
+      "title": "Tuyên bố về khả năng tiếp cận",
+      "date": "Được lập ngày 4 tháng 12 năm 2024."
+    },
+    "scope": "Tuyên bố về khả năng tiếp cận này áp dụng cho trang web visio.numerique.gouv.fr",
+    "complianceStatus": {
+      "title": "Tình trạng tuân thủ",
+      "body": "visio.numerique.gouv.fr không tuân thủ RGAA 4.1. Trang web chưa được kiểm định. Tuy nhiên, đội ngũ nỗ lực tạo ra một trang web dễ tiếp cận với mọi người bằng cách tuân theo các khuyến nghị của RGAA."
+    },
+    "improvement": {
+      "title": "Cải thiện và liên hệ",
+      "body": "Nếu bạn không thể truy cập nội dung hoặc dịch vụ, bạn có thể liên hệ với người phụ trách lasuite.numerique.gouv.fr để được hướng dẫn đến một giải pháp thay thế dễ tiếp cận hoặc để nhận nội dung dưới hình thức khác.",
+      "contact": {
+        "email": "Email: visio@numerique.gouv.fr",
+        "address": "Địa chỉ: DINUM, 20 avenue de Ségur 75007 Paris"
+      },
+      "response": "Chúng tôi cố gắng phản hồi trong vòng 2 ngày làm việc."
+    },
+    "recourse": {
+      "title": "Phương thức khiếu nại",
+      "introduction": "Quy trình này được sử dụng trong trường hợp sau: bạn đã báo cáo với người quản lý trang web về một vấn đề về khả năng tiếp cận khiến bạn không thể truy cập nội dung hoặc một trong các dịch vụ của cổng thông tin, và bạn chưa nhận được phản hồi thỏa đáng.",
+      "options": {
+        "intro": "Bạn có thể:",
+        "option1": "Viết thư cho Người bảo vệ quyền lợi",
+        "option2": "Liên hệ với đại diện của Người bảo vệ quyền lợi tại khu vực của bạn",
+        "option3": "Gửi thư qua đường bưu điện (miễn phí, không cần tem): </br> Người bảo vệ quyền lợi Phản hồi miễn phí 71120 75342 Paris CEDEX 07"
+      }
+    }
+  }
+}

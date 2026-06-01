@@ -2,7 +2,7 @@
 
 import logging
 from functools import cached_property, lru_cache
-from typing import Annotated, List, Mapping, Optional, Set
+from typing import Annotated, List, Literal, Mapping, Optional, Set
 
 from fastapi import Depends
 from pydantic import (
@@ -112,6 +112,12 @@ class Settings(BaseSettings):
     webhook_status_forcelist: List[int] = [502, 503, 504]
     webhook_backoff_factor: float = 0.1
     app_external_user_agent: str = "summary"
+
+    # Locale
+    default_context_language: Literal["de", "en", "fr", "nl", "ru", "vi"] = "fr"
+
+    # Output related settings
+    summary_title_template: Optional[str] = "Résumé de {title}"
 
     # Summary related settings
     is_summary_enabled: bool = True

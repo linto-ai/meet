@@ -1,0 +1,689 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-04-22 14:04+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: ru\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<12 || n%100>14) ? 1 : 2);\n"
+
+#: core/admin.py:29
+msgid "Personal info"
+msgstr "Личная информация"
+
+#: core/admin.py:42
+msgid "Permissions"
+msgstr "Права доступа"
+
+#: core/admin.py:54
+msgid "Important dates"
+msgstr "Важные даты"
+
+#: core/admin.py:132 core/admin.py:275
+msgid "No owner"
+msgstr "Нет владельца"
+
+#: core/admin.py:135 core/admin.py:278
+msgid "Multiple owners"
+msgstr "Несколько владельцев"
+
+#: core/admin.py:148
+msgid "Resend notification to external service"
+msgstr "Повторно отправить уведомление во внешний сервис"
+
+#: core/admin.py:171
+#, python-format
+msgid "Failed to notify for recording %(id)s"
+msgstr "Не удалось отправить уведомление о записи %(id)s"
+
+#: core/admin.py:179
+#, python-format
+msgid "Failed to notify for recording %(id)s: %(error)s"
+msgstr "Не удалось отправить уведомление о записи %(id)s: %(error)s"
+
+#: core/admin.py:187
+#, python-format
+msgid "Successfully sent notifications for %(count)s recording(s)."
+msgstr "Уведомления успешно отправлены для %(count)s записей."
+
+#: core/admin.py:195
+#, python-format
+msgid "Skipped %(count)s expired recording(s)."
+msgstr "Пропущено %(count)s просроченных записей."
+
+#: core/admin.py:200
+msgid "Mark selected recordings as 'Failed to Stop'"
+msgstr "Отметить выбранные записи как «Не удалось остановить»"
+
+#: core/admin.py:218
+#, python-format
+msgid "%(count)s recording(s) successfully marked as 'Failed to Stop'."
+msgstr "%(count)s записей успешно отмечены как «Не удалось остановить»."
+
+#: core/admin.py:226
+#, fuzzy, python-format
+#| msgid "Skipped %(count)s expired recording(s)."
+msgid "Skipped %(count)s recording(s) with an ineligible status."
+msgstr "Пропущено %(count)s записей с неподходящим статусом."
+
+#: core/admin.py:342
+msgid "No scopes"
+msgstr "Нет областей действия"
+
+#: core/admin.py:344
+msgid "Scopes"
+msgstr "Области действия"
+
+#: core/api/filters.py:25
+msgid "Creator is me"
+msgstr "Создатель — это я"
+
+#: core/api/serializers.py:88
+msgid "You must be administrator or owner of a room to add accesses to it."
+msgstr ""
+"Чтобы добавлять доступы к комнате, вы должны быть её администратором или "
+"владельцем."
+
+#: core/api/serializers.py:538
+msgid "This file extension is not allowed."
+msgstr "Это расширение файла не разрешено."
+
+#: core/api/viewsets.py:987
+msgid "You have reached the maximum number of files for this type."
+msgstr "Вы достигли максимального количества файлов этого типа."
+
+#: core/models.py:37
+msgid "Member"
+msgstr "Участник"
+
+#: core/models.py:38
+msgid "Administrator"
+msgstr "Администратор"
+
+#: core/models.py:39
+msgid "Owner"
+msgstr "Владелец"
+
+#: core/models.py:55
+msgid "Initiated"
+msgstr "Инициировано"
+
+#: core/models.py:56
+msgid "Active"
+msgstr "Активно"
+
+#: core/models.py:57
+msgid "Stopped"
+msgstr "Остановлено"
+
+#: core/models.py:58
+msgid "Saved"
+msgstr "Сохранено"
+
+#: core/models.py:59
+msgid "Aborted"
+msgstr "Прервано"
+
+#: core/models.py:60
+msgid "Failed to Start"
+msgstr "Не удалось запустить"
+
+#: core/models.py:61
+msgid "Failed to Stop"
+msgstr "Не удалось остановить"
+
+#: core/models.py:62
+msgid "Notification succeeded"
+msgstr "Уведомление успешно отправлено"
+
+#: core/models.py:89
+msgid "SCREEN_RECORDING"
+msgstr "SCREEN_RECORDING"
+
+#: core/models.py:90
+msgid "TRANSCRIPT"
+msgstr "TRANSCRIPT"
+
+#: core/models.py:96
+msgid "Public Access"
+msgstr "Публичный доступ"
+
+#: core/models.py:97
+msgid "Trusted Access"
+msgstr "Доверенный доступ"
+
+#: core/models.py:98
+msgid "Restricted Access"
+msgstr "Ограниченный доступ"
+
+#: core/models.py:110
+msgid "id"
+msgstr "идентификатор"
+
+#: core/models.py:111
+msgid "primary key for the record as UUID"
+msgstr "первичный ключ записи в виде UUID"
+
+#: core/models.py:117
+msgid "created on"
+msgstr "создано"
+
+#: core/models.py:118
+msgid "date and time at which a record was created"
+msgstr "дата и время создания записи"
+
+#: core/models.py:123
+msgid "updated on"
+msgstr "обновлено"
+
+#: core/models.py:124
+msgid "date and time at which a record was last updated"
+msgstr "дата и время последнего обновления записи"
+
+#: core/models.py:144
+msgid ""
+"Enter a valid sub. This value may contain only letters, numbers, and @/./+/-/"
+"_ characters."
+msgstr ""
+"Введите корректный sub. Это значение может содержать только буквы, цифры и "
+"символы @/./+/-/_."
+
+#: core/models.py:150
+msgid "sub"
+msgstr "sub"
+
+#: core/models.py:152
+msgid ""
+"Optional for pending users; required upon account activation. 255 characters "
+"or fewer. Letters, numbers, and @/./+/-/_ characters only."
+msgstr ""
+"Необязательно для ожидающих пользователей; обязательно при активации "
+"учётной записи. 255 символов или менее. Только буквы, цифры и символы "
+"@/./+/-/_."
+
+#: core/models.py:161
+msgid "identity email address"
+msgstr "адрес электронной почты для идентификации"
+
+#: core/models.py:166
+msgid "admin email address"
+msgstr "адрес электронной почты администратора"
+
+#: core/models.py:168
+msgid "full name"
+msgstr "полное имя"
+
+#: core/models.py:170
+msgid "short name"
+msgstr "краткое имя"
+
+#: core/models.py:176
+msgid "language"
+msgstr "язык"
+
+#: core/models.py:177
+msgid "The language in which the user wants to see the interface."
+msgstr "Язык, на котором пользователь хочет видеть интерфейс."
+
+#: core/models.py:183
+msgid "The timezone in which the user wants to see times."
+msgstr "Часовой пояс, в котором пользователь хочет видеть время."
+
+#: core/models.py:186
+msgid "device"
+msgstr "устройство"
+
+#: core/models.py:188
+msgid "Whether the user is a device or a real user."
+msgstr "Является ли пользователь устройством или реальным пользователем."
+
+#: core/models.py:191
+msgid "staff status"
+msgstr "статус персонала"
+
+#: core/models.py:193
+msgid "Whether the user can log into this admin site."
+msgstr "Может ли пользователь входить в этот административный сайт."
+
+#: core/models.py:196
+msgid "active"
+msgstr "активен"
+
+#: core/models.py:199
+msgid ""
+"Whether this user should be treated as active. Unselect this instead of "
+"deleting accounts."
+msgstr ""
+"Следует ли считать этого пользователя активным. Снимите этот флажок вместо "
+"удаления учётных записей."
+
+#: core/models.py:212
+msgid "user"
+msgstr "пользователь"
+
+#: core/models.py:213
+msgid "users"
+msgstr "пользователи"
+
+#: core/models.py:272
+msgid "Resource"
+msgstr "Ресурс"
+
+#: core/models.py:273
+msgid "Resources"
+msgstr "Ресурсы"
+
+#: core/models.py:331
+msgid "Resource access"
+msgstr "Доступ к ресурсу"
+
+#: core/models.py:332
+msgid "Resource accesses"
+msgstr "Доступы к ресурсам"
+
+#: core/models.py:338
+msgid "Resource access with this User and Resource already exists."
+msgstr "Доступ к ресурсу с этим пользователем и ресурсом уже существует."
+
+#: core/models.py:394
+msgid "Visio room configuration"
+msgstr "Конфигурация комнаты видеосвязи"
+
+#: core/models.py:395
+msgid "Values for Visio parameters to configure the room."
+msgstr "Значения параметров видеосвязи для настройки комнаты."
+
+#: core/models.py:402
+msgid "Room PIN code"
+msgstr "PIN-код комнаты"
+
+#: core/models.py:403
+msgid "Unique n-digit code that identifies this room in telephony mode."
+msgstr ""
+"Уникальный n-значный код, идентифицирующий эту комнату в режиме телефонии."
+
+#: core/models.py:409 core/models.py:563
+msgid "Room"
+msgstr "Комната"
+
+#: core/models.py:410
+msgid "Rooms"
+msgstr "Комнаты"
+
+#: core/models.py:574
+msgid "Worker ID"
+msgstr "Идентификатор обработчика"
+
+#: core/models.py:576
+msgid ""
+"Enter an identifier for the worker recording.This ID is retained even when "
+"the worker stops, allowing for easy tracking."
+msgstr ""
+"Введите идентификатор обработчика записи. Этот идентификатор сохраняется даже "
+"после остановки обработчика, что упрощает отслеживание."
+
+#: core/models.py:584
+msgid "Recording mode"
+msgstr "Режим записи"
+
+#: core/models.py:585
+msgid "Defines the mode of recording being called."
+msgstr "Определяет вызываемый режим записи."
+
+#: core/models.py:590 core/models.py:591
+msgid "Recording options"
+msgstr "Параметры записи"
+
+#: core/models.py:597
+msgid "Recording"
+msgstr "Запись"
+
+#: core/models.py:598
+msgid "Recordings"
+msgstr "Записи"
+
+#: core/models.py:706
+msgid "Recording/user relation"
+msgstr "Связь запись/пользователь"
+
+#: core/models.py:707
+msgid "Recording/user relations"
+msgstr "Связи запись/пользователь"
+
+#: core/models.py:713
+msgid "This user is already in this recording."
+msgstr "Этот пользователь уже есть в этой записи."
+
+#: core/models.py:719
+msgid "This team is already in this recording."
+msgstr "Эта команда уже есть в этой записи."
+
+#: core/models.py:725
+msgid "Either user or team must be set, not both."
+msgstr "Должен быть указан либо пользователь, либо команда, но не оба."
+
+#: core/models.py:742
+#, fuzzy
+#| msgid "created on"
+msgid "Create rooms"
+msgstr "Создавать комнаты"
+
+#: core/models.py:743
+msgid "List rooms"
+msgstr "Просматривать список комнат"
+
+#: core/models.py:744
+msgid "Retrieve room details"
+msgstr "Получать сведения о комнате"
+
+#: core/models.py:745
+#, fuzzy
+#| msgid "updated on"
+msgid "Update rooms"
+msgstr "Обновлять комнаты"
+
+#: core/models.py:746
+msgid "Delete rooms"
+msgstr "Удалять комнаты"
+
+#: core/models.py:759
+msgid "Application name"
+msgstr "Название приложения"
+
+#: core/models.py:760
+msgid "Descriptive name for this application."
+msgstr "Описательное название этого приложения."
+
+#: core/models.py:770
+msgid "Hashed on Save. Copy it now if this is a new secret."
+msgstr ""
+"Хешируется при сохранении. Скопируйте сейчас, если это новый секрет."
+
+#: core/models.py:781
+msgid "Application"
+msgstr "Приложение"
+
+#: core/models.py:782
+msgid "Applications"
+msgstr "Приложения"
+
+#: core/models.py:805
+msgid "Enter a valid domain"
+msgstr "Введите корректный домен"
+
+#: core/models.py:808
+msgid "Domain"
+msgstr "Домен"
+
+#: core/models.py:809
+msgid "Email domain this application can act on behalf of."
+msgstr "Почтовый домен, от имени которого может действовать это приложение."
+
+#: core/models.py:821
+msgid "Application domain"
+msgstr "Домен приложения"
+
+#: core/models.py:822
+msgid "Application domains"
+msgstr "Домены приложения"
+
+#: core/models.py:840
+#, fuzzy
+#| msgid "Recording"
+msgid "Pending"
+msgstr "В ожидании"
+
+#: core/models.py:848
+msgid "Ready"
+msgstr "Готово"
+
+#: core/models.py:854
+msgid "Background image"
+msgstr "Фоновое изображение"
+
+#: core/models.py:866
+msgid "title"
+msgstr "заголовок"
+
+#: core/models.py:890
+msgid "Malware detection info when the analysis status is unsafe."
+msgstr ""
+"Информация об обнаружении вредоносного ПО, когда статус анализа небезопасен."
+
+#: core/models.py:895
+msgid "File"
+msgstr "Файл"
+
+#: core/models.py:896
+msgid "Files"
+msgstr "Файлы"
+
+#: core/models.py:1000
+#, fuzzy
+#| msgid "This user is already in this recording."
+msgid "This file is already hard deleted."
+msgstr "Этот файл уже окончательно удалён."
+
+#: core/models.py:1010
+msgid "To hard delete a file, it must first be soft deleted."
+msgstr ""
+"Чтобы окончательно удалить файл, его сначала нужно удалить временно."
+
+#: core/recording/event/notification.py:153 core/tasks/recording.py:151
+msgid "Your recording is ready"
+msgstr "Ваша запись готова"
+
+#: core/services/invitation.py:44
+#, python-brace-format
+msgid "Video call in progress: {sender.email} is waiting for you to connect"
+msgstr "Идёт видеозвонок: {sender.email} ждёт вашего подключения"
+
+#: core/tasks/linto.py:505
+#, fuzzy
+#| msgid "Your recording is ready"
+msgid "Your meeting transcription is ready"
+msgstr "Расшифровка вашей встречи готова"
+
+#: core/templates/mail/html/invitation.html:159
+#: core/templates/mail/html/screen_recording.html:159
+#: core/templates/mail/html/transcription.html:159
+#: core/templates/mail/text/invitation.txt:3
+#: core/templates/mail/text/screen_recording.txt:3
+#: core/templates/mail/text/transcription.txt:3
+msgid "Logo email"
+msgstr "Логотип письма"
+
+#: core/templates/mail/html/invitation.html:189
+#: core/templates/mail/text/invitation.txt:5
+msgid "invites you to join an ongoing video call"
+msgstr "приглашает вас присоединиться к текущему видеозвонку"
+
+#: core/templates/mail/html/invitation.html:200
+#: core/templates/mail/text/invitation.txt:7
+msgid "JOIN THE CALL"
+msgstr "ПРИСОЕДИНИТЬСЯ К ЗВОНКУ"
+
+#: core/templates/mail/html/invitation.html:227
+#: core/templates/mail/text/invitation.txt:13
+msgid ""
+"If you can't click the button, copy and paste the URL into your browser to "
+"join the call."
+msgstr ""
+"Если не получается нажать кнопку, скопируйте и вставьте URL в браузер, чтобы "
+"присоединиться к звонку."
+
+#: core/templates/mail/html/invitation.html:235
+#: core/templates/mail/text/invitation.txt:15
+msgid "Tips for a better experience:"
+msgstr "Советы для лучшего качества:"
+
+#: core/templates/mail/html/invitation.html:237
+#: core/templates/mail/text/invitation.txt:17
+msgid "Use Chrome or Firefox for better call quality"
+msgstr "Используйте Chrome или Firefox для лучшего качества звонка"
+
+#: core/templates/mail/html/invitation.html:238
+#: core/templates/mail/text/invitation.txt:18
+msgid "Test your microphone and camera before joining"
+msgstr "Проверьте микрофон и камеру перед подключением"
+
+#: core/templates/mail/html/invitation.html:239
+#: core/templates/mail/text/invitation.txt:19
+msgid "Make sure you have a stable internet connection"
+msgstr "Убедитесь, что у вас стабильное интернет-соединение"
+
+#: core/templates/mail/html/invitation.html:248
+#: core/templates/mail/html/screen_recording.html:260
+#: core/templates/mail/html/transcription.html:243
+#: core/templates/mail/text/invitation.txt:21
+#: core/templates/mail/text/screen_recording.txt:31
+#: core/templates/mail/text/transcription.txt:26
+#, python-format
+msgid " Thank you for using %(brandname)s. "
+msgstr " Спасибо, что используете %(brandname)s. "
+
+#: core/templates/mail/html/screen_recording.html:188
+#: core/templates/mail/text/screen_recording.txt:6
+msgid "Your recording is ready!"
+msgstr "Ваша запись готова!"
+
+#: core/templates/mail/html/screen_recording.html:195
+#: core/templates/mail/text/screen_recording.txt:8
+#, python-format
+msgid ""
+" Your recording of \"%(room_name)s\" on %(recording_date)s at "
+"%(recording_time)s is now ready to download. "
+msgstr ""
+" Ваша запись «%(room_name)s» от %(recording_date)s в %(recording_time)s "
+"теперь готова к загрузке. "
+
+#: core/templates/mail/html/screen_recording.html:195
+#: core/templates/mail/text/screen_recording.txt:8
+#, python-format
+msgid " The recording will expire in %(days)s days. "
+msgstr " Срок действия записи истечёт через %(days)s дней. "
+
+#: core/templates/mail/html/screen_recording.html:200
+#: core/templates/mail/text/screen_recording.txt:9
+msgid ""
+" Sharing the recording via link is not yet available. Only organizers can "
+"download it. "
+msgstr ""
+" Предоставление записи по ссылке пока недоступно. Загрузить её могут только "
+"организаторы. "
+
+#: core/templates/mail/html/screen_recording.html:206
+#: core/templates/mail/text/screen_recording.txt:11
+msgid "To keep this recording permanently:"
+msgstr "Чтобы сохранить эту запись навсегда:"
+
+#: core/templates/mail/html/screen_recording.html:208
+#: core/templates/mail/text/screen_recording.txt:13
+msgid "Click the \"Open\" button below "
+msgstr "Нажмите кнопку «Открыть» ниже "
+
+#: core/templates/mail/html/screen_recording.html:209
+#: core/templates/mail/text/screen_recording.txt:14
+msgid "Use the \"Download\" button in the interface "
+msgstr "Используйте кнопку «Загрузить» в интерфейсе "
+
+#: core/templates/mail/html/screen_recording.html:210
+#: core/templates/mail/text/screen_recording.txt:15
+msgid "Save the file to your preferred location"
+msgstr "Сохраните файл в удобное для вас место"
+
+#: core/templates/mail/html/screen_recording.html:216
+#: core/templates/mail/text/screen_recording.txt:18
+#, fuzzy
+#| msgid "Your recording is ready"
+msgid " Your recording is saved in Twake Drive. "
+msgstr " Ваша запись сохранена в Twake Drive. "
+
+#: core/templates/mail/html/screen_recording.html:225
+#: core/templates/mail/html/transcription.html:216
+#: core/templates/mail/text/screen_recording.txt:20
+#: core/templates/mail/text/transcription.txt:17
+msgid "Open in Twake Drive"
+msgstr ""
+
+#: core/templates/mail/html/screen_recording.html:237
+#: core/templates/mail/text/screen_recording.txt:24
+msgid "Download directly"
+msgstr ""
+
+#: core/templates/mail/html/screen_recording.html:245
+#: core/templates/mail/html/transcription.html:228
+#: core/templates/mail/text/screen_recording.txt:27
+#: core/templates/mail/text/transcription.txt:22
+#, python-format
+msgid ""
+" If you have any questions or need assistance, please contact our support "
+"team at %(support_email)s. "
+msgstr ""
+" Если у вас есть вопросы или нужна помощь, свяжитесь с нашей службой "
+"поддержки по адресу %(support_email)s. "
+
+#: core/templates/mail/html/transcription.html:188
+#: core/templates/mail/text/transcription.txt:6
+#, fuzzy
+#| msgid "Your recording is ready!"
+msgid "Your meeting transcription is ready!"
+msgstr "Расшифровка вашей встречи готова!"
+
+#: core/templates/mail/html/transcription.html:195
+#: core/templates/mail/text/transcription.txt:8
+#, fuzzy, python-format
+#| msgid ""
+#| " Your recording of \"%(room_name)s\" on %(recording_date)s at "
+#| "%(recording_time)s is now ready to download. "
+msgid ""
+" The transcription and summary of \"%(room_name)s\" on %(recording_date)s at "
+"%(recording_time)s are now available. "
+msgstr ""
+" Расшифровка и краткое содержание «%(room_name)s» от %(recording_date)s в "
+"%(recording_time)s теперь доступны. "
+
+#: core/templates/mail/html/transcription.html:201
+#: core/templates/mail/text/transcription.txt:10
+msgid "Summary preview:"
+msgstr ""
+
+#: core/templates/mail/html/transcription.html:207
+#: core/templates/mail/text/transcription.txt:15
+msgid " The meeting files are available in your Twake Drive. "
+msgstr ""
+
+#: core/templates/mail/html/transcription.html:224
+#: core/templates/mail/text/transcription.txt:20
+msgid " A PDF summary is attached to this email. "
+msgstr ""
+
+#: meet/settings.py:223
+msgid "English"
+msgstr "Английский"
+
+#: meet/settings.py:224
+msgid "French"
+msgstr "Французский"
+
+#: meet/settings.py:225
+msgid "Dutch"
+msgstr "Нидерландский"
+
+#: meet/settings.py:226
+msgid "German"
+msgstr "Немецкий"
+
+#~ msgid "Open"
+#~ msgstr "Открыть"

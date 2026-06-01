@@ -1,0 +1,170 @@
+{
+  "account": {
+    "currentlyLoggedAs": "Вы вошли как <0>{{user}}</0>",
+    "heading": "Учётная запись",
+    "youAreNotLoggedIn": "Вы не вошли в систему.",
+    "nameLabel": "Ваше имя",
+    "authentication": "Аутентификация",
+    "nameError": "Имя не может быть пустым"
+  },
+  "preferences": {
+    "title": "Настройки",
+    "idleDisconnectModal": {
+      "label": "Покидать звонки без участников",
+      "description": "Автоматически покидает звонок через несколько минут, если к нему не присоединяется ни один участник"
+    }
+  },
+  "audio": {
+    "microphone": {
+      "heading": "Микрофон",
+      "label": "Выберите аудиовход",
+      "disabled": "Микрофон отключён"
+    },
+    "noiseReduction": {
+      "label": "Шумоподавление",
+      "heading": "Шумоподавление",
+      "ariaLabel": {
+        "enable": "Включить шумоподавление",
+        "disable": "Отключить шумоподавление"
+      }
+    },
+    "speakers": {
+      "heading": "Динамики",
+      "label": "Выберите аудиовыход",
+      "test": "Проверить",
+      "ongoingTest": "Проверка звука…",
+      "safariWarning": "Выбор динамика пока недоступен в Safari из-за ограничений браузера."
+    },
+    "permissionsRequired": "Требуются разрешения"
+  },
+  "video": {
+    "camera": {
+      "heading": "Камера",
+      "label": "Выберите видеовход",
+      "disabled": "Камера отключена",
+      "previewAriaLabel": {
+        "enabled": "Предпросмотр видео включён",
+        "disabled": "Предпросмотр видео отключён"
+      }
+    },
+    "resolution": {
+      "heading": "Разрешение",
+      "publish": {
+        "label": "Выберите разрешение отправки (макс.)",
+        "items": {
+          "high": "Высокое разрешение",
+          "medium": "Стандартное разрешение",
+          "low": "Низкое разрешение"
+        }
+      },
+      "subscribe": {
+        "label": "Выберите разрешение приёма (макс.)",
+        "items": {
+          "high": "Высокое разрешение (автоматически)",
+          "medium": "Стандартное разрешение",
+          "low": "Низкое разрешение"
+        }
+      }
+    },
+    "permissionsRequired": "Требуются разрешения"
+  },
+  "transcription": {
+    "heading": "Расшифровка",
+    "language": {
+      "label": "Язык встречи",
+      "options": {
+        "french": "Французский (fr)",
+        "english": "Английский (en)",
+        "dutch": "Нидерландский (nl)",
+        "german": "Немецкий (de)",
+        "auto": "Автоматически"
+      }
+    }
+  },
+  "notifications": {
+    "heading": "Звуковые уведомления",
+    "label": "звуковые уведомления для",
+    "actions": {
+      "disable": "Отключить",
+      "enable": "Включить"
+    },
+    "items": {
+      "participantJoined": {
+        "label": "Участник присоединился"
+      },
+      "handRaised": {
+        "label": "Поднята рука"
+      },
+      "messageReceived": {
+        "label": "Получено сообщение"
+      }
+    }
+  },
+  "shortcuts": {
+    "listLabel": "Сочетания клавиш",
+    "columnAction": "Действие",
+    "columnShortcut": "Сочетание клавиш"
+  },
+  "dialog": {
+    "heading": "Настройки"
+  },
+  "language": {
+    "heading": "Язык",
+    "label": "Язык"
+  },
+  "settingsButtonLabel": "Настройки",
+  "accessibility": {
+    "announceReactions": {
+      "label": "Объявлять реакции вслух"
+    },
+    "captions": {
+      "heading": "Субтитры",
+      "textSize": {
+        "label": "Размер текста субтитров",
+        "options": {
+          "small": "Маленький",
+          "medium": "Средний",
+          "large": "Большой"
+        }
+      },
+      "fontColor": {
+        "label": "Цвет шрифта",
+        "options": {
+          "default": "По умолчанию",
+          "white": "Белый",
+          "black": "Чёрный",
+          "blue": "Синий",
+          "green": "Зелёный",
+          "red": "Красный",
+          "yellow": "Жёлтый",
+          "cyan": "Голубой",
+          "magenta": "Пурпурный"
+        }
+      },
+      "backgroundColor": {
+        "label": "Цвет фона",
+        "options": {
+          "default": "По умолчанию",
+          "white": "Белый",
+          "black": "Чёрный",
+          "blue": "Синий",
+          "green": "Зелёный",
+          "red": "Красный",
+          "yellow": "Жёлтый",
+          "cyan": "Голубой",
+          "magenta": "Пурпурный"
+        }
+      }
+    }
+  },
+  "tabs": {
+    "account": "Профиль",
+    "audio": "Аудио",
+    "video": "Видео",
+    "general": "Общие",
+    "notifications": "Уведомления",
+    "accessibility": "Доступность",
+    "transcription": "Расшифровка",
+    "shortcuts": "Сочетания клавиш"
+  }
+}
