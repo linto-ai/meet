@@ -1,0 +1,54 @@
+{
+  "defaultName": "Một người đóng góp",
+  "joined": {
+    "description": "{{name}} đã tham gia phòng"
+  },
+  "raised": {
+    "description": "{{name}} đã giơ tay.",
+    "cta": "Mở danh sách chờ"
+  },
+  "muted": "{{name}} đã tắt micro của bạn. Không người tham gia nào có thể nghe thấy bạn.",
+  "openChat": "Mở trò chuyện",
+  "chatMessageReceived": "{{name}} nói: {{message}}",
+  "lowerHand": {
+    "auto": "Có vẻ như bạn đã bắt đầu nói, nên tay của bạn sẽ được hạ xuống.",
+    "dismiss": "Giữ tay giơ lên"
+  },
+  "reaction": {
+    "description": "{{name}} đã bày tỏ cảm xúc với {{emoji}}"
+  },
+  "permissionsRemoved": {
+    "camera": "Người tổ chức đã tắt video cho tất cả người tham gia.",
+    "microphone": "Người tổ chức đã tắt micro cho tất cả người tham gia.",
+    "screen_share": "Người tổ chức đã tắt chia sẻ màn hình cho tất cả người tham gia."
+  },
+  "waitingParticipants": {
+    "one": "Một người muốn tham gia cuộc gọi này.",
+    "several": "Nhiều người muốn tham gia cuộc gọi này.",
+    "open": "Mở",
+    "accept": "Chấp nhận"
+  },
+  "transcript": {
+    "started": "{{name}} đã bắt đầu chép lời cuộc họp.",
+    "stopped": "{{name}} đã dừng chép lời cuộc họp.",
+    "limitReached": "Bản chép lời đã vượt quá thời lượng tối đa cho phép và sẽ được tự động lưu.",
+    "requested": "{{name}} muốn bắt đầu chép lời cuộc họp."
+  },
+  "screenRecording": {
+    "started": "{{name}} đã bắt đầu ghi cuộc họp.",
+    "stopped": "{{name}} đã dừng ghi cuộc họp.",
+    "limitReached": "Bản ghi đã vượt quá thời lượng tối đa cho phép và sẽ được tự động lưu.",
+    "requested": "{{name}} muốn bắt đầu ghi cuộc họp."
+  },
+  "recordingSave": {
+    "transcript": {
+      "message": "Bản ghi của bạn đang được lưu! Chúng tôi sẽ gửi bản chép lời đến <strong>{{email}}</strong> ngay khi sẵn sàng.",
+      "default": "Bản ghi của bạn đang được lưu! Chúng tôi sẽ gửi bản chép lời đến email của bạn ngay khi sẵn sàng."
+    },
+    "screenRecording": {
+      "message": "Bản ghi của bạn đang được lưu! Chúng tôi sẽ gửi thông báo đến <strong>{{email}}</strong> ngay khi sẵn sàng.",
+      "default": "Bản ghi của bạn đang được lưu! Chúng tôi sẽ gửi thông báo đến email của bạn ngay khi sẵn sàng."
+    }
+  },
+  "openMenu": "Mở menu"
+}

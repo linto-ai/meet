@@ -60,7 +60,7 @@ class Settings(BaseSettings):
     webhook_url: str
 
     # Locale
-    default_context_language: Literal["de", "en", "fr", "nl"] = "fr"
+    default_context_language: Literal["de", "en", "fr", "nl", "ru", "vi"] = "fr"
 
     # Output related settings
     summary_title_template: Optional[str] = "Résumé de {title}"
