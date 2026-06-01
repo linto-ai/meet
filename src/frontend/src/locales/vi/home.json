@@ -1,0 +1,62 @@
+{
+  "createMeeting": "Tạo cuộc họp",
+  "heading": "Họp trực tuyến đơn giản và an toàn",
+  "intro": "Giao tiếp và làm việc dễ dàng mà không ảnh hưởng đến chủ quyền của bạn",
+  "joinInputError": "Sử dụng liên kết hoặc mã cuộc họp. Ví dụ:",
+  "joinInputExample": "URL hoặc mã gồm 10 chữ cái",
+  "joinInputLabel": "Liên kết cuộc họp",
+  "joinInputSubmit": "Tham gia cuộc họp",
+  "joinMeeting": "Tham gia cuộc họp",
+  "joinMeetingTipContent": "Bạn có thể tham gia cuộc họp bằng cách dán liên kết đầy đủ của nó vào thanh địa chỉ của trình duyệt.",
+  "joinMeetingTipHeading": "Bạn có biết?",
+  "loginToCreateMeeting": "Đăng nhập để tạo cuộc họp",
+  "moreLinkLabel": "Tìm hiểu thêm về {{appTitle}} - tab mới",
+  "moreLink": "Tìm hiểu thêm",
+  "moreAbout": "về {{appTitle}}",
+  "createMenu": {
+    "laterOption": "Tạo cuộc họp cho một ngày sau",
+    "instantOption": "Bắt đầu cuộc họp tức thì"
+  },
+  "laterMeetingDialog": {
+    "heading": "Thông tin kết nối của bạn",
+    "description": "Chia sẻ thông tin này với khách mời. Họ sẽ có thể tham gia cuộc họp mà không cần đăng nhập. Cuộc họp này là vĩnh viễn và có thể được dùng lại.",
+    "permissions": "Những người có liên kết này không cần sự cho phép của bạn để tham gia cuộc họp.",
+    "copy": "Sao chép thông tin",
+    "copied": "Đã sao chép thông tin vào bộ nhớ tạm",
+    "copyUrl": "Sao chép liên kết cuộc họp",
+    "phone": {
+      "call": "Gọi:",
+      "pinCode": "Mã:"
+    }
+  },
+  "introSlider": {
+    "previous": {
+      "label": "Trang chiếu trước",
+      "labelWithPosition": "Trang chiếu trước ({{current}} trên {{total}})",
+      "tooltip": "Trang chiếu trước"
+    },
+    "next": {
+      "label": "Trang chiếu tiếp theo",
+      "labelWithPosition": "Trang chiếu tiếp theo ({{current}} trên {{total}})",
+      "tooltip": "Trang chiếu tiếp theo"
+    },
+    "beta": {
+      "text": "Tham gia bản beta",
+      "tooltip": "Điền vào biểu mẫu"
+    },
+    "slide1": {
+      "title": "Chuyển sang sự đơn giản. Hãy thử ngay!",
+      "body": "Khám phá một giải pháp trực quan và dễ tiếp cận, được thiết kế cho tất cả công chức, đối tác của họ và nhiều hơn nữa."
+    },
+    "slide2": {
+      "title": "Tổ chức cuộc gọi nhóm không giới hạn",
+      "body": "Cuộc họp không giới hạn thời gian, với giao tiếp mượt mà và chất lượng cao, bất kể quy mô nhóm."
+    },
+    "slide3": {
+      "title": "Chuyển đổi cuộc họp của bạn với AI",
+      "body": "Nhận bản chép lời chính xác và hữu ích để tăng năng suất của bạn. Tính năng đang trong bản beta—hãy thử ngay!"
+    },
+    "carouselLabel": "Trình chiếu giới thiệu",
+    "slidePosition": "Trang chiếu {{current}} trên {{total}}"
+  }
+}

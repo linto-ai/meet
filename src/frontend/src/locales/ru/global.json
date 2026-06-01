@@ -1,0 +1,61 @@
+{
+  "backToHome": "Вернуться на главный экран",
+  "cancel": "Отмена",
+  "closeDialog": "Закрыть диалог",
+  "error": {
+    "heading": "Произошла ошибка при загрузке страницы"
+  },
+  "feedback": {
+    "context": "Ваши отзывы формируют продукт!",
+    "cta": "Поделиться отзывом - новая вкладка"
+  },
+  "forbidden": {
+    "heading": "У вас нет прав для просмотра этой страницы"
+  },
+  "loading": "Загрузка…",
+  "loggedInUserTooltip": "Вы вошли как ",
+  "login": {
+    "buttonLabel": "Войти",
+    "proconnectButtonLabel": "Войти через ProConnect",
+    "proconnectLinkLabel": "Что такое ProConnect? - новая вкладка",
+    "proconnectLink": "Что такое ProConnect?"
+  },
+  "logout": "Выйти",
+  "notFound": {
+    "heading": "Проверьте код встречи",
+    "body": "Убедитесь, что вы ввели правильный код встречи в URL-адресе. Пример:"
+  },
+  "selected": "выбрано",
+  "submit": "OK",
+  "footer": {
+    "links": {
+      "legifrance": "legifrance.gouv.fr",
+      "infogouv": "info.gouv.fr",
+      "servicepublic": "service-public.fr",
+      "datagouv": "data.gouv.fr",
+      "legalsTerms": "Правовая информация",
+      "data": "Персональные данные и cookie",
+      "accessibility": "Доступность: не соответствует",
+      "ariaLabel": "новое окно",
+      "codeAnnotation": "Наш код открыт и доступен в этом",
+      "code": "Репозитории открытого исходного кода",
+      "technicalDetails": "Техническая информация",
+      "termsOfService": "Условия использования"
+    },
+    "mentions": "Если не указано иное, содержимое этого сайта доступно по",
+    "license": "лицензии etalab 2.0"
+  },
+  "loginHint": {
+    "title": "Войдите в свою учётную запись",
+    "body": "Вместо ожидания войдите в свою учётную запись.",
+    "button": {
+      "ariaLabel": "Закрыть предложение",
+      "label": "OK"
+    }
+  },
+  "skipLink": "Перейти к основному содержимому",
+  "clipboardContent": {
+    "url": "Чтобы присоединиться к видеоконференции, нажмите на эту ссылку: {{roomUrl}}",
+    "numberAndPin": "Чтобы присоединиться по телефону, наберите {{phoneNumber}} и введите этот код: {{pinCode}}"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "error": {
+    "title": "Bản ghi không khả dụng",
+    "body": "Bản ghi không khả dụng hoặc có thể đã bị xóa. Chỉ người tổ chức cuộc họp mới có thể truy cập. Vui lòng liên hệ với họ nếu cần."
+  },
+  "expired": {
+    "title": "Bản ghi đã hết hạn",
+    "body": "Bản ghi này đã bị xóa vào ngày {{date}}."
+  },
+  "authentication": {
+    "title": "Yêu cầu xác thực",
+    "body": "Vui lòng đăng nhập để truy cập bản ghi này."
+  },
+  "unsaved": {
+    "title": "Không thể tải xuống",
+    "body": "Bản ghi này chưa sẵn sàng để tải xuống. Vui lòng thử lại sau."
+  },
+  "success": {
+    "title": "Bản ghi của bạn đã sẵn sàng!",
+    "body": "Bản ghi của cuộc họp {{room}} từ {{created_at}}.",
+    "expiration": "Lưu ý, bản ghi này sẽ hết hạn sau {{expiration_days}} ngày.",
+    "button": "Tải xuống",
+    "warning": {
+      "title": "Đã tắt chia sẻ qua liên kết",
+      "body": "Chia sẻ bản ghi qua liên kết chưa khả dụng. Chỉ người tổ chức mới có thể tải xuống."
+    }
+  }
+}

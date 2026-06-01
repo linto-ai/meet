@@ -1,0 +1,170 @@
+{
+  "account": {
+    "currentlyLoggedAs": "Bạn hiện đang đăng nhập với tên <0>{{user}}</0>",
+    "heading": "Tài khoản",
+    "youAreNotLoggedIn": "Bạn chưa đăng nhập.",
+    "nameLabel": "Tên của bạn",
+    "authentication": "Xác thực",
+    "nameError": "Tên của bạn không được để trống"
+  },
+  "preferences": {
+    "title": "Tùy chọn",
+    "idleDisconnectModal": {
+      "label": "Rời khỏi cuộc gọi không có người tham gia",
+      "description": "Tự động rời khỏi cuộc gọi sau vài phút nếu không có người tham gia nào khác tham gia"
+    }
+  },
+  "audio": {
+    "microphone": {
+      "heading": "Micro",
+      "label": "Chọn đầu vào âm thanh của bạn",
+      "disabled": "Đã tắt micro"
+    },
+    "noiseReduction": {
+      "label": "Giảm tiếng ồn",
+      "heading": "Giảm tiếng ồn",
+      "ariaLabel": {
+        "enable": "Bật giảm tiếng ồn",
+        "disable": "Tắt giảm tiếng ồn"
+      }
+    },
+    "speakers": {
+      "heading": "Loa",
+      "label": "Chọn đầu ra âm thanh của bạn",
+      "test": "Kiểm tra",
+      "ongoingTest": "Đang kiểm tra âm thanh…",
+      "safariWarning": "Việc chọn loa chưa khả dụng trên Safari do giới hạn của trình duyệt."
+    },
+    "permissionsRequired": "Yêu cầu quyền"
+  },
+  "video": {
+    "camera": {
+      "heading": "Máy ảnh",
+      "label": "Chọn đầu vào video của bạn",
+      "disabled": "Đã tắt máy ảnh",
+      "previewAriaLabel": {
+        "enabled": "Đã bật xem trước video",
+        "disabled": "Đã tắt xem trước video"
+      }
+    },
+    "resolution": {
+      "heading": "Độ phân giải",
+      "publish": {
+        "label": "Chọn độ phân giải gửi của bạn (tối đa)",
+        "items": {
+          "high": "Độ nét cao",
+          "medium": "Độ nét tiêu chuẩn",
+          "low": "Độ nét thấp"
+        }
+      },
+      "subscribe": {
+        "label": "Chọn độ phân giải nhận của bạn (tối đa)",
+        "items": {
+          "high": "Độ nét cao (tự động)",
+          "medium": "Độ nét tiêu chuẩn",
+          "low": "Độ nét thấp"
+        }
+      }
+    },
+    "permissionsRequired": "Yêu cầu quyền"
+  },
+  "transcription": {
+    "heading": "Chép lời",
+    "language": {
+      "label": "Ngôn ngữ cuộc họp",
+      "options": {
+        "french": "Tiếng Pháp (fr)",
+        "english": "Tiếng Anh (en)",
+        "dutch": "Tiếng Hà Lan (nl)",
+        "german": "Tiếng Đức (de)",
+        "auto": "Tự động"
+      }
+    }
+  },
+  "notifications": {
+    "heading": "Thông báo âm thanh",
+    "label": "thông báo âm thanh cho",
+    "actions": {
+      "disable": "Tắt",
+      "enable": "Bật"
+    },
+    "items": {
+      "participantJoined": {
+        "label": "Người tham gia đã vào"
+      },
+      "handRaised": {
+        "label": "Đã giơ tay"
+      },
+      "messageReceived": {
+        "label": "Đã nhận tin nhắn"
+      }
+    }
+  },
+  "shortcuts": {
+    "listLabel": "Phím tắt",
+    "columnAction": "Hành động",
+    "columnShortcut": "Phím tắt"
+  },
+  "dialog": {
+    "heading": "Cài đặt"
+  },
+  "language": {
+    "heading": "Ngôn ngữ",
+    "label": "Ngôn ngữ"
+  },
+  "settingsButtonLabel": "Cài đặt",
+  "accessibility": {
+    "announceReactions": {
+      "label": "Đọc to các cảm xúc"
+    },
+    "captions": {
+      "heading": "Phụ đề",
+      "textSize": {
+        "label": "Kích thước chữ phụ đề",
+        "options": {
+          "small": "Nhỏ",
+          "medium": "Vừa",
+          "large": "Lớn"
+        }
+      },
+      "fontColor": {
+        "label": "Màu chữ",
+        "options": {
+          "default": "Mặc định",
+          "white": "Trắng",
+          "black": "Đen",
+          "blue": "Xanh dương",
+          "green": "Xanh lá",
+          "red": "Đỏ",
+          "yellow": "Vàng",
+          "cyan": "Lục lam",
+          "magenta": "Đỏ tươi"
+        }
+      },
+      "backgroundColor": {
+        "label": "Màu nền",
+        "options": {
+          "default": "Mặc định",
+          "white": "Trắng",
+          "black": "Đen",
+          "blue": "Xanh dương",
+          "green": "Xanh lá",
+          "red": "Đỏ",
+          "yellow": "Vàng",
+          "cyan": "Lục lam",
+          "magenta": "Đỏ tươi"
+        }
+      }
+    }
+  },
+  "tabs": {
+    "account": "Hồ sơ",
+    "audio": "Âm thanh",
+    "video": "Video",
+    "general": "Chung",
+    "notifications": "Thông báo",
+    "accessibility": "Khả năng tiếp cận",
+    "transcription": "Chép lời",
+    "shortcuts": "Phím tắt"
+  }
+}

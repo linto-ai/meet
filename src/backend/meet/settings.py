@@ -302,6 +302,8 @@ class Base(Configuration):
             ("nl-nl", _("Dutch")),
             ("de-de", _("German")),
             ("es-es", _("Spanish")),
+            ("ru-ru", _("Russian")),
+            ("vi-vn", _("Vietnamese")),
         )
     )
 
