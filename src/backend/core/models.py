@@ -65,6 +65,7 @@ class RecordingStatusChoices(models.TextChoices):
         _("External process successful"),
     )
     EXTERNAL_PROCESS_FAILED = "external_process_failed", _("External process failed")
+    NOTIFICATION_FAILED = "notification_failed", _("Notification failed")
 
     @classmethod
     def is_final(cls, status):
@@ -82,6 +83,7 @@ class RecordingStatusChoices(models.TextChoices):
             cls.EXTERNAL_PROCESS_FAILED,
             cls.FAILED_TO_START,
             cls.FAILED_TO_STOP,
+            cls.NOTIFICATION_FAILED,
         }
 
     @classmethod
@@ -612,6 +614,16 @@ class Recording(BaseModel):
         unique=True,
         verbose_name=_("External Process ID"),
         help_text=_("ID of the external process associated with the recording."),
+    )
+    linto_state = models.JSONField(
+        blank=True,
+        default=dict,
+        verbose_name=_("LinTO pipeline state"),
+        help_text=_(
+            "Idempotent checkpoint of the transcription/notification pipeline: "
+            "conversation_id, per-step completion flags and attempt count. Used "
+            "to resume after a crash/retry without re-running completed steps."
+        ),
     )
 
     class Meta:
