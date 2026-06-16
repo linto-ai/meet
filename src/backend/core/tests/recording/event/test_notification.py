@@ -306,3 +306,51 @@ def test_notify_user_by_email_smtp_exception(mocked_current_site, caplog):
         assert result is False
         assert mock_send_mail.call_count == 2
         assert "notification could not be sent:" in caplog.text
+
+
+class TestNotifyAndUpdateStatus:
+    """Status transition persisted after notification, incl. the terminal-failure guard."""
+
+    def test_success_sets_notification_succeeded(self):
+        recording = factories.RecordingFactory(
+            status=models.RecordingStatusChoices.ACTIVE
+        )
+        service = NotificationService()
+        with mock.patch.object(service, "notify_external_services", return_value=True):
+            result = service.notify_and_update_status(recording)
+
+        assert result is True
+        recording.refresh_from_db()
+        assert recording.status == models.RecordingStatusChoices.NOTIFICATION_SUCCEEDED
+
+    def test_failure_sets_saved(self):
+        recording = factories.RecordingFactory(
+            status=models.RecordingStatusChoices.ACTIVE
+        )
+        service = NotificationService()
+        with mock.patch.object(service, "notify_external_services", return_value=False):
+            result = service.notify_and_update_status(recording)
+
+        assert result is False
+        recording.refresh_from_db()
+        assert recording.status == models.RecordingStatusChoices.SAVED
+
+    def test_never_downgrades_a_terminal_failure(self):
+        """If a concurrent failure handler already persisted NOTIFICATION_FAILED,
+        a stale success must NOT overwrite it back to SUCCEEDED."""
+        recording = factories.RecordingFactory(
+            status=models.RecordingStatusChoices.ACTIVE
+        )
+        # Simulate the failure handler marking the row FAILED in the DB, while our
+        # in-memory `recording` instance still believes it is ACTIVE.
+        models.Recording.objects.filter(id=recording.id).update(
+            status=models.RecordingStatusChoices.NOTIFICATION_FAILED
+        )
+
+        service = NotificationService()
+        with mock.patch.object(service, "notify_external_services", return_value=True):
+            result = service.notify_and_update_status(recording)
+
+        assert result is False
+        recording.refresh_from_db()
+        assert recording.status == models.RecordingStatusChoices.NOTIFICATION_FAILED
