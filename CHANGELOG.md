@@ -12,10 +12,14 @@ and this project adheres to
 
 - ✨(backend) add optional S3 bucket polling for storage backends
   without native event notifications
+- ✨(backend) idempotent, retryable recording-notification pipeline with
+  resume checkpoints and admin+creator emails on terminal failure
 
 ### Changed
 
 - ⬆️(dependencies) update python dependencies
+- ♻️(backend) a failed Twake upload now retries / notifies instead of
+  silently falling back to a direct-link email
 
 ### Fixed
 

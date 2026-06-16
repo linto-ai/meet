@@ -60,6 +60,7 @@ class RecordingStatusChoices(models.TextChoices):
     FAILED_TO_START = "failed_to_start", _("Failed to Start")
     FAILED_TO_STOP = "failed_to_stop", _("Failed to Stop")
     NOTIFICATION_SUCCEEDED = "notification_succeeded", _("Notification succeeded")
+    NOTIFICATION_FAILED = "notification_failed", _("Notification failed")
 
     @classmethod
     def is_final(cls, status):
@@ -75,6 +76,7 @@ class RecordingStatusChoices(models.TextChoices):
             cls.ABORTED,
             cls.FAILED_TO_START,
             cls.FAILED_TO_STOP,
+            cls.NOTIFICATION_FAILED,
         }
 
     @classmethod
@@ -589,6 +591,16 @@ class Recording(BaseModel):
         default=dict,
         verbose_name=_("Recording options"),
         help_text=_("Recording options"),
+    )
+    linto_state = models.JSONField(
+        blank=True,
+        default=dict,
+        verbose_name=_("LinTO pipeline state"),
+        help_text=_(
+            "Idempotent checkpoint of the transcription/notification pipeline: "
+            "conversation_id, per-step completion flags and attempt count. Used "
+            "to resume after a crash/retry without re-running completed steps."
+        ),
     )
 
     class Meta:
