@@ -14,27 +14,39 @@ from asgiref.sync import async_to_sync, sync_to_async
 
 from core import models
 from core.services.twake_recording import upload_recording_files
+from core.tasks._base import NotificationTask
+from core.tasks._errors import TransientError, classify_external
+from core.tasks._state import ensure_state, mark_done, save_state, step_done
 from core.tasks._task import task
 
 logger = logging.getLogger(__name__)
 
 
-@task
-def process_screen_recording_to_twake(recording_id):
+@task(
+    bind=True,
+    base=NotificationTask,
+    autoretry_for=(TransientError,),
+    retry_backoff=5,
+    retry_backoff_max=600,
+    max_retries=getattr(settings, "RECORDING_NOTIFICATION_MAX_RETRIES", 4),
+    retry_jitter=True,
+)
+def process_screen_recording_to_twake(self, recording_id):
     """Upload a screen recording (MP4) to Twake Drive and notify owners.
 
-    Downloads the MP4 from MinIO, uploads it to Twake Drive under
+    Downloads the MP4 from S3 storage, uploads it to Twake Drive under
     `_Reunions/Reunion_{date}/Enregistrement_{date}.mp4`, then sends an
     email to every owner with the direct download link plus the Twake
     Drive link when available.
+
+    Transient failures (network/timeout/HTTP 5xx) on the S3 download or the
+    Twake upload are retried by Celery with exponential back-off; permanent
+    errors propagate to ``NotificationTask.on_failure`` (admin + creator email,
+    status set to NOTIFICATION_FAILED). The Twake upload is idempotent (folder
+    reused, files overwritten by name) so a whole-task retry is safe; the
+    ``twake``/``email`` steps are still checkpointed in ``linto_state``.
     """
-    try:
-        _process_screen_recording_sync(recording_id)
-    except Exception:
-        logger.exception(
-            "Screen recording Twake upload failed for recording %s",
-            recording_id,
-        )
+    _process_screen_recording_sync(recording_id)
 
 
 @async_to_sync
@@ -46,10 +58,14 @@ async def _process_screen_recording_sync(recording_id):
         models.Recording.objects.select_related("room").get
     )(id=recording_id)
 
-    logger.info("Downloading %s from MinIO", recording.key)
+    state = ensure_state(recording)
+    state["attempts"] = int(state.get("attempts", 0)) + 1
+    await save_state(recording)
+
+    logger.info("Downloading %s from S3 storage", recording.key)
 
     @sync_to_async
-    def download_from_minio():
+    def download_from_storage():
         s3_client = default_storage.connection.meta.client
         s3_response = s3_client.get_object(
             Bucket=default_storage.bucket_name,
@@ -57,7 +73,8 @@ async def _process_screen_recording_sync(recording_id):
         )
         return s3_response["Body"].read()
 
-    file_content = await download_from_minio()
+    with classify_external("download recording from S3"):
+        file_content = await download_from_storage()
     logger.info(
         "Downloaded %d bytes for recording %s",
         len(file_content),
@@ -83,28 +100,31 @@ async def _process_screen_recording_sync(recording_id):
     meeting_time = recording.created_at.strftime("%d-%m-%Y_%H-%M")
 
     twake_drive_link = None
-    try:
-        twake_drive_link = await upload_recording_files(
-            recording,
-            owner_access,
-            [
-                {
-                    "filename": f"Enregistrement_{meeting_time}.mp4",
-                    "content": file_content,
-                    "content_type": "video/mp4",
-                }
-            ],
-        )
-    except Exception:
-        logger.exception(
-            "Twake Drive upload failed for recording %s, continuing with email",
-            recording_id,
-        )
+    if not step_done(recording, "twake"):
+        # Transient failures here are retried by Celery (autoretry_for);
+        # permanent ones propagate to on_failure. The upload is idempotent.
+        with classify_external("upload screen recording to Twake Drive"):
+            twake_drive_link = await upload_recording_files(
+                recording,
+                owner_access,
+                [
+                    {
+                        "filename": f"Enregistrement_{meeting_time}.mp4",
+                        "content": file_content,
+                        "content_type": "video/mp4",
+                    }
+                ],
+            )
+        await mark_done(recording, "twake")
 
     download_base = get_recording_download_base_url()
     download_link = f"{download_base}/{recording.id}" if download_base else None
 
     room_name = recording.room.name or "Meeting"
+
+    if step_done(recording, "email"):
+        logger.info("Email already sent for %s, skipping", recording_id)
+        return
 
     accesses = await sync_to_async(
         lambda: list(
@@ -118,6 +138,7 @@ async def _process_screen_recording_sync(recording_id):
         )
     )()
 
+    email_failures = False
     for access in accesses:
         user = access.user
         try:
@@ -163,8 +184,12 @@ async def _process_screen_recording_sync(recording_id):
                 recording_id,
             )
         except smtplib.SMTPException:
+            email_failures = True
             logger.warning(
                 "Failed to send screen recording email to %s",
                 user.email,
                 exc_info=True,
             )
+
+    if not email_failures:
+        await mark_done(recording, "email")
