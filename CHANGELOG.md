@@ -220,6 +220,8 @@ and this project adheres to
 - ✨(frontend) prioritize screen share in picture-in-picture layout #1467
 - ✨(backend) add optional S3 bucket polling for storage backends
   without native event notifications
+- ✨(backend) idempotent, retryable recording-notification pipeline with
+  resume checkpoints and admin+creator emails on terminal failure
 
 ### Changed
 
@@ -228,6 +230,8 @@ and this project adheres to
 - 🚸(frontend) use "Advanced" instead of "Premium" in the sidepanel
 - ♿️(frontend) make fullscreen share warning keyboard accessible #1459
 - ⬆️(summary) update docker alpine to 3.24 & ffmpeg to 8.1.2 #1471
+- ♻️(backend) a failed Twake upload now retries / notifies instead of
+  silently falling back to a direct-link email
 
 ### Fixed
 

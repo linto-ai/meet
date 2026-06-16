@@ -477,6 +477,16 @@ class Base(Configuration):
     CELERY_BROKER_URL = values.Value("redis://redis:6379/0", environ_prefix=None)
     CELERY_BROKER_TRANSPORT_OPTIONS = values.DictValue({}, environ_prefix=None)
 
+    # Max number of Celery retries for the recording notification pipeline
+    # (LinTO transcription / screen-recording-to-Twake) on transient errors,
+    # before the task is marked NOTIFICATION_FAILED and admins/creator are
+    # emailed. Read by the @task decorators in core/tasks/.
+    RECORDING_NOTIFICATION_MAX_RETRIES = values.PositiveIntegerValue(
+        default=4,
+        environ_name="RECORDING_NOTIFICATION_MAX_RETRIES",
+        environ_prefix=None,
+    )
+
     # Session
     SESSION_ENGINE = values.Value(
         default="django.contrib.sessions.backends.cache",

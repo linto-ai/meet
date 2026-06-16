@@ -61,6 +61,15 @@ class NotificationService:
         storage-hook webhook and the polling fallback.
         """
         succeeded = self.notify_external_services(recording)
+
+        # The notification path (inline failure handler, or a concurrent Celery
+        # on_failure) may have already marked the row terminally FAILED on its
+        # own loaded instance. Re-read the persisted status so we never overwrite
+        # a terminal failure back to SUCCEEDED from our stale in-memory instance.
+        recording.refresh_from_db(fields=["status"])
+        if recording.status == models.RecordingStatusChoices.NOTIFICATION_FAILED:
+            return False
+
         recording.status = (
             models.RecordingStatusChoices.NOTIFICATION_SUCCEEDED
             if succeeded
