@@ -1,7 +1,7 @@
 import { Field, H } from '@/primitives'
 import { useTranslation } from 'react-i18next'
 import { useLanguageLabels } from '@/i18n/useLanguageLabels'
-import { TabPanel, TabPanelProps } from '@/primitives/Tabs'
+import { TabPanel, type TabPanelProps } from '@/primitives/Tabs'
 import { userPreferencesStore } from '@/stores/userPreferences'
 import { useSnapshot } from 'valtio'
 
@@ -33,6 +33,19 @@ export const GeneralTab = ({ id }: GeneralTabProps) => {
         isSelected={userPreferencesSnap.is_idle_disconnect_modal_enabled}
         onChange={(value) =>
           (userPreferencesStore.is_idle_disconnect_modal_enabled = value)
+        }
+        wrapperProps={{
+          noMargin: true,
+          fullWidth: true,
+        }}
+      />
+      <Field
+        type="switch"
+        label={t('preferences.autoMuteLargeRoom.label')}
+        description={t('preferences.autoMuteLargeRoom.description')}
+        isSelected={userPreferencesSnap.is_auto_mute_large_room_enabled}
+        onChange={(value) =>
+          (userPreferencesStore.is_auto_mute_large_room_enabled = value)
         }
         wrapperProps={{
           noMargin: true,

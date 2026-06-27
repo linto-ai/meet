@@ -1,11 +1,11 @@
-import { A, Div, H, Text } from '@/primitives'
+import { Div, H, Text } from '@/primitives'
 
 import { css } from '@/styled-system/css'
 import { useRoomId } from '@/features/rooms/livekit/hooks/useRoomId'
 import { useRoomContext } from '@livekit/components-react'
 import {
   RecordingMode,
-  useHumanizeRecordingMaxDuration,
+  useHasRecordingAccess,
   useRecordingStatuses,
 } from '@/features/recording'
 import { useState } from 'react'
@@ -28,10 +28,10 @@ import { useMutateRecording } from '../hooks/useMutateRecording'
 import { useSidePanel } from '@/features/rooms/livekit/hooks/useSidePanel'
 import { useHasFeatureWithoutAdminRights } from '../hooks/useHasFeatureWithoutAdminRights'
 import { FeatureFlags } from '@/features/analytics/enums'
+import { LimitDescription } from './LimitDescription'
 
 export const ScreenRecordingSidePanel = () => {
   const { data } = useConfig()
-  const recordingMaxDuration = useHumanizeRecordingMaxDuration()
 
   const keyPrefix = 'screenRecording'
   const { t } = useTranslation('rooms', { keyPrefix })
@@ -39,6 +39,11 @@ export const ScreenRecordingSidePanel = () => {
   const [includeTranscript, setIncludeTranscript] = useState(false)
 
   const hasFeatureWithoutAdminRights = useHasFeatureWithoutAdminRights(
+    RecordingMode.ScreenRecording,
+    FeatureFlags.ScreenRecording
+  )
+
+  const hasScreenRecordingAccess = useHasRecordingAccess(
     RecordingMode.ScreenRecording,
     FeatureFlags.ScreenRecording
   )
@@ -121,6 +126,18 @@ export const ScreenRecordingSidePanel = () => {
     )
   }
 
+  if (!hasScreenRecordingAccess) {
+    return (
+      <NoAccessView
+        i18nKeyPrefix={keyPrefix}
+        i18nKey="premium"
+        imagePath="/assets/intro-slider/3.png"
+        isActive={statuses.isActive}
+        handleRequest={handleRequestScreenRecording}
+      />
+    )
+  }
+
   return (
     <Div
       display="flex"
@@ -153,22 +170,10 @@ export const ScreenRecordingSidePanel = () => {
         <H lvl={1} margin={'sm'} fullWidth>
           {t('heading')}
         </H>
-        <Text variant="body" fullWidth>
-          {recordingMaxDuration
-            ? t('body', { max_duration: recordingMaxDuration })
-            : t('bodyWithoutMaxDuration')}{' '}
-          {data?.support?.help_article_recording && (
-            <A
-              href={data.support.help_article_recording}
-              target="_blank"
-              rel="noopener noreferrer"
-              externalIcon
-              aria-label={t('linkAriaLabel')}
-            >
-              {t('linkMore')}
-            </A>
-          )}
-        </Text>
+        <LimitDescription
+          keyPrefix={'screenRecording'}
+          supportArticleLink={data?.support?.help_article_recording}
+        />
       </VStack>
       <VStack gap={0} marginBottom={25}>
         <RowWrapper iconName="cloud_download" position="first">

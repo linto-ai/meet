@@ -12,6 +12,10 @@
     "idleDisconnectModal": {
       "label": "Leave calls with no participants",
       "description": "Automatically leaves a call after a few minutes if no other participant joins"
+    },
+    "autoMuteLargeRoom": {
+      "label": "Automatically mute my microphone",
+      "description": "Automatically mute your microphone when joining a large meeting."
     }
   },
   "audio": {
@@ -21,8 +25,8 @@
       "disabled": "Microphone disabled"
     },
     "noiseReduction": {
-      "label": "Noise reduction",
-      "heading": "Noise reduction",
+      "label": "Advanced voice optimization",
+      "heading": "Audio filters",
       "ariaLabel": {
         "enable": "Enable noise reduction",
         "disable": "Disable noise reduction"
@@ -116,6 +120,16 @@
   "accessibility": {
     "announceReactions": {
       "label": "Announce reactions aloud"
+    },
+    "font": {
+      "label": "Display font",
+      "description": "Customize the font used in the interface to improve your reading comfort.",
+      "options": {
+        "default": "Default",
+        "lexend": "Lexend (improved readability)",
+        "atkinson-hyperlegible": "Atkinson Hyperlegible (low vision)",
+        "opendyslexic": "OpenDyslexic (dyslexia)"
+      }
     },
     "captions": {
       "heading": "Captions",

@@ -3,7 +3,7 @@
     "heading": {
       "normal": "Du hast das Meeting verlassen",
       "duplicateIdentity": "Du bist dem Meeting von einem anderen Gerät aus beigetreten",
-      "participantRemoved": "Du wurdest von der*dem Organisator:in aus dem Meeting entfernt"
+      "participantRemoved": "Du wurdest vom Host aus dem Meeting entfernt"
     },
     "home": "Zur Startseite zurückkehren",
     "back": "Dem Meeting erneut beitreten"
@@ -166,6 +166,7 @@
     "countdownAnnouncement": "Das Meeting endet in {{duration}}."
   },
   "controls": {
+    "region": "Anrufsteuerung",
     "microphone": "Mikrofon",
     "camera": "Kamera",
     "chat": {
@@ -215,7 +216,7 @@
     "moreOptions": "Weitere Optionen",
     "reactions": {
       "button": "Reaktion senden",
-      "send": "Reaktion {{emoji}} senden",
+      "toolbar": "Reaktion senden",
       "announce": "{{name}} : {{emoji}}",
       "you": "du",
       "emojis": {
@@ -230,6 +231,16 @@
       }
     }
   },
+  "pictureInPicture": {
+    "placeholder": {
+      "title": "Ihr Videoanruf befindet sich in einem anderen Fenster.",
+      "description": "Im Bild-im-Bild-Modus bleiben Sie mit dem Anruf verbunden, während Sie andere Aufgaben erledigen.",
+      "bringBack": "Anruf hierher zurückholen"
+    },
+    "stage": "Teilnehmer",
+    "controlBar": "Besprechungssteuerung",
+    "title": "Bild-im-Bild Besprechung"
+  },
   "options": {
     "buttonLabel": "Weitere Optionen",
     "items": {
@@ -240,6 +251,10 @@
       "username": "Deinen Namen aktualisieren",
       "effects": "Effekte anwenden",
       "switchCamera": "Kamera wechseln",
+      "pictureInPicture": {
+        "enter": "Bild-im-Bild",
+        "exit": "Bild-im-Bild schließen"
+      },
       "fullscreen": {
         "enter": "Vollbild",
         "exit": "Vollbildmodus verlassen"
@@ -275,11 +290,14 @@
       "apply": "Ersetze deinen Hintergrund:",
       "personal": {
         "title": "Meine Hintergründe",
+        "selectedLabel": "Hintergrund abwählen (er ist aktuell angewendet).",
+        "apply": "Als Hintergrund verwenden.",
         "selectFileTooltip": "Wähle ein Bild aus, das als persönlicher Hintergrund verwendet werden soll",
         "notLoggedInWarning": "Du bist nicht angemeldet, der persönliche Hintergrund wird nicht von einem Meeting zum anderen gespeichert.",
         "warningUploadDisabled": "Persönliche Hintergründe werden derzeit nicht von einem Meeting zum anderen gespeichert.",
         "uploadLimitReached": "Du kannst keine weiteren persönlichen Hintergründe hinzufügen.",
         "uploadInProgress": "Datei wird hochgeladen…",
+        "deleteLabel": "Benutzerdefinierten Hintergrund löschen.",
         "errors": {
           "close": "Schließen",
           "file_too_large": {
@@ -381,7 +399,7 @@
     "body": "Transkribiere bis zu {{max_duration}} Meetingdauer.",
     "bodyWithoutMaxDuration": "Transkribieren dein Meeting ohne Zeitbegrenzung.",
     "details": {
-      "receiver": "Das Transkript wird an die*den Organisator:in und die Mitorganisierenden gesendet.",
+      "receiver": "Das Transkript wird an den Host und die Co-Hosts gesendet.",
       "destination": "Ein neues Dokument wird erstellt auf",
       "destinationUnknown": "Ein neues Dokument wird erstellt",
       "language": "Meeting-Sprache:",
@@ -414,7 +432,7 @@
     },
     "premium": {
       "heading": "Premium-Funktion",
-      "body": "Diese Funktion ist öffentlichen Bediensteten vorbehalten. Wenn deine E-Mail-Adresse nicht autorisiert ist, kontaktiere bitte den Support, um Zugriff zu erhalten.",
+      "body": "Diese Funktion ist für Sie nicht verfügbar. Bitte wenden Sie sich an den Support, um weitere Informationen zu erhalten.",
       "linkMore": "Dokumentation öffnen",
       "linkAriaLabel": "Dokumentation zum Premium-Zugang öffnen – öffnet in neuem Tab",
       "dividerLabel": "ODER",
@@ -436,7 +454,7 @@
     "linkMore": "Dokumentation öffnen",
     "linkAriaLabel": "Dokumentation zur Aufzeichnung öffnen – öffnet in neuem Tab",
     "details": {
-      "receiver": "Die Aufzeichnung wird an die*den Organisator:in und die Mitorganisierenden gesendet.",
+      "receiver": "Die Aufzeichnung wird an den Host und die Co-Hosts gesendet.",
       "destination": "Diese Aufzeichnung wird vorübergehend auf unseren Servern gespeichert",
       "loading": "Aufzeichnung wird gestartet",
       "linkMore": "Mehr erfahren",
@@ -465,6 +483,22 @@
         "buttonLabel": "Anfrage senden"
       }
     },
+    "premium": {
+      "heading": "Premium-Funktion",
+      "body": "Diese Funktion ist für Sie nicht verfügbar. Bitte wenden Sie sich an den Support, um weitere Informationen zu erhalten.",
+      "linkMore": "Dokumentation öffnen",
+      "linkAriaLabel": "Dokumentation zum Premium-Zugang öffnen – öffnet in neuem Tab",
+      "dividerLabel": "ODER",
+      "login": {
+        "heading": "Anmeldung erforderlich",
+        "body": "Nur die*der Ersteller:in bzw. Admin kann die Aufzeichnung starten. Melde dich an, um deine Berechtigungen zu überprüfen."
+      },
+      "request": {
+        "heading": "Aufnahme anfragen",
+        "body": "Die Moderation wird benachrichtigt und kann die Aufnahme starten.",
+        "buttonLabel": "Anfrage senden"
+      }
+    },
     "durationMessage": "(begrenzt auf {{max_duration}})"
   },
   "errorRecordingAlertDialog": {
@@ -476,7 +510,7 @@
     "button": "OK"
   },
   "admin": {
-    "description": "Diese Einstellungen für Organisierende ermöglichen dir die Kontrolle über dein Meeting. Nur Organisierende haben Zugriff auf diese Optionen.",
+    "description": "Diese Host-Einstellungen ermöglichen dir die Kontrolle über dein Meeting. Nur Hosts haben Zugriff auf diese Optionen.",
     "access": {
       "title": "Raumzugang",
       "description": "Diese Einstellungen gelten auch für zukünftige Meetings in diesem Raum.",
@@ -510,6 +544,10 @@
       "screenshare": {
         "label": "Bildschirm teilen",
         "description": "Wenn du diese Option deaktivierst, können Teilnehmende ihren Bildschirm nicht mehr teilen. Laufende Bildschirmfreigaben werden sofort beendet."
+      },
+      "mute": {
+        "label": "Andere stummschalten",
+        "description": "Wenn deaktiviert, können Teilnehmer andere Teilnehmer nicht mehr stummschalten."
       }
     },
     "recording": {

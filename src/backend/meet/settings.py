@@ -186,6 +186,9 @@ class Base(Configuration):
     FILE_UPLOAD_PATH = values.Value(
         "files", environ_name="FILE_UPLOAD_PATH", environ_prefix=None
     )
+    FILE_UPLOAD_TMP_PATH = values.Value(
+        "tmp/files", environ_name="FILE_UPLOAD_TMP_PATH", environ_prefix=None
+    )
 
     FILE_UPLOAD_APPLY_RESTRICTIONS = values.BooleanValue(
         default=True, environ_name="FILE_UPLOAD_APPLY_RESTRICTIONS", environ_prefix=None
@@ -409,6 +412,12 @@ class Base(Configuration):
         ),
         "transcription_destination": values.Value(
             None, environ_name="FRONTEND_TRANSCRIPTION_DESTINATION", environ_prefix=None
+        ),
+        "max_participants_for_sound": values.PositiveIntegerValue(
+            5, environ_name="FRONTEND_MAX_PARTICIPANTS_FOR_SOUND", environ_prefix=None
+        ),
+        "auto_mute_on_join_threshold": values.PositiveIntegerValue(
+            50, environ_name="FRONTEND_AUTO_MUTE_ON_JOIN_THRESHOLD", environ_prefix=None
         ),
     }
 
@@ -746,6 +755,44 @@ class Base(Configuration):
     RECORDING_MAX_DURATION = values.IntegerValue(
         None, environ_name="RECORDING_MAX_DURATION", environ_prefix=None
     )
+
+    # Recording encoding options for LiveKit Egress (video composite egress only).
+    # These settings affect screen recordings handled by VideoCompositeEgressService;
+    # they are silently ignored by AudioCompositeEgressService (audio-only transcript
+    # recordings), whose request never carries advanced EncodingOptions.
+    # When disabled, LiveKit falls back to its built-in H264_720P_30 preset
+    # (1280x720, 30 fps, 3000 kbps H.264 MAIN video, 128 kbps AAC audio).
+    # When enabled, the values below are passed to LiveKit as EncodingOptions
+    # (advanced) and replace the preset. Lowering framerate and bitrate reduces
+    # output file size and CPU load on the egress worker.
+    RECORDING_ENCODING_ENABLED = values.BooleanValue(
+        False, environ_name="RECORDING_ENCODING_ENABLED", environ_prefix=None
+    )
+    RECORDING_ENCODING_WIDTH = values.PositiveIntegerValue(
+        1280, environ_name="RECORDING_ENCODING_WIDTH", environ_prefix=None
+    )
+    RECORDING_ENCODING_HEIGHT = values.PositiveIntegerValue(
+        720, environ_name="RECORDING_ENCODING_HEIGHT", environ_prefix=None
+    )
+    RECORDING_ENCODING_FRAMERATE = values.PositiveIntegerValue(
+        30, environ_name="RECORDING_ENCODING_FRAMERATE", environ_prefix=None
+    )
+    RECORDING_ENCODING_VIDEO_BITRATE_KBPS = values.PositiveIntegerValue(
+        3000,
+        environ_name="RECORDING_ENCODING_VIDEO_BITRATE_KBPS",
+        environ_prefix=None,
+    )
+    RECORDING_ENCODING_AUDIO_BITRATE_KBPS = values.PositiveIntegerValue(
+        128,
+        environ_name="RECORDING_ENCODING_AUDIO_BITRATE_KBPS",
+        environ_prefix=None,
+    )
+    RECORDING_ENCODING_KEY_FRAME_INTERVAL_S = values.FloatValue(
+        4.0,
+        environ_name="RECORDING_ENCODING_KEY_FRAME_INTERVAL_S",
+        environ_prefix=None,
+    )
+
     SUMMARY_SERVICE_ENDPOINT = values.Value(
         None, environ_name="SUMMARY_SERVICE_ENDPOINT", environ_prefix=None
     )
@@ -918,7 +965,25 @@ class Base(Configuration):
         environ_prefix=None,
     )
 
+    # Metadata collector settings
+    METADATA_COLLECTOR_ENABLED = values.BooleanValue(
+        False, environ_name="METADATA_COLLECTOR_ENABLED", environ_prefix=None
+    )
+    METADATA_COLLECTOR_AGENT_NAME = values.Value(
+        "metadata-collector",
+        environ_name="METADATA_COLLECTOR_AGENT_NAME",
+        environ_prefix=None,
+    )
+    METADATA_COLLECTOR_OUTPUT_FOLDER = values.Value(
+        "metadata",
+        environ_name="METADATA_COLLECTOR_OUTPUT_FOLDER",
+        environ_prefix=None,
+    )
+
     # External Applications
+    APPLICATION_ENABLED = values.BooleanValue(
+        False, environ_name="APPLICATION_ENABLED", environ_prefix=None
+    )
     APPLICATION_CLIENT_ID_LENGTH = values.PositiveIntegerValue(
         40,
         environ_name="APPLICATION_CLIENT_ID_LENGTH",
@@ -962,6 +1027,18 @@ class Base(Configuration):
         environ_name="APPLICATION_BASE_URL",
         environ_prefix=None,
     )
+    # Warning: EXTERNAL_API_ALLOW_PUBLIC_ACCESS is ignored when
+    # EXTERNAL_API_DEFAULT_ACCESS_LEVEL=public.
+    EXTERNAL_API_ALLOW_PUBLIC_ACCESS = values.BooleanValue(
+        False,
+        environ_name="EXTERNAL_API_ALLOW_PUBLIC_ACCESS",
+        environ_prefix=None,
+    )
+    EXTERNAL_API_DEFAULT_ACCESS_LEVEL = values.Value(
+        "trusted",
+        environ_name="EXTERNAL_API_DEFAULT_ACCESS_LEVEL",
+        environ_prefix=None,
+    )
     # Allows third-party platforms to create users with email-only identification.
     # Required for external integrations, but fragile due to deferred user reconciliation
     # on sub. Enable it with care /!\
@@ -970,6 +1047,126 @@ class Base(Configuration):
         environ_name="APPLICATION_ALLOW_USER_CREATION",
         environ_prefix=None,
     )
+
+    # Addons
+    ADDONS_ENABLED = values.BooleanValue(
+        False,
+        environ_name="ADDONS_ENABLED",
+        environ_prefix=None,
+    )
+    ADDONS_SESSION_TTL = values.PositiveIntegerValue(
+        3600,
+        environ_name="ADDONS_SESSION_TTL",
+        environ_prefix=None,
+    )
+    ADDONS_TRANSIT_TOKEN_TTL = values.PositiveIntegerValue(
+        120,
+        environ_name="ADDONS_TRANSIT_TOKEN_TTL",
+        environ_prefix=None,
+    )
+    ADDONS_CSRF_SECRET = SecretFileValue(
+        None,
+        environ_name="ADDONS_CSRF_SECRET",
+        environ_prefix=None,
+    )
+    ADDONS_CACHE_PREFIX_SESSION = values.Value(
+        "sid",
+        environ_name="ADDONS_CACHE_PREFIX_SESSION",
+        environ_prefix=None,
+    )
+    ADDONS_CACHE_PREFIX_TRANSIT = values.Value(
+        "transit",
+        environ_name="ADDONS_CACHE_PREFIX_TRANSIT",
+        environ_prefix=None,
+    )
+    ADDONS_TOKEN_AUDIENCE = values.Value(
+        "addons",
+        environ_name="ADDONS_TOKEN_AUDIENCE",
+        environ_prefix=None,
+    )
+    ADDONS_TOKEN_ISSUER = values.Value(
+        "lasuite-meet",
+        environ_name="ADDONS_TOKEN_ISSUER",
+        environ_prefix=None,
+    )
+    ADDONS_TOKEN_TTL = values.PositiveIntegerValue(
+        7200,
+        environ_name="ADDONS_TOKEN_TTL",
+        environ_prefix=None,
+    )
+    ADDONS_TOKEN_ALG = values.Value(
+        "HS256",
+        environ_name="ADDONS_TOKEN_ALG",
+        environ_prefix=None,
+    )
+    ADDONS_TOKEN_TYPE = values.Value(
+        "Bearer",
+        environ_name="ADDONS_TOKEN_TYPE",
+        environ_prefix=None,
+    )
+    ADDONS_TOKEN_SECRET_KEY = SecretFileValue(
+        None,
+        environ_name="ADDONS_TOKEN_SECRET_KEY",
+        environ_prefix=None,
+    )
+    ADDONS_TOKEN_SCOPE = values.Value(
+        "rooms:create",
+        environ_name="ADDONS_TOKEN_SCOPE",
+        environ_prefix=None,
+    )
+    ADDONS_RANDOM_TOKEN_BYTE_LENGTH = values.PositiveIntegerValue(
+        60,
+        environ_name="ADDONS_RANDOM_TOKEN_BYTE_LENGTH",
+        environ_prefix=None,
+    )
+    ADDONS_SESSION_ID_COOKIE = values.Value(
+        "addonsSid",
+        environ_name="ADDONS_SESSION_ID_COOKIE",
+        environ_prefix=None,
+    )
+    ADDONS_PENDING_SESSION_KEY = values.Value(
+        "addons_sid",
+        environ_name="ADDONS_PENDING_SESSION_KEY",
+        environ_prefix=None,
+    )
+
+    # Logging
+    # We want to make it easy to log to console but by default we log production
+    # to Sentry and don't want to log to console.
+    LOGGING = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "simple": {
+                "format": "{asctime} {name} {levelname} {message}",
+                "style": "{",
+            },
+        },
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+                "formatter": "simple",
+            },
+        },
+        # Override root logger to send it to console
+        "root": {
+            "handlers": ["console"],
+            "level": values.Value(
+                "INFO", environ_name="LOGGING_LEVEL_LOGGERS_ROOT", environ_prefix=None
+            ),
+        },
+        "loggers": {
+            "core": {
+                "handlers": ["console"],
+                "level": values.Value(
+                    "INFO",
+                    environ_name="LOGGING_LEVEL_LOGGERS_APP",
+                    environ_prefix=None,
+                ),
+                "propagate": False,
+            },
+        },
+    }
 
     # pylint: disable=invalid-name
     @property
@@ -1008,6 +1205,11 @@ class Base(Configuration):
         settings to be loaded.
         """
         super().post_setup()
+
+        if cls.FILE_UPLOAD_TMP_PATH == cls.FILE_UPLOAD_PATH:
+            raise ValueError(
+                "FILE_UPLOAD_TMP_PATH cannot be the same as FILE_UPLOAD_PATH"
+            )
 
         # The SENTRY_DSN setting should be available to activate sentry for an environment
         if cls.SENTRY_DSN is not None:
@@ -1095,11 +1297,22 @@ class Test(Base):
     USE_SWAGGER = True
     EXTERNAL_API_ENABLED = True
 
-    APPLICATION_JWT_SECRET_KEY = "devKey"  # noqa:S105
+    LIVEKIT_CONFIGURATION = {
+        "api_key": "devkey-padded-for-minimum-len!-livekit",
+        "api_secret": "secret-key-padded-for-minimum-len!-livekit",
+        "url": "http://127.0.0.1.nip.io:7880",
+    }
+
+    APPLICATION_ENABLED = True
+    APPLICATION_JWT_SECRET_KEY = "secret-key-padded-for-minimum-len!-application"  # noqa:S105
     APPLICATION_JWT_AUDIENCE = "Test inc."
 
     CELERY_TASK_ALWAYS_EAGER = True
     FILE_UPLOAD_ENABLED = True
+
+    ADDONS_ENABLED = True
+    ADDONS_CSRF_SECRET = "secret-key-padded-for-minimum-len!-addons"  # noqa:S105
+    ADDONS_TOKEN_SECRET_KEY = "secret-key-padded-for-minimum-len!-addons"  # noqa:S105
 
     def __init__(self):
         # pylint: disable=invalid-name

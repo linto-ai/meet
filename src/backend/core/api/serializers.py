@@ -13,7 +13,8 @@ from django.core.exceptions import SuspiciousOperation
 from django.utils.translation import gettext_lazy as _
 
 from django_pydantic_field.rest_framework import SchemaField
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
+from pydantic import ValidationError as PydanticValidationError
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 from timezone_field.rest_framework import TimeZoneSerializerField
@@ -123,9 +124,6 @@ class ListRoomSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "slug"]
 
 
-VALID_RECORDING_PERMISSIONS = {"admin_owner", "authenticated"}
-
-
 class RoomSerializer(serializers.ModelSerializer):
     """Serialize Room model for the API."""
 
@@ -135,18 +133,13 @@ class RoomSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "slug", "pin_code"]
 
     def validate_configuration(self, value):
-        """Validate recording permission values in configuration."""
-        if not isinstance(value, dict):
+        """Validate room configuration against the RoomConfiguration schema."""
+        if value is None or value == {}:
             return value
-
-        for key in ("screen_recording_permission", "transcript_permission"):
-            if key in value and value[key] not in VALID_RECORDING_PERMISSIONS:
-                raise serializers.ValidationError(
-                    {
-                        key: f"Must be one of: {', '.join(sorted(VALID_RECORDING_PERMISSIONS))}"
-                    }
-                )
-
+        try:
+            RoomConfiguration.model_validate(value)
+        except PydanticValidationError as e:
+            raise serializers.ValidationError(e.errors()) from e
         return value
 
     def to_representation(self, instance):
@@ -205,7 +198,7 @@ class RoomSerializer(serializers.ModelSerializer):
                 room_id=room_id,
                 user=request.user,
                 username=username,
-                configuration=configuration,
+                configuration=output["configuration"],
                 is_admin_or_owner=is_admin_or_owner,
             )
         else:
@@ -261,11 +254,14 @@ class RecordingOptions(BaseModel):
             When `None`, falls back to the application default.
         original_mode: The original recording mode before any override.
             Must be one of the valid RecordingModeChoices values when provided.
+        collect_metadata: Whether to collect additional metadata during recording.
+            When `None`, no metadata are collected.
 
     """
 
     language: str | None = None
     transcribe: bool | None = None
+    collect_metadata: bool | None = None
     original_mode: Literal["screen_recording", "transcript"] | None = None
 
     model_config = {"extra": "forbid"}
@@ -332,7 +328,22 @@ class MuteParticipantSerializer(BaseParticipantsManagementSerializer):
     )
 
 
-TrackSource = Literal["SCREEN_SHARE", "SCREEN_SHARE_AUDIO", "CAMERA", "MICROPHONE"]
+TrackSource = Literal["camera", "microphone", "screen_share", "screen_share_audio"]
+
+
+class RoomConfiguration(BaseModel):
+    """Validate room configuration structure.
+
+    Unknown fields are rejected.
+    """
+
+    can_publish_sources: list[TrackSource] | None = None
+    everyone_can_mute: bool | None = None
+    # LinTO recording permission settings (kept in the room configuration).
+    screen_recording_permission: Literal["admin_owner", "authenticated"] | None = None
+    transcript_permission: Literal["admin_owner", "authenticated"] | None = None
+
+    model_config = {"extra": "forbid"}
 
 
 class ParticipantPermission(BaseModel):
@@ -353,6 +364,10 @@ class ParticipantPermission(BaseModel):
     can_subscribe_metrics: bool | None = None
 
     model_config = {"extra": "forbid"}
+
+    @field_serializer("can_publish_sources")
+    def _serialize_sources(self, sources: list[str]) -> list[str]:
+        return [s.upper() for s in sources]
 
 
 class UpdateParticipantSerializer(BaseParticipantsManagementSerializer):
@@ -460,7 +475,7 @@ class ListFileSerializer(serializers.ModelSerializer):
 
     def get_url(self, obj):
         """Return the URL of the file."""
-        if obj.is_pending_upload:
+        if not obj.is_ready:
             return None
 
         return f"{settings.MEDIA_BASE_URL}{settings.MEDIA_URL}{quote(obj.file_key)}"
@@ -555,3 +570,15 @@ class CreateFileSerializer(ListFileSerializer):
 
     def update(self, instance, validated_data):
         raise NotImplementedError("Update method can not be used.")
+
+
+class RaiseHandSerializer(BaseValidationOnlySerializer):
+    """Serializer for raising or lowering a participant's hand in a room."""
+
+    raised = serializers.BooleanField()
+
+
+class RenameParticipantSerializer(BaseValidationOnlySerializer):
+    """Serializer for renaming a participant in a room."""
+
+    name = serializers.CharField(min_length=1, max_length=255, allow_blank=False)

@@ -1,5 +1,7 @@
 FROM node:20-alpine AS frontend-deps
 
+USER node
+
 WORKDIR /home/frontend/
 
 COPY ./src/frontend/package.json ./package.json
@@ -8,7 +10,7 @@ COPY ./src/frontend/package-lock.json ./package-lock.json
 RUN npm ci
 
 COPY .dockerignore ./.dockerignore
-COPY ./src/frontend/ .
+COPY --chown=node:node ./src/frontend/ .
 
 ### ---- Front-end builder image ----
 FROM frontend-deps AS meet
@@ -16,6 +18,8 @@ FROM frontend-deps AS meet
 WORKDIR /home/frontend
 
 FROM frontend-deps AS meet-dev
+
+USER node
 
 WORKDIR /home/frontend
 
@@ -35,15 +39,17 @@ ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 RUN npm run build
 
 # ---- Front-end image ----
-FROM nginxinc/nginx-unprivileged:alpine3.21 AS frontend-production
+FROM nginxinc/nginx-unprivileged:alpine3.23 AS frontend-production
 
 USER root
-RUN apk update && apk upgrade libssl3 \
-    libcrypto3 \
-    libxml2>=2.12.7-r2 \
-    libxslt>=1.1.39-r2 \
-    libexpat>=2.7.2-r0 \
-    libpng>=1.6.53-r0 \
+
+# Security patches for known CVEs
+RUN apk update && apk upgrade  \
+    libcrypto3>=3.5.7-r0 \
+    libssl3>=3.5.7-r0 \
+    musl \
+    musl-utils \
+    zlib>=1.3.2-r0 \
     && apk del curl
 
 USER nginx

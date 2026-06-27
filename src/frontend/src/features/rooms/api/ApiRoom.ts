@@ -1,4 +1,6 @@
 import { RecordingPermission } from '@/features/recording/types'
+import type { Track } from 'livekit-client'
+type Source = Track.Source
 
 export type ApiLiveKit = {
   url: string
@@ -12,6 +14,13 @@ export enum ApiAccessLevel {
   RESTRICTED = 'restricted',
 }
 
+export type RoomConfiguration = {
+  can_publish_sources?: Source[] | null
+  everyone_can_mute?: boolean | null
+  screen_recording_permission?: RecordingPermission
+  transcript_permission?: RecordingPermission
+}
+
 export type ApiRoom = {
   id: string
   name: string
@@ -20,9 +29,7 @@ export type ApiRoom = {
   is_administrable: boolean
   access_level: ApiAccessLevel
   livekit?: ApiLiveKit
-  configuration?: {
-    [key: string]: string | number | boolean | string[]
-  }
+  configuration?: RoomConfiguration
   recording_permissions?: {
     screen_recording_permission?: RecordingPermission
     transcript_permission?: RecordingPermission

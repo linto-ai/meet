@@ -6,10 +6,13 @@ from logging import getLogger
 from urllib.parse import unquote, urlparse
 
 from django.conf import settings
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.files.storage import default_storage
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 
@@ -30,6 +33,7 @@ from rest_framework import (
 from rest_framework import (
     status as drf_status,
 )
+from rest_framework.settings import api_settings
 
 from core import enums, models, utils
 from core.api.filters import ListFileFilter
@@ -44,6 +48,10 @@ from core.recording.event.exceptions import (
 )
 from core.recording.event.notification import notification_service
 from core.recording.event.parsers import get_parser
+from core.recording.services.metadata_collector import (
+    MetadataCollectorException,
+    MetadataCollectorService,
+)
 from core.recording.worker.exceptions import (
     RecordingStartError,
     RecordingStopError,
@@ -64,10 +72,16 @@ from core.services.lobby import (
     LobbyService,
 )
 from core.services.participants_management import (
+    ParticipantNotFoundException,
     ParticipantsManagement,
     ParticipantsManagementException,
 )
 from core.services.room_creation import RoomCreation
+from core.services.room_management import (
+    RoomManagement,
+    RoomManagementException,
+    RoomNotFoundException,
+)
 from core.services.subtitle import SubtitleException, SubtitleService
 from core.tasks.file import process_file_deletion
 
@@ -291,6 +305,41 @@ class RoomViewSet(
         if callback_id := self.request.data.get("callback_id"):
             RoomCreation().persist_callback_state(callback_id, room)
 
+    def perform_update(self, serializer):
+        """Persist the room update, then sync metadata to LiveKit."""
+
+        old_configuration = serializer.instance.configuration
+        old_access_level = serializer.instance.access_level
+
+        room = serializer.save()
+
+        if (
+            room.configuration == old_configuration
+            and room.access_level == old_access_level
+        ):
+            return
+
+        metadata = {
+            "configuration": room.configuration,
+            "access_level": room.access_level,
+        }
+
+        try:
+            RoomManagement().update_metadata(
+                room_name=str(room.id),
+                metadata=metadata,
+            )
+        except RoomNotFoundException:
+            logger.info(
+                "LiveKit room %s does not exist yet, skipping metadata sync",
+                room.id,
+            )
+        except RoomManagementException:
+            logger.warning(
+                "Failed to sync metadata to LiveKit for room %s",
+                room.id,
+            )
+
     @decorators.action(
         detail=True,
         methods=["post"],
@@ -314,16 +363,27 @@ class RoomViewSet(
         options = serializer.validated_data.get("options")
         room = self.get_object()
 
-        # May raise exception if an active or initiated recording already exist for the room
-        recording = models.Recording.objects.create(
-            room=room,
-            mode=mode,
-            options=options.model_dump(exclude_none=True) if options else {},
-        )
+        try:
+            with transaction.atomic():
+                recording = models.Recording.objects.create(
+                    room=room,
+                    mode=mode,
+                    options=options.model_dump(exclude_none=True) if options else {},
+                )
+                models.RecordingAccess.objects.create(
+                    user=self.request.user,
+                    role=models.RoleChoices.OWNER,
+                    recording=recording,
+                )
 
-        models.RecordingAccess.objects.create(
-            user=self.request.user, role=models.RoleChoices.OWNER, recording=recording
-        )
+        except (DjangoValidationError, IntegrityError):
+            # DjangoValidationError covers the Python-level check (full_clean);
+            # IntegrityError covers the race where two concurrent requests both
+            # pass that check and the DB-level UNIQUE constraint catches the loser.
+            return drf_response.Response(
+                {"error": f"A recording is already in progress for room {room.slug}"},
+                status=drf_status.HTTP_409_CONFLICT,
+            )
 
         worker_service = get_worker_service(mode=recording.mode)
         worker_manager = WorkerServiceMediator(worker_service=worker_service)
@@ -331,10 +391,22 @@ class RoomViewSet(
         try:
             worker_manager.start(recording)
         except RecordingStartError:
+            models.Recording.objects.filter(pk=recording.pk).update(
+                status=models.RecordingStatusChoices.FAILED_TO_START
+            )
             return drf_response.Response(
                 {"error": f"Recording failed to start for room {room.slug}"},
-                status=drf_status.HTTP_500_INTERNAL_SERVER_ERROR,
+                status=drf_status.HTTP_502_BAD_GATEWAY,
             )
+
+        if settings.METADATA_COLLECTOR_ENABLED and (
+            recording.options.get("collect_metadata", False)
+        ):
+            try:
+                MetadataCollectorService().start(recording)
+                logger.debug("Started MetadataCollectorService")
+            except MetadataCollectorException:
+                logger.warning("Failed to start MetadataCollectorService")
 
         return drf_response.Response(
             {"message": f"Recording successfully started for room {room.slug}"},
@@ -583,7 +655,11 @@ class RoomViewSet(
         methods=["post"],
         url_path="mute-participant",
         url_name="mute-participant",
-        permission_classes=[permissions.HasPrivilegesOnRoom],
+        permission_classes=[permissions.CanMuteParticipant],
+        authentication_classes=[
+            LiveKitTokenAuthentication,
+            *api_settings.DEFAULT_AUTHENTICATION_CLASSES,
+        ],
     )
     def mute_participant(self, request, pk=None):  # pylint: disable=unused-argument
         """Mute a specific track for a participant in the room."""
@@ -592,11 +668,36 @@ class RoomViewSet(
         serializer = serializers.MuteParticipantSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        # TEMPORARY: a LiveKit token proves access was granted, not that the caller
+        # joined. Cross-check identity against the live participant list until auth
+        # is hardened. Skipped for non-LiveKit auth backends.
+        caller_identity = getattr(request.auth, "identity", None)
+        if caller_identity is not None:
+            try:
+                ParticipantsManagement().check_if_in_meeting(
+                    room_name=str(room.pk),
+                    identity=caller_identity,
+                )
+            except (ParticipantNotFoundException, ParticipantsManagementException):
+                logger.warning(
+                    "Failed to verify caller presence for mute in room %s; denying",
+                    room.pk,
+                )
+                return drf_response.Response(
+                    {"error": "Could not verify caller presence"},
+                    status=drf_status.HTTP_403_FORBIDDEN,
+                )
+
         try:
             ParticipantsManagement().mute(
                 room_name=str(room.pk),
                 identity=str(serializer.validated_data["participant_identity"]),
                 track_sid=serializer.validated_data["track_sid"],
+            )
+        except ParticipantNotFoundException:
+            return drf_response.Response(
+                {"error": "Participant not found"},
+                status=drf_status.HTTP_404_NOT_FOUND,
             )
         except ParticipantsManagementException:
             return drf_response.Response(
@@ -636,6 +737,11 @@ class RoomViewSet(
                 permission=permission.model_dump() if permission else None,
                 name=serializer.validated_data.get("name"),
             )
+        except ParticipantNotFoundException:
+            return drf_response.Response(
+                {"error": "Participant not found"},
+                status=drf_status.HTTP_404_NOT_FOUND,
+            )
         except ParticipantsManagementException:
             return drf_response.Response(
                 {"error": "Failed to update participant"},
@@ -668,6 +774,11 @@ class RoomViewSet(
                 room_name=str(room.pk),
                 identity=str(serializer.validated_data["participant_identity"]),
             )
+        except ParticipantNotFoundException:
+            return drf_response.Response(
+                {"error": "Participant not found"},
+                status=drf_status.HTTP_404_NOT_FOUND,
+            )
         except ParticipantsManagementException:
             return drf_response.Response(
                 {"error": "Failed to remove participant"},
@@ -676,6 +787,92 @@ class RoomViewSet(
 
         return drf_response.Response(
             {"status": "success"}, status=drf_status.HTTP_200_OK
+        )
+
+    @decorators.action(
+        detail=True,
+        methods=["post"],
+        url_path="toggle-hand",
+        url_name="toggle-hand",
+        permission_classes=[permissions.HasLiveKitRoomAccess],
+        authentication_classes=[LiveKitTokenAuthentication],
+    )
+    def toggle_hand(self, request, pk=None):  # pylint: disable=unused-argument
+        """Raise or lower the current participant's hand in the room."""
+        room = self.get_object()
+
+        serializer = serializers.RaiseHandSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        identity = request.auth.identity
+
+        # LiveKit uses the handRaisedAt participant attribute to signal hand state.
+        # An empty string means the hand is lowered; a non-empty ISO 8601 timestamp
+        # means the hand is raised. The timestamp is used by clients to determine
+        # the order in which participants raised their hands.
+        hand_raised_at = (
+            timezone.now().isoformat() if serializer.validated_data["raised"] else ""
+        )
+
+        try:
+            ParticipantsManagement().update(
+                room_name=str(room.pk),
+                identity=identity,
+                attributes={"handRaisedAt": hand_raised_at},
+            )
+        except ParticipantNotFoundException:
+            return drf_response.Response(
+                {"error": "Participant not found"},
+                status=drf_status.HTTP_404_NOT_FOUND,
+            )
+        except ParticipantsManagementException:
+            return drf_response.Response(
+                {"error": "Failed to update participant hand state"},
+                status=drf_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        return drf_response.Response(
+            {"status": "success"},
+            status=drf_status.HTTP_200_OK,
+        )
+
+    @decorators.action(
+        detail=True,
+        methods=["post"],
+        url_path="rename",
+        url_name="rename",
+        permission_classes=[permissions.HasLiveKitRoomAccess],
+        authentication_classes=[LiveKitTokenAuthentication],
+    )
+    def rename(self, request, pk=None):  # pylint: disable=unused-argument
+        """Rename the current participant in the room."""
+        room = self.get_object()
+
+        serializer = serializers.RenameParticipantSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        identity = request.auth.identity
+
+        try:
+            ParticipantsManagement().update(
+                room_name=str(room.pk),
+                identity=identity,
+                name=serializer.validated_data["name"],
+            )
+        except ParticipantNotFoundException:
+            return drf_response.Response(
+                {"error": "Participant not found"},
+                status=drf_status.HTTP_404_NOT_FOUND,
+            )
+        except ParticipantsManagementException:
+            return drf_response.Response(
+                {"error": "Failed to rename participant"},
+                status=drf_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        return drf_response.Response(
+            {"status": "success"},
+            status=drf_status.HTTP_200_OK,
         )
 
 
@@ -990,95 +1187,123 @@ class FileViewSet(
         """
         Check the actual uploaded file and mark it as ready.
         """
-
+        # Ensures we go through authorization checks
         file = self.get_object()
 
-        if not file.is_pending_upload:
+        # Try to update the file with the new state. If the file is already in this state
+        # we are in a concurrent request, and we should reject that request
+        updated_rows = models.File.objects.filter(
+            upload_state=models.FileUploadStateChoices.PENDING,
+            pk=kwargs["pk"],
+        ).update(upload_state=models.FileUploadStateChoices.ANALYZING)
+        if updated_rows != 1:
             raise drf_exceptions.ValidationError(
                 {"file": "This action is only available for files in PENDING state."},
                 code="file_upload_state_not_pending",
             )
+        file.refresh_from_db()
 
         s3_client = default_storage.connection.meta.client
+        validation_error = None
 
-        head_response = s3_client.head_object(
-            Bucket=default_storage.bucket_name, Key=file.file_key
-        )
-        file_size = head_response["ContentLength"]
-
-        if settings.FILE_UPLOAD_APPLY_RESTRICTIONS:
-            config_for_file_type = settings.FILE_UPLOAD_RESTRICTIONS[file.type]
-            if file_size > config_for_file_type["max_size"]:
-                self._complete_file_deletion(file)
-                logger.info(
-                    "upload_ended: file size (%s) for file %s higher than the allowed max size",
-                    file_size,
-                    file.file_key,
-                )
-                raise drf_exceptions.ValidationError(
-                    detail="The file size is higher than the allowed max size.",
-                    code="file_size_exceeded",
-                )
-
-        # python-magic recommends using at least the first 2048 bytes
-        # to reduce incorrect identification.
-        # This is a tradeoff between pulling in the whole file and the most likely relevant bytes
-        # of the file for mime type identification.
-        if file_size > 2048:
-            range_response = s3_client.get_object(
-                Bucket=default_storage.bucket_name,
-                Key=file.file_key,
-                Range="bytes=0-2047",
-            )
-            file_head = range_response["Body"].read()
-        else:
-            file_head = s3_client.get_object(
-                Bucket=default_storage.bucket_name, Key=file.file_key
-            )["Body"].read()
-
-        # Use improved MIME type detection combining magic bytes and file extension
-        logger.info("upload_ended: detecting mimetype for file: %s", file.file_key)
-        mimetype = utils.detect_mimetype(file_head, filename=file.filename)
-
-        if settings.FILE_UPLOAD_APPLY_RESTRICTIONS:
-            config_for_file_type = settings.FILE_UPLOAD_RESTRICTIONS[file.type]
-            allowed_file_mimetypes = config_for_file_type["allowed_mimetypes"]
-            if mimetype not in allowed_file_mimetypes:
-                self._complete_file_deletion(file)
-                logger.warning(
-                    "upload_ended: mimetype not allowed %s for file %s",
-                    mimetype,
-                    file.file_key,
-                )
-                raise drf_exceptions.ValidationError(
-                    detail="The file type is not allowed.",
-                    code="file_type_not_allowed",
-                )
-
-        file.upload_state = models.FileUploadStateChoices.READY
-        file.mimetype = mimetype
-        file.size = file_size
-
-        file.save(update_fields=["upload_state", "mimetype", "size"])
-
-        if head_response["ContentType"] != mimetype:
-            logger.info(
-                "upload_ended: content type mismatch between object storage and file,"
-                " updating from %s to %s",
-                head_response["ContentType"],
-                mimetype,
-            )
+        try:
+            # We copy the file to its final destination, we will run the checks on that
+            # final file and ignore any updates to the temporary file. (We cannot revoke the policy,
+            # so the temporary file might still be updated after that.)
+            # The temporary folders will need to be cleaned periodically
             s3_client.copy_object(
                 Bucket=default_storage.bucket_name,
                 Key=file.file_key,
                 CopySource={
                     "Bucket": default_storage.bucket_name,
-                    "Key": file.file_key,
+                    "Key": file.temporary_file_key,
                 },
-                ContentType=mimetype,
-                Metadata=head_response["Metadata"],
-                MetadataDirective="REPLACE",
             )
+
+            head_response = s3_client.head_object(
+                Bucket=default_storage.bucket_name, Key=file.file_key
+            )
+            file_size = head_response["ContentLength"]
+            # python-magic recommends using at least the first 2048 bytes
+            # to reduce incorrect identification.
+            # This is a tradeoff between pulling in the whole file and
+            # the most likely relevant bytes
+            # of the file for mime type identification.
+            if file_size > 2048:
+                range_response = s3_client.get_object(
+                    Bucket=default_storage.bucket_name,
+                    Key=file.file_key,
+                    Range="bytes=0-2047",
+                )
+                file_head = range_response["Body"].read()
+            else:
+                file_head = s3_client.get_object(
+                    Bucket=default_storage.bucket_name, Key=file.file_key
+                )["Body"].read()
+
+            logger.info("upload_ended: detecting mimetype for file: %s", file.file_key)
+            mimetype = utils.detect_mimetype(file_head, filename=file.filename)
+
+            if settings.FILE_UPLOAD_APPLY_RESTRICTIONS:
+                config_for_file_type = settings.FILE_UPLOAD_RESTRICTIONS[file.type]
+                if file_size > config_for_file_type["max_size"]:
+                    logger.info(
+                        "upload_ended: file size (%s) for file %s higher than the allowed max size",
+                        file_size,
+                        file.file_key,
+                    )
+                    validation_error = drf_exceptions.ValidationError(
+                        detail="The file size is higher than the allowed max size.",
+                        code="file_size_exceeded",
+                    )
+                else:
+                    # Use improved MIME type detection combining magic bytes and file extension
+                    allowed_file_mimetypes = config_for_file_type["allowed_mimetypes"]
+                    if mimetype not in allowed_file_mimetypes:
+                        logger.warning(
+                            "upload_ended: mimetype not allowed %s for file %s",
+                            mimetype,
+                            file.file_key,
+                        )
+                        validation_error = drf_exceptions.ValidationError(
+                            detail="The file type is not allowed.",
+                            code="file_type_not_allowed",
+                        )
+
+            if validation_error is not None:
+                self._complete_file_deletion(file)
+            else:
+                file.upload_state = models.FileUploadStateChoices.READY
+                file.mimetype = mimetype
+                file.size = file_size
+                file.save(update_fields=["upload_state", "mimetype", "size"])
+
+                if head_response["ContentType"] != mimetype:
+                    logger.info(
+                        "upload_ended: content type mismatch between object storage and file,"
+                        " updating from %s to %s",
+                        head_response["ContentType"],
+                        mimetype,
+                    )
+                    s3_client.copy_object(
+                        Bucket=default_storage.bucket_name,
+                        Key=file.file_key,
+                        CopySource={
+                            "Bucket": default_storage.bucket_name,
+                            "Key": file.file_key,
+                        },
+                        ContentType=mimetype,
+                        Metadata=head_response["Metadata"],
+                        MetadataDirective="REPLACE",
+                    )
+        except Exception as e:
+            logger.exception("Failed to analyze file, reverting to pending state")
+            file.upload_state = models.FileUploadStateChoices.PENDING
+            file.save()
+            raise e
+
+        if validation_error:
+            raise validation_error
 
         # Not yet implemented
         # Change the file.upload_state when this will be done
@@ -1092,7 +1317,7 @@ class FileViewSet(
         """Delete a file completely."""
         file.soft_delete()
         file.hard_delete()
-        process_file_deletion.delay(file.id)
+        transaction.on_commit(lambda: process_file_deletion.delay(file.id))
 
     def _authorize_subrequest(self, request, pattern):
         """
@@ -1183,7 +1408,7 @@ class FileViewSet(
             request, MEDIA_STORAGE_URL_PATTERN
         )
 
-        if file.is_pending_upload:
+        if not file.is_ready:
             logger.warning("File '%s' is not ready", file.id)
             raise drf_exceptions.PermissionDenied()
 

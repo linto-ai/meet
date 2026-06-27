@@ -2,6 +2,19 @@ import { proxy, subscribe } from 'valtio'
 import { STORAGE_KEYS } from '@/utils/storageKeys'
 import { deserializeToProxyMap } from '@/utils/valtio'
 
+export type UiFont =
+  | 'default'
+  | 'lexend'
+  | 'atkinson-hyperlegible'
+  | 'opendyslexic'
+
+export const UI_FONT_OPTIONS: UiFont[] = [
+  'default',
+  'lexend',
+  'atkinson-hyperlegible',
+  'opendyslexic',
+]
+
 export type CaptionTextSize = 'small' | 'medium' | 'large'
 
 export const CAPTION_TEXT_SIZE_OPTIONS: CaptionTextSize[] = [
@@ -46,7 +59,7 @@ export const CAPTION_FONT_COLOR_VALUES: Record<CaptionColor, string> = {
 }
 
 export const CAPTION_BACKGROUND_COLOR_VALUES: Record<CaptionColor, string> = {
-  default: 'rgba(0, 0, 0, 0.75)',
+  default: 'transparent',
   black: 'rgba(0, 0, 0, 0.75)',
   white: 'rgba(255, 255, 255, 0.75)',
   blue: 'rgba(0, 0, 255, 0.75)',
@@ -62,6 +75,7 @@ type AccessibilityState = {
   captionTextSize: CaptionTextSize
   captionFontColor: CaptionColor
   captionBackgroundColor: CaptionColor
+  uiFont: UiFont
 }
 
 const DEFAULT_STATE: AccessibilityState = {
@@ -69,6 +83,7 @@ const DEFAULT_STATE: AccessibilityState = {
   captionTextSize: 'medium',
   captionFontColor: 'default',
   captionBackgroundColor: 'default',
+  uiFont: 'default',
 }
 
 function getAccessibilityState(): AccessibilityState {
@@ -91,6 +106,9 @@ function getAccessibilityState(): AccessibilityState {
       )
         ? parsed.captionBackgroundColor
         : DEFAULT_STATE.captionBackgroundColor
+      const uiFont = UI_FONT_OPTIONS.includes(parsed.uiFont)
+        ? parsed.uiFont
+        : DEFAULT_STATE.uiFont
       return {
         ...DEFAULT_STATE,
         ...parsed,
@@ -101,6 +119,7 @@ function getAccessibilityState(): AccessibilityState {
         captionTextSize,
         captionFontColor,
         captionBackgroundColor,
+        uiFont,
       }
     }
 

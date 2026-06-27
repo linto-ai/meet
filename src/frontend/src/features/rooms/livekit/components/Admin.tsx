@@ -10,6 +10,7 @@ import { keys } from '@/api/queryKeys'
 import { useQuery } from '@tanstack/react-query'
 import { useParams } from 'wouter'
 import { usePublishSourcesManager } from '@/features/rooms/livekit/hooks/usePublishSourcesManager'
+import { usePermissionsManager } from '../hooks/usePermissionsManager'
 import { RecordingMode, RecordingPermission } from '@/features/recording/types'
 import { useIsRecordingModeEnabled } from '@/features/recording/hooks/useIsRecordingModeEnabled'
 import {
@@ -137,6 +138,8 @@ export const Admin = () => {
     isScreenShareEnabled,
   } = usePublishSourcesManager()
 
+  const { toggleMuting, isMutingEnabled } = usePermissionsManager()
+
   const { notifyParticipants } = useNotifyParticipants()
 
   const handleRecordingPermissionChange =
@@ -224,6 +227,17 @@ export const Admin = () => {
             description={t('moderation.screenshare.description')}
             isSelected={isScreenShareEnabled}
             onChange={toggleScreenShare}
+            wrapperProps={{
+              noMargin: true,
+              fullWidth: true,
+            }}
+          />
+          <Field
+            type="switch"
+            label={t('moderation.mute.label')}
+            description={t('moderation.mute.description')}
+            isSelected={isMutingEnabled}
+            onChange={toggleMuting}
             wrapperProps={{
               noMargin: true,
               fullWidth: true,

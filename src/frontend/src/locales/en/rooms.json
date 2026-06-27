@@ -3,7 +3,7 @@
     "heading": {
       "normal": "You have left the meeting",
       "duplicateIdentity": "You have joined the meeting from another device",
-      "participantRemoved": "You have been removed from the meeting by an administrator"
+      "participantRemoved": "You have been removed from the meeting by a host"
     },
     "home": "Return to home",
     "back": "Rejoin the meeting"
@@ -166,6 +166,7 @@
     "countdownAnnouncement": "Call ends in {{duration}}."
   },
   "controls": {
+    "region": "Call controls",
     "microphone": "Microphone",
     "camera": "Camera",
     "chat": {
@@ -215,7 +216,7 @@
     "moreOptions": "More options",
     "reactions": {
       "button": "Send reaction",
-      "send": "Send reaction {{emoji}}",
+      "toolbar": "Send reaction",
       "announce": "{{name}} : {{emoji}}",
       "you": "you",
       "emojis": {
@@ -230,6 +231,16 @@
       }
     }
   },
+  "pictureInPicture": {
+    "placeholder": {
+      "title": "Your video call is in another window.",
+      "description": "Picture-in-Picture mode allows you to stay connected to the call while performing other tasks.",
+      "bringBack": "Bring the call back here"
+    },
+    "stage": "Participants",
+    "controlBar": "Meeting controls",
+    "title": "Picture-in-picture meeting"
+  },
   "options": {
     "buttonLabel": "More Options",
     "items": {
@@ -240,6 +251,10 @@
       "username": "Update Your Name",
       "effects": "Backgrounds and Effects",
       "switchCamera": "Switch camera",
+      "pictureInPicture": {
+        "enter": "Picture-in-picture",
+        "exit": "Close picture-in-picture"
+      },
       "fullscreen": {
         "enter": "Fullscreen",
         "exit": "Exit fullscreen mode"
@@ -275,11 +290,14 @@
       "apply": "Replace your background:",
       "personal": {
         "title": "My backgrounds",
+        "selectedLabel": "Unselect background (it's currently applied).",
+        "apply": "Use as background.",
         "selectFileTooltip": "Select an image file to use as a personal background",
         "notLoggedInWarning": "You are not logged-in, personal backgrounds won't be saved from one meeting to the other.",
         "warningUploadDisabled": "Personal backgrounds are currently not saved from one meeting to the other.",
         "uploadLimitReached": "You cannot upload more personal backgrounds.",
         "uploadInProgress": "Image is being uploaded…",
+        "deleteLabel": "Delete background.",
         "errors": {
           "close": "Close",
           "file_too_large": {
@@ -327,7 +345,7 @@
       "chat": "Messages in the chat",
       "transcript": "Transcribe",
       "screenRecording": "Record",
-      "admin": "Admin settings",
+      "admin": "Host settings",
       "tools": "More tools",
       "info": "Meeting information"
     },
@@ -337,7 +355,7 @@
       "chat": "messages",
       "transcript": "transcribe",
       "screenRecording": "record",
-      "admin": "admin settings",
+      "admin": "host settings",
       "tools": "more tools",
       "info": "meeting information"
     },
@@ -414,7 +432,7 @@
     },
     "premium": {
       "heading": "Premium feature",
-      "body": "This feature is reserved for public agents. If your email address is not authorized, please contact support to get access.",
+      "body": "This feature is not available to you. Please contact support for more information.",
       "linkMore": "Open documentation",
       "linkAriaLabel": "Open documentation about premium access - opens in new window",
       "dividerLabel": "OR",
@@ -465,6 +483,22 @@
         "buttonLabel": "Request"
       }
     },
+    "premium": {
+      "heading": "Premium feature",
+      "body": "This feature is not available to you. Please contact support for more information.",
+      "linkMore": "Open documentation",
+      "linkAriaLabel": "Open documentation about premium access - opens in new window",
+      "dividerLabel": "OR",
+      "login": {
+        "heading": "You are not logged in!",
+        "body": "You must be logged in to use this feature. Please log in, then try again."
+      },
+      "request": {
+        "heading": "Request Recording",
+        "body": "The host will be notified and can enable recording for you.",
+        "buttonLabel": "Request"
+      }
+    },
     "durationMessage": "(limited to {{max_duration}}) "
   },
   "errorRecordingAlertDialog": {
@@ -476,7 +510,7 @@
     "button": "OK"
   },
   "admin": {
-    "description": "These organizer settings allow you to maintain control of your meeting. Only organizers can access these controls.",
+    "description": "These host settings allow you to maintain control of your meeting. Only hosts can access these controls.",
     "access": {
       "title": "Room access",
       "description": "These settings will also apply to future occurrences of this meeting.",
@@ -510,6 +544,10 @@
       "screenshare": {
         "label": "Share their screen",
         "description": "Disabling this option will prevent participants from sharing their screen, and any ongoing screen sharing will be stopped immediately."
+      },
+      "mute": {
+        "label": "Mute others",
+        "description": "When disabled, participants will no longer be able to mute other participants."
       }
     },
     "recording": {

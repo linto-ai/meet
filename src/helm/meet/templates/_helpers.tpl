@@ -203,12 +203,31 @@ Requires top level scope
 {{- end }}
 
 {{/*
-Full name for the agents
+Full name for the Celery Summary Backend
 
 Requires top level scope
 */}}
-{{- define "meet.agents.fullname" -}}
-{{ include "meet.fullname" . }}-agents
+{{- define "meet.celerySummaryBackend.fullname" -}}
+{{ include "meet.fullname" . }}-celery-summary-backend
+{{- end }}
+
+
+{{/*
+Full name for the agent metadata
+
+Requires top level scope
+*/}}
+{{- define "meet.agentMetadata.fullname" -}}
+{{ include "meet.fullname" . }}-agent-metadata
+{{- end }}
+
+{{/*
+Full name for the agent subtitles
+
+Requires top level scope
+*/}}
+{{- define "meet.agentSubtitles.fullname" -}}
+{{ include "meet.fullname" . }}-agent-subtitles
 {{- end }}
 
 {{/*

@@ -1,4 +1,3 @@
-import '@livekit/components-styles'
 import '@/styles/index.css'
 import { Suspense } from 'react'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
@@ -15,12 +14,14 @@ import { queryClient } from '@/api/queryClient'
 import { AppInitialization } from '@/components/AppInitialization'
 import { useIsSdkContext } from '@/features/sdk/hooks/useIsSdkContext'
 import { getEnv } from '@/utils/getEnv'
+import { useApplyA11yFonts } from '@/hooks/useApplyA11yFonts'
 
 function App() {
   const { i18n } = useTranslation()
   useTitle(getEnv('VITE_APP_TITLE') ?? '')
 
   const isSDKContext = useIsSdkContext()
+  useApplyA11yFonts()
 
   return (
     <QueryClientProvider client={queryClient}>

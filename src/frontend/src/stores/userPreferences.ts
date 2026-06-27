@@ -1,13 +1,14 @@
-import { proxy } from 'valtio'
-import { subscribe } from 'valtio/index'
+import { proxy, subscribe } from 'valtio'
 import { STORAGE_KEYS } from '@/utils/storageKeys'
 
 type State = {
   is_idle_disconnect_modal_enabled: boolean
+  is_auto_mute_large_room_enabled: boolean
 }
 
 const DEFAULT_STATE = {
   is_idle_disconnect_modal_enabled: true,
+  is_auto_mute_large_room_enabled: true,
 }
 
 function getUserPreferencesState(): State {

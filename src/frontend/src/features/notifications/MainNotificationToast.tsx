@@ -1,40 +1,34 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect } from 'react'
 import { useRoomContext } from '@livekit/components-react'
 import { Participant, RemoteParticipant, RoomEvent } from 'livekit-client'
-import { ChatMessage, isMobileBrowser } from '@livekit/components-core'
+import { type ChatMessage, isMobileBrowser } from '@livekit/components-core'
 import { useTranslation } from 'react-i18next'
-import { Div } from '@/primitives'
 import { NotificationType } from './NotificationType'
 import { NotificationDuration } from './NotificationDuration'
 import { decodeNotificationDataReceived } from './utils'
 import { useNotificationSound } from '@/features/notifications/hooks/useSoundNotification'
-import { ToastProvider, toastQueue } from './components/ToastProvider'
-import { WaitingParticipantNotification } from './components/WaitingParticipantNotification'
+import { toastQueue } from './components/ToastProvider'
 import { queryClient } from '@/api/queryClient'
 import { keys } from '@/api/queryKeys'
 import { fetchRoom } from '@/features/rooms/api/fetchRoom'
 import { useParams } from 'wouter'
-import {
-  Emoji,
-  Reaction,
-} from '@/features/rooms/livekit/components/controls/ReactionsToggle'
-import {
-  ANIMATION_DURATION,
-  ReactionPortals,
-} from '@/features/rooms/livekit/components/ReactionPortal'
 import { layoutStore } from '@/stores/layout'
 import { PanelId } from '@/features/rooms/livekit/hooks/useSidePanel'
 import { useScreenReaderAnnounce } from '@/hooks/useScreenReaderAnnounce'
+import { Emoji } from '@/features/reactions/types'
+import { useReactions } from '@/features/reactions/hooks/useReactions'
+import { NotificationProvider } from './NotificationProvider'
+import { useConfig } from '@/api/useConfig'
 
 export const MainNotificationToast = () => {
   const room = useRoomContext()
+  const { data } = useConfig()
   const { triggerNotificationSound } = useNotificationSound()
   const { roomId } = useParams()
   const { t } = useTranslation('notifications')
   const announce = useScreenReaderAnnounce()
 
-  const [reactions, setReactions] = useState<Reaction[]>([])
-  const instanceIdRef = useRef(0)
+  const { appendReaction } = useReactions()
 
   useEffect(() => {
     const handleChatMessage = (
@@ -67,21 +61,13 @@ export const MainNotificationToast = () => {
     }
   }, [room, triggerNotificationSound, announce, t])
 
-  const handleEmoji = (emoji: string, participant: Participant) => {
-    if (!emoji || !Object.values(Emoji).includes(emoji as Emoji)) return
-    const id = instanceIdRef.current++
-    setReactions((prev) => [
-      ...prev,
-      {
-        id,
-        emoji,
-        participant,
-      },
-    ])
-    setTimeout(() => {
-      setReactions((prev) => prev.filter((instance) => instance.id !== id))
-    }, ANIMATION_DURATION)
-  }
+  const handleEmoji = useCallback(
+    (emoji: string, participant: Participant) => {
+      if (!emoji || !Object.values(Emoji).includes(emoji as Emoji)) return
+      appendReaction(emoji as Emoji, participant)
+    },
+    [appendReaction]
+  )
 
   useEffect(() => {
     const handleDataReceived = (
@@ -160,14 +146,23 @@ export const MainNotificationToast = () => {
     return () => {
       room.off(RoomEvent.DataReceived, handleDataReceived)
     }
-  }, [room, roomId])
+  }, [room, roomId, handleEmoji])
+
+  const triggerNotificationSoundIfRoomIsSmall = useCallback(
+    (type: NotificationType) => {
+      if (!data) return
+      if (room.numParticipants >= data.max_participants_for_sound) return
+      triggerNotificationSound(type)
+    },
+    [room, data, triggerNotificationSound]
+  )
 
   useEffect(() => {
     const showJoinNotification = (participant: Participant) => {
       if (isMobileBrowser()) {
         return
       }
-      triggerNotificationSound(NotificationType.ParticipantJoined)
+      triggerNotificationSoundIfRoomIsSmall(NotificationType.ParticipantJoined)
       toastQueue.add(
         {
           participant,
@@ -182,7 +177,7 @@ export const MainNotificationToast = () => {
     return () => {
       room.off(RoomEvent.ParticipantConnected, showJoinNotification)
     }
-  }, [room, triggerNotificationSound])
+  }, [room, triggerNotificationSoundIfRoomIsSmall])
 
   useEffect(() => {
     const removeParticipantNotifications = (participant: Participant) => {
@@ -259,11 +254,5 @@ export const MainNotificationToast = () => {
   // the 'notifications' namespace might not be loaded yet
   useTranslation(['notifications'])
 
-  return (
-    <Div position="absolute" bottom={0} right={5} zIndex={1000}>
-      <ToastProvider />
-      <WaitingParticipantNotification />
-      <ReactionPortals reactions={reactions} />
-    </Div>
-  )
+  return <NotificationProvider />
 }

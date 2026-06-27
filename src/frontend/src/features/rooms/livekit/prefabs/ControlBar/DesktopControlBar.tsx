@@ -1,9 +1,8 @@
 import { supportsScreenSharing } from '@livekit/components-core'
-import { ControlBarAuxProps } from './ControlBar'
+import type { ControlBarAuxProps } from './ControlBar'
 import { css } from '@/styled-system/css'
 import { LeaveButton } from '../../components/controls/LeaveButton'
 import { Track } from 'livekit-client'
-import { ReactionsToggle } from '../../components/controls/ReactionsToggle'
 import { HandToggle } from '../../components/controls/HandToggle'
 import { ScreenShareToggle } from '../../components/controls/ScreenShareToggle'
 import { SubtitlesToggle } from '../../components/controls/SubtitlesToggle'
@@ -15,6 +14,8 @@ import { useRegisterKeyboardShortcut } from '@/features/shortcuts/useRegisterKey
 import { useFullScreen } from '../../hooks/useFullScreen'
 import { VideoDeviceControl } from '../../components/controls/Device/VideoDeviceControl'
 import { AudioDevicesControl } from '../../components/controls/Device/AudioDevicesControl'
+import { ReactionsToggle } from '@/features/reactions/components/ReactionsToggle'
+import { ControlBarRegion } from '@/features/layout/components/ControlBarRegion'
 
 export function DesktopControlBar({
   onDeviceError,
@@ -48,11 +49,7 @@ export function DesktopControlBar({
       className={css({
         width: '100vw',
         display: 'flex',
-        position: 'absolute',
         padding: '1.125rem',
-        bottom: 0,
-        left: 0,
-        right: 0,
       })}
     >
       <div
@@ -65,15 +62,7 @@ export function DesktopControlBar({
           marginLeft: '0.5rem',
         })}
       />
-      <div
-        className={css({
-          flex: '1 1 33%',
-          alignItems: 'center',
-          justifyContent: 'center',
-          display: 'flex',
-          gap: '0.65rem',
-        })}
-      >
+      <ControlBarRegion>
         <AudioDevicesControl
           onDeviceError={(error) =>
             onDeviceError?.({ source: Track.Source.Microphone, error })
@@ -97,7 +86,7 @@ export function DesktopControlBar({
         <OptionsButton />
         <LeaveButton />
         <StartMediaButton />
-      </div>
+      </ControlBarRegion>
       <MoreOptions parentElement={desktopControlBarEl} />
     </div>
   )

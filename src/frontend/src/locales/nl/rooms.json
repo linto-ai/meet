@@ -166,6 +166,7 @@
     "countdownAnnouncement": "Het gesprek eindigt over {{duration}}."
   },
   "controls": {
+    "region": "Gespreksbesturing",
     "microphone": "Microfoon",
     "camera": "Camera",
     "chat": {
@@ -215,7 +216,7 @@
     "moreOptions": "Meer opties",
     "reactions": {
       "button": "Stuur reactie",
-      "send": "Stuur reactie {{emoji}}",
+      "toolbar": "Stuur reactie",
       "announce": "{{name}} : {{emoji}}",
       "you": "U",
       "emojis": {
@@ -230,6 +231,16 @@
       }
     }
   },
+  "pictureInPicture": {
+    "placeholder": {
+      "title": "Uw videogesprek bevindt zich in een ander venster.",
+      "description": "Met de beeld-in-beeld-modus kunt u verbonden blijven met het gesprek terwijl u andere taken uitvoert.",
+      "bringBack": "Gesprek hier terughalen"
+    },
+    "stage": "Deelnemers",
+    "controlBar": "Vergaderbesturing",
+    "title": "Beeld-in-beeld vergadering"
+  },
   "options": {
     "buttonLabel": "Meer opties",
     "items": {
@@ -240,6 +251,10 @@
       "username": "Verander uw naam",
       "effects": "Pas effecten toe",
       "switchCamera": "Selecteer camera",
+      "pictureInPicture": {
+        "enter": "Beeld-in-beeld",
+        "exit": "Beeld-in-beeld sluiten"
+      },
       "fullscreen": {
         "enter": "Volledig scherm",
         "exit": "Stop volledig scherm stand"
@@ -275,11 +290,14 @@
       "apply": "Vervang je achtergrond:",
       "personal": {
         "title": "Mijn achtergronden",
+        "selectedLabel": "Deselecteer de achtergrond (deze is momenteel toegepast).",
+        "apply": "Gebruik als achtergrond.",
         "selectFileTooltip": "Selecteer een afbeeldingsbestand om te gebruiken als persoonlijke achtergrond",
         "notLoggedInWarning": "U bent niet ingelogd, persoonlijke achtergronden worden niet opgeslagen van de ene vergadering naar de andere.",
         "warningUploadDisabled": "Persoonlijke achtergronden worden momenteel niet opgeslagen van de ene vergadering naar de andere.",
         "uploadLimitReached": "U kunt geen persoonlijke achtergronden meer uploaden.",
         "uploadInProgress": "Afbeelding wordt geüpload…",
+        "deleteLabel": "Aangepaste achtergrond verwijderen.",
         "errors": {
           "close": "Sluiten",
           "file_too_large": {
@@ -414,7 +432,7 @@
     },
     "premium": {
       "heading": "Premiumfunctie",
-      "body": "Deze functie is voorbehouden aan openbare medewerkers. Als uw e-mailadres niet is toegestaan, neem dan contact op met de support om toegang te krijgen.",
+      "body": "Deze functie is niet voor u beschikbaar. Neem contact op met de ondersteuning voor meer informatie.",
       "linkMore": "Documentatie openen",
       "linkAriaLabel": "Documentatie over premiumtoegang openen - opent in nieuw venster",
       "dividerLabel": "OF",
@@ -436,7 +454,7 @@
     "linkMore": "Documentatie openen",
     "linkAriaLabel": "Documentatie over opname openen - opent in nieuw venster",
     "details": {
-      "receiver": "De opname wordt verzonden naar de organisator en co-organisatoren.",
+      "receiver": "De opname wordt verzonden naar de host en co-hosts.",
       "destination": "Deze opname wordt tijdelijk op onze servers bewaard",
       "loading": "Opname wordt gestart",
       "linkMore": "Meer informatie",
@@ -465,6 +483,22 @@
         "buttonLabel": "Aanvragen"
       }
     },
+    "premium": {
+      "heading": "Premiumfunctie",
+      "body": "Deze functie is niet voor u beschikbaar. Neem contact op met de ondersteuning voor meer informatie.",
+      "linkMore": "Documentatie openen",
+      "linkAriaLabel": "Documentatie over premiumtoegang openen - opent in nieuw venster",
+      "dividerLabel": "OF",
+      "login": {
+        "heading": "Inloggen vereist",
+        "body": "Alleen de maker van de vergadering of een beheerder kan de opname starten. Log in om uw machtigingen te controleren."
+      },
+      "request": {
+        "heading": "Opname aanvragen",
+        "body": "De host wordt op de hoogte gebracht en kan de opname voor u inschakelen.",
+        "buttonLabel": "Aanvragen"
+      }
+    },
     "durationMessage": "(beperkt tot {{max_duration}})"
   },
   "errorRecordingAlertDialog": {
@@ -476,7 +510,7 @@
     "button": "Opnieuw proberen"
   },
   "admin": {
-    "description": "Deze organisatorinstellingen geven u controle over uw vergadering. Alleen organisatoren hebben toegang tot deze bedieningselementen.",
+    "description": "Deze hostinstellingen geven u controle over uw vergadering. Alleen hosts hebben toegang tot deze bedieningselementen.",
     "access": {
       "title": "Toegang tot vergadering",
       "description": "Deze instellingen zijn ook van toepassing op toekomstige sessies van deze vergadering.",
@@ -510,6 +544,10 @@
       "screenshare": {
         "label": "Hun scherm delen",
         "description": "Als u deze optie uitschakelt, kunnen deelnemers hun scherm niet meer delen en wordt elke lopende schermdeling onmiddellijk gestopt."
+      },
+      "mute": {
+        "label": "Anderen dempen",
+        "description": "Wanneer uitgeschakeld, kunnen deelnemers andere deelnemers niet meer dempen."
       }
     },
     "recording": {

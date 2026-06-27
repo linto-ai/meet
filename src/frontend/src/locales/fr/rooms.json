@@ -166,6 +166,7 @@
     "countdownAnnouncement": "L'appel se termine dans {{duration}}."
   },
   "controls": {
+    "region": "Commandes pour les appels",
     "microphone": "Microphone",
     "camera": "Camera",
     "chat": {
@@ -215,7 +216,7 @@
     "moreOptions": "Plus d'options",
     "reactions": {
       "button": "Envoyer une réaction",
-      "send": "Envoyer la réaction {{emoji}}",
+      "toolbar": "Envoyer une réaction",
       "announce": "{{name}} : {{emoji}}",
       "you": "vous",
       "emojis": {
@@ -230,6 +231,16 @@
       }
     }
   },
+  "pictureInPicture": {
+    "placeholder": {
+      "title": "Votre appel vidéo est dans une autre fenêtre.",
+      "description": "Le mode image dans l'image vous permet de rester connecté à l'appel tout en effectuant d'autres tâches.",
+      "bringBack": "Ramener l'appel ici"
+    },
+    "stage": "Participants",
+    "controlBar": "Commandes de la réunion",
+    "title": "Réunion en image dans l'image"
+  },
   "options": {
     "buttonLabel": "Plus d'options",
     "items": {
@@ -240,6 +251,10 @@
       "username": "Choisir votre nom",
       "effects": "Arrière-plans et effets",
       "switchCamera": "Changer de caméra",
+      "pictureInPicture": {
+        "enter": "Image dans l'image",
+        "exit": "Fermer l'image dans l'image"
+      },
       "fullscreen": {
         "enter": "Plein écran",
         "exit": "Quitter le mode plein écran"
@@ -275,11 +290,14 @@
       "apply": "Remplacer votre arrière plan :",
       "personal": {
         "title": "Mes arrière-plans",
+        "selectedLabel": "Ne plus utiliser comme arrière-plan (actuellement actif).",
+        "apply": "Utiliser comme arrière plan.",
         "selectFileTooltip": "Sélectionnez une image à utiliser comme arrière-plan",
         "notLoggedInWarning": "Vous n'êtes pas connecté, l'arrière-plan personnel ne sera pas sauvegardé d'une réunion à l'autre.",
         "warningUploadDisabled": "Les arrière-plans personnels ne sont actuellement pas sauvegardés d'une réunion à l'autre.",
         "uploadLimitReached": "Vous ne pouvez pas ajouter plus d'arrière-plans personnels.",
         "uploadInProgress": "Image en cours d'envoi…",
+        "deleteLabel": "Supprimer l'arrière-plan.",
         "errors": {
           "close": "Fermer",
           "file_too_large": {
@@ -414,7 +432,7 @@
     },
     "premium": {
       "heading": "Fonctionnalité premium",
-      "body": "Cette fonctionnalité est réservée aux agents publics. Si votre adresse email n’est pas autorisée, contactez le support pour obtenir l'accès.",
+      "body": "Cette fonctionnalité ne vous est pas ouverte. Contactez le support pour obtenir plus d'informations.",
       "linkMore": "Ouvrir la documentation",
       "dividerLabel": "OU",
       "login": {
@@ -465,6 +483,22 @@
         "buttonLabel": "Demander"
       }
     },
+    "premium": {
+      "heading": "Fonctionnalité premium",
+      "body": "Cette fonctionnalité ne vous est pas ouverte. Contactez le support pour obtenir plus d'informations.",
+      "linkMore": "Ouvrir la documentation",
+      "dividerLabel": "OU",
+      "login": {
+        "heading": "Vous n'êtes pas connecté !",
+        "body": "Vous devez être connecté pour utiliser cette fonctionnalité. Connectez-vous, puis réessayez."
+      },
+      "request": {
+        "heading": "Demander à l'organisateur",
+        "body": "L'hôte recevra une notification et pourra démarrer l'enregistrement pour vous.",
+        "buttonLabel": "Demander"
+      },
+      "linkAriaLabel": "Ouvrir la documentation sur l'accès premium - ouvre dans une nouvelle fenêtre"
+    },
     "durationMessage": "(limité à {{max_duration}}) "
   },
   "errorRecordingAlertDialog": {
@@ -510,6 +544,10 @@
       "screenshare": {
         "label": "Partager leur écran",
         "description": "En désactivant cette option, les participants ne pourront plus partager leur écran et tout partage en cours sera immédiatement interrompu."
+      },
+      "mute": {
+        "label": "Muter les autres",
+        "description": "En désactivant cette option, les participants ne pourront plus muter d'autres participants."
       }
     },
     "recording": {

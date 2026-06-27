@@ -44,6 +44,13 @@ export const buttonRecipe = cva({
         paddingY: 'var(--square-padding)',
       },
     },
+    round: {
+      true: {
+        borderRadius: '50%',
+        paddingX: 'var(--square-padding)',
+        paddingY: 'var(--square-padding)',
+      },
+    },
     variant: {
       primary: {
         backgroundColor: 'primary.800',
@@ -203,6 +210,9 @@ export const buttonRecipe = cva({
           outline: '2px solid',
           outlineColor: 'focusRing',
           outlineOffset: '2px',
+        },
+        '&[data-disabled]': {
+          opacity: 0.2,
         },
       },
       quaternaryText: {

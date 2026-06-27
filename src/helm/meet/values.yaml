@@ -216,8 +216,11 @@ backend:
     ttlSecondsAfterFinished: 30
     backoffLimit: 2
 
-  ## @param backend.securityContext Configure backend Pod security context
+  ## @param backend.securityContext Configure backend Container security context
   securityContext: null
+
+  ## @param backend.podSecurityContext Configure backend Pod security context
+  podSecurityContext: null
 
   ## @param backend.envVars Configure backend container environment variables
   ## @extra backend.envVars.BY_VALUE Example environment variable by setting value directly
@@ -259,8 +262,8 @@ backend:
         python manage.py migrate --no-input
     restartPolicy: Never
 
-  ## @param backend.createsuperuser.command backend migrate command
-  ## @param backend.createsuperuser.restartPolicy backend migrate job restart policy
+  ## @param backend.createsuperuser.command backend createsuperuser command
+  ## @param backend.createsuperuser.restartPolicy backend createsuperuser job restart policy
   createsuperuser:
     command:
       - "/bin/sh"
@@ -274,6 +277,17 @@ backend:
         echo "Database is ready"
 
         python manage.py createsuperuser --email $DJANGO_SUPERUSER_EMAIL --password $DJANGO_SUPERUSER_PASSWORD
+    restartPolicy: Never
+
+  ## @param backend.mergeDuplicateUsers.command backend merge_duplicate_users command
+  ## @param backend.mergeDuplicateUsers.restartPolicy backend merge_duplicate_users job restart policy
+  mergeDuplicateUsers:
+    annotations: {}
+    enabled: false
+    command:
+      - python
+      - manage.py
+      - merge_duplicate_users
     restartPolicy: Never
 
   ## @param backend.probes.liveness.path [nullable] Configure path for backend HTTP liveness probe
@@ -359,8 +373,11 @@ frontend:
   ## @param frontend.sidecars Add sidecars containers to frontend deployment
   sidecars: []
 
-  ## @param frontend.securityContext Configure frontend Pod security context
+  ## @param frontend.securityContext Configure frontend Container security context
   securityContext: null
+
+  ## @param frontend.podSecurityContext Configure frontend Pod security context
+  podSecurityContext: null
 
   ## @param frontend.envVars Configure frontend container environment variables
   ## @extra frontend.envVars.BY_VALUE Example environment variable by setting value directly
@@ -427,6 +444,20 @@ frontend:
   ## @param frontend.pdb.enabled Enable pdb on frontend
   pdb:
     enabled: true
+
+  ## @param frontend.outlookAddon.enabled Enable the Outlook add-in ConfigMap (config.js + manifest.xml)
+  ## @param frontend.outlookAddon.appName Display name used in the Outlook add-in (manifest + runtime config)
+  ## @param frontend.outlookAddon.baseUrl Public base URL where the add-in is served (no trailing slash)
+  ## @param frontend.outlookAddon.enableSourceTracking Enable appending ?from=outlook-addon to the URL
+  ## @param frontend.outlookAddon.feedbackForm Add a link to the footer opening a feedback form
+  outlookAddon:
+    enabled: false
+    appName: ""
+    baseUrl: ""
+    enableSourceTracking: false
+    feedbackForm: ""
+    id: ""
+
 
 ## @section posthog
 
@@ -533,8 +564,11 @@ summary:
   ## @param summary.migrateJobAnnotations Annotations for the migrate job
   migrateJobAnnotations: {}
 
-  ## @param summary.securityContext Configure summary Pod security context
+  ## @param summary.securityContext Configure summary Container security context
   securityContext: null
+
+  ## @param summary.podSecurityContext Configure summary Pod security context
+  podSecurityContext: null
 
   ## @param summary.envVars Configure summary container environment variables
   ## @extra summary.envVars.BY_VALUE Example environment variable by setting value directly
@@ -646,8 +680,11 @@ celeryBackend:
   ## @param celeryBackend.migrateJobAnnotations Annotations for the migrate job
   migrateJobAnnotations: {}
 
-  ## @param celeryBackend.securityContext Configure celeryBackend Pod security context
+  ## @param celeryBackend.securityContext Configure celeryBackend Container security context
   securityContext: null
+
+  ## @param celeryBackend.podSecurityContext Configure celeryBackend Pod security context
+  podSecurityContext: null
 
   ## @param celeryBackend.envVars Configure celeryBackend container environment variables
   ## @extra celeryBackend.envVars.BY_VALUE Example environment variable by setting value directly
@@ -738,7 +775,7 @@ celeryTranscribe:
     - "--pool=solo"
     - "--loglevel=info"
     - "-Q"
-    - "transcribe-queue"
+    - "transcribe-queue,transcribe-queue-v2"
 
   ## @param celeryTranscribe.args Override the celeryTranscribe container args
   args: []
@@ -755,8 +792,11 @@ celeryTranscribe:
   ## @param celeryTranscribe.migrateJobAnnotations Annotations for the migrate job
   migrateJobAnnotations: {}
 
-  ## @param celeryTranscribe.securityContext Configure celeryTranscribe Pod security context
+  ## @param celeryTranscribe.securityContext Configure celeryTranscribe Container security context
   securityContext: null
+
+  ## @param celeryTranscribe.podSecurityContext Configure celeryTranscribe Pod security context
+  podSecurityContext: null
 
   ## @param celeryTranscribe.envVars Configure celeryTranscribe container environment variables
   ## @extra celeryTranscribe.envVars.BY_VALUE Example environment variable by setting value directly
@@ -824,6 +864,21 @@ celeryTranscribe:
   pdb:
     enabled: false
 
+  ## @param celeryTranscribe.instances List of celeryTranscribe instances to deploy. Each entry creates a dedicated Deployment. Useful when wanting to use multiple instances of WhisperX (configure each endpoint in the extraEnv value specific to that instance).
+  ## @extra celeryTranscribe.instances[].name Unique name suffix for the instance (used in the Deployment name and pod labels)
+  ## @extra celeryTranscribe.instances[].replicas Override the number of replicas for this specific instance
+  ## @extra celeryTranscribe.instances[].extraEnvVars Additional environment variables for this specific instance (same structure as envVars)
+  ## @extra celeryTranscribe.instances[].command Override the container command for this specific instance
+  ## @extra celeryTranscribe.instances[].args Override the container args for this specific instance
+  ## @extra celeryTranscribe.instances[].resources Override resource requirements for this specific instance
+  ## @extra celeryTranscribe.instances[].nodeSelector Override node selector for this specific instance
+  ## @extra celeryTranscribe.instances[].affinity Override affinity for this specific instance
+  ## @extra celeryTranscribe.instances[].tolerations Override tolerations for this specific instance
+  ## @extra celeryTranscribe.instances[].pdb.enabled Enable pdb for this specific instance
+  instances:
+    - name: default
+      extraEnvVars: {}
+
 ## @section celerySummarize
 
 celerySummarize:
@@ -847,7 +902,7 @@ celerySummarize:
     - "--pool=solo"
     - "--loglevel=info"
     - "-Q"
-    - "summarize-queue"
+    - "summarize-queue,summarize-queue-v2"
 
   ## @param celerySummarize.args Override the celerySummarize container args
   args: []
@@ -864,8 +919,11 @@ celerySummarize:
   ## @param celerySummarize.migrateJobAnnotations Annotations for the migrate job
   migrateJobAnnotations: {}
 
-  ## @param celerySummarize.securityContext Configure celerySummarize Pod security context
+  ## @param celerySummarize.securityContext Configure celerySummarize Container security context
   securityContext: null
+
+  ## @param celerySummarize.podSecurityContext Configure celerySummarize Pod security context
+  podSecurityContext: null
 
   ## @param celerySummarize.envVars Configure celerySummarize container environment variables
   ## @extra celerySummarize.envVars.BY_VALUE Example environment variable by setting value directly
@@ -933,48 +991,240 @@ celerySummarize:
   pdb:
     enabled: false
 
-## @section agents
+## @section celerySummaryBackend
 
-agents:
+celerySummaryBackend:
+  ## @param celerySummaryBackend.image.repository Repository to use to pull meet's celerySummaryBackend container image
+  ## @param celerySummaryBackend.image.tag meet's celerySummaryBackend container tag
+  ## @param celerySummaryBackend.image.pullPolicy celerySummaryBackend container image pull policy
+  image:
+    repository: lasuite/meet-summary
+    pullPolicy: IfNotPresent
+    tag: "latest"
 
-  ## @param agents.image.repository Repository to use to pull meet's agents container image
-  ## @param agents.image.tag meet's agents container tag
-  ## @param agents.image.pullPolicy agents container image pull policy
+  ## @param celerySummaryBackend.dpAnnotations Annotations to add to the celerySummaryBackend Deployment
+  dpAnnotations: {}
+
+  ## @param celerySummaryBackend.command Override the celerySummaryBackend container command
+  command:
+    - "celery"
+    - "-A"
+    - "summary.core.celery_worker"
+    - "worker"
+    - "--pool=solo"
+    - "--loglevel=info"
+    - "-Q"
+    - "call-webhook-queue-v2"
+
+  ## @param celerySummaryBackend.args Override the celerySummaryBackend container args
+  args: []
+
+  ## @param celerySummaryBackend.replicas Amount of celerySummaryBackend replicas
+  replicas: 1
+
+  ## @param celerySummaryBackend.shareProcessNamespace Enable share process namespace between containers
+  shareProcessNamespace: false
+
+  ## @param celerySummaryBackend.sidecars Add sidecars containers to celerySummaryBackend deployment
+  sidecars: []
+
+  ## @param celerySummaryBackend.migrateJobAnnotations Annotations for the migrate job
+  migrateJobAnnotations: {}
+
+  ## @param celerySummaryBackend.securityContext Configure celerySummaryBackend Pod security context
+  securityContext: null
+
+  ## @param celerySummaryBackend.envVars Configure celerySummaryBackend container environment variables
+  ## @extra celerySummaryBackend.envVars.BY_VALUE Example environment variable by setting value directly
+  ## @extra celerySummaryBackend.envVars.FROM_CONFIGMAP.configMapKeyRef.name Name of a ConfigMap when configuring env vars from a ConfigMap
+  ## @extra celerySummaryBackend.envVars.FROM_CONFIGMAP.configMapKeyRef.key Key within a ConfigMap when configuring env vars from a ConfigMap
+  ## @extra celerySummaryBackend.envVars.FROM_SECRET.secretKeyRef.name Name of a Secret when configuring env vars from a Secret
+  ## @extra celerySummaryBackend.envVars.FROM_SECRET.secretKeyRef.key Key within a Secret when configuring env vars from a Secret
+  ## @skip celerySummaryBackend.envVars
+  envVars:
+    <<: *commonEnvVars
+
+  ## @param celerySummaryBackend.podAnnotations Annotations to add to the celerySummaryBackend Pod
+  podAnnotations: {}
+
+  ## @param celerySummaryBackend.service.type celerySummaryBackend Service type
+  ## @param celerySummaryBackend.service.port celerySummaryBackend Service listening port
+  ## @param celerySummaryBackend.service.targetPort celerySummaryBackend container listening port
+  ## @param celerySummaryBackend.service.annotations Annotations to add to the celerySummaryBackend Service
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8000
+    annotations: {}
+
+  ## @param celerySummaryBackend.probes Configure celerySummaryBackend probes
+  ## @param celerySummaryBackend.probes.liveness.path [nullable] Configure path for celerySummaryBackend HTTP liveness probe
+  ## @param celerySummaryBackend.probes.liveness.targetPort [nullable] Configure port for celerySummaryBackend HTTP liveness probe
+  ## @param celerySummaryBackend.probes.liveness.initialDelaySeconds [nullable] Configure initial delay for celerySummaryBackend liveness probe
+  ## @param celerySummaryBackend.probes.liveness.initialDelaySeconds [nullable] Configure timeout for celerySummaryBackend liveness probe
+  ## @param celerySummaryBackend.probes.startup.path [nullable] Configure path for celerySummaryBackend HTTP startup probe
+  ## @param celerySummaryBackend.probes.startup.targetPort [nullable] Configure port for celerySummaryBackend HTTP startup probe
+  ## @param celerySummaryBackend.probes.startup.initialDelaySeconds [nullable] Configure initial delay for celerySummaryBackend startup probe
+  ## @param celerySummaryBackend.probes.startup.initialDelaySeconds [nullable] Configure timeout for celerySummaryBackend startup probe
+  ## @param celerySummaryBackend.probes.readiness.path [nullable] Configure path for celerySummaryBackend HTTP readiness probe
+  ## @param celerySummaryBackend.probes.readiness.targetPort [nullable] Configure port for celerySummaryBackend HTTP readiness probe
+  ## @param celerySummaryBackend.probes.readiness.initialDelaySeconds [nullable] Configure initial delay for celerySummaryBackend readiness probe
+  ## @param celerySummaryBackend.probes.readiness.initialDelaySeconds [nullable] Configure timeout for celerySummaryBackend readiness probe
+  probes: {}
+
+  ## @param celerySummaryBackend.resources Resource requirements for the celerySummaryBackend container
+  resources: {}
+
+  ## @param celerySummaryBackend.nodeSelector Node selector for the celerySummaryBackend Pod
+  nodeSelector: {}
+
+  ## @param celerySummaryBackend.tolerations Tolerations for the celerySummaryBackend Pod
+  tolerations: []
+
+  ## @param celerySummaryBackend.affinity Affinity for the celerySummaryBackend Pod
+  affinity: {}
+
+  ## @param celerySummaryBackend.persistence Additional volumes to create and mount on the celerySummaryBackend. Used for debugging purposes
+  ## @extra celerySummaryBackend.persistence.volume-name.size Size of the additional volume
+  ## @extra celerySummaryBackend.persistence.volume-name.type Type of the additional volume, persistentVolumeClaim or emptyDir
+  ## @extra celerySummaryBackend.persistence.volume-name.mountPath Path where the volume should be mounted to
+  persistence: {}
+
+  ## @param celerySummaryBackend.extraVolumeMounts Additional volumes to mount on the celerySummaryBackend.
+  extraVolumeMounts: []
+
+  ## @param celerySummaryBackend.extraVolumes Additional volumes to mount on the celerySummaryBackend.
+  extraVolumes: []
+
+  ## @param celerySummaryBackend.pdb.enabled Enable pdb on celerySummaryBackend
+  pdb:
+    enabled: false
+
+
+## @section agentMetadata
+
+agentMetadata:
+
+  ## @param agentMetadata.image.repository Repository to use to pull meet's agentMetadata container image
+  ## @param agentMetadata.image.tag meet's agentMetadata container tag
+  ## @param agentMetadata.image.pullPolicy agentMetadata container image pull policy
   image:
     repository: lasuite/meet-agents
     pullPolicy: IfNotPresent
     tag: "latest"
 
-  ## @param agents.dpAnnotations Annotations to add to the agents Deployment
+  ## @param agentMetadata.dpAnnotations Annotations to add to the agentMetadata Deployment
   dpAnnotations: {}
 
-  ## @param agents.command Override the agents container command
+  ## @param agentMetadata.command Override the agentMetadata container command
   command: []
 
-  ## @param agents.args Override the agents container args
+  ## @param agentMetadata.args Override the agentMetadata container args
   args: []
 
-  ## @param agents.replicas Amount of agents replicas
+  ## @param agentMetadata.replicas Amount of agentMetadata replicas
   replicas: 1
 
-  ## @param agents.shareProcessNamespace Enable share process namespace between containers
+  ## @param agentMetadata.shareProcessNamespace Enable share process namespace between containers
   shareProcessNamespace: false
 
-  ## @param agents.sidecars Add sidecars containers to agents deployment
+  ## @param agentMetadata.sidecars Add sidecars containers to agentMetadata deployment
   sidecars: []
 
-  ## @param agents.securityContext Configure agents Pod security context
+  ## @param agentMetadata.securityContext Configure agentMetadata Container security context
   securityContext: null
 
-  ## @param agents.envVars Configure agents container environment variables
-  ## @extra agents.envVars.BY_VALUE Example environment variable by setting value directly
-  ## @extra agents.envVars.FROM_CONFIGMAP.configMapKeyRef.name Name of a ConfigMap when configuring env vars from a ConfigMap
-  ## @extra agents.envVars.FROM_CONFIGMAP.configMapKeyRef.key Key within a ConfigMap when configuring env vars from a ConfigMap
-  ## @extra agents.envVars.FROM_SECRET.secretKeyRef.name Name of a Secret when configuring env vars from a Secret
-  ## @extra agents.envVars.FROM_SECRET.secretKeyRef.key Key within a Secret when configuring env vars from a Secret
-  ## @extra agents.envVars.DEEPGRAM_STT_MODEL Deepgram model to use for speech-to-text (default: nova-3)
-  ## @extra agents.envVars.DEEPGRAM_STT_LANGUAGE Language code for transcription or 'multi' for automatic multilingual support with real-time code-switching (default: multi, supports: en, es, fr, de, hi, ru, pt, ja, it, nl)
-  ## @skip agents.envVars
+  ## @param agentMetadata.podSecurityContext Configure agentMetadata Pod security context
+  podSecurityContext: null
+
+  ## @param agentMetadata.envVars Configure agentMetadata container environment variables
+  ## @extra agentMetadata.envVars.BY_VALUE Example environment variable by setting value directly
+  ## @extra agentMetadata.envVars.FROM_CONFIGMAP.configMapKeyRef.name Name of a ConfigMap when configuring env vars from a ConfigMap
+  ## @extra agentMetadata.envVars.FROM_CONFIGMAP.configMapKeyRef.key Key within a ConfigMap when configuring env vars from a ConfigMap
+  ## @extra agentMetadata.envVars.FROM_SECRET.secretKeyRef.name Name of a Secret when configuring env vars from a Secret
+  ## @extra agentMetadata.envVars.FROM_SECRET.secretKeyRef.key Key within a Secret when configuring env vars from a Secret
+  ## @extra agentMetadata.envVars.DEEPGRAM_STT_MODEL Deepgram model to use for speech-to-text (default: nova-3)
+  ## @extra agentMetadata.envVars.DEEPGRAM_STT_LANGUAGE Language code for transcription or 'multi' for automatic multilingual support with real-time code-switching (default: multi, supports: en, es, fr, de, hi, ru, pt, ja, it, nl)
+  ## @skip agentMetadata.envVars
+  envVars:
+    <<: *commonEnvVars
+
+  ## @param agentMetadata.podAnnotations Annotations to add to the agentMetadata Pod
+  podAnnotations: {}
+
+  ## @param agentMetadata.resources Resource requirements for the agentMetadata container
+  resources: {}
+
+  ## @param agentMetadata.nodeSelector Node selector for the agentMetadata Pod
+  nodeSelector: {}
+
+  ## @param agentMetadata.tolerations Tolerations for the agentMetadata Pod
+  tolerations: []
+
+  ## @param agentMetadata.affinity Affinity for the agentSubtitles Pod
+  affinity: {}
+
+  ## @param agentMetadata.persistence Additional volumes to create and mount on the agentSubtitles. Used for debugging purposes
+  ## @extra agentMetadata.persistence.volume-name.size Size of the additional volume
+  ## @extra agentMetadata.persistence.volume-name.type Type of the additional volume, persistentVolumeClaim or emptyDir
+  ## @extra agentMetadata.persistence.volume-name.mountPath Path where the volume should be mounted to
+  persistence: {}
+
+  ## @param agentMetadata.extraVolumeMounts Additional volumes to mount on the agentMetadata.
+  extraVolumeMounts: []
+
+  ## @param agentMetadata.extraVolumes Additional volumes to mount on the agentMetadata.
+  extraVolumes: []
+
+  ## @param agentMetadata.pdb.enabled Enable pdb on agentMetadata
+  pdb:
+    enabled: false
+
+## @section agentSubtitles
+
+agentSubtitles:
+
+  ## @param agentSubtitles.image.repository Repository to use to pull meet's agentSubtitles container image
+  ## @param agentSubtitles.image.tag meet's agentSubtitles container tag
+  ## @param agentSubtitles.image.pullPolicy agentSubtitles container image pull policy
+  image:
+    repository: lasuite/meet-agents
+    pullPolicy: IfNotPresent
+    tag: "latest"
+
+  ## @param agentSubtitles.dpAnnotations Annotations to add to the agentSubtitles Deployment
+  dpAnnotations: {}
+
+  ## @param agentSubtitles.command Override the agentSubtitles container command
+  command: []
+
+  ## @param agentSubtitles.args Override the agentSubtitles container args
+  args: []
+
+  ## @param agentSubtitles.replicas Amount of agentSubtitles replicas
+  replicas: 1
+
+  ## @param agentSubtitles.shareProcessNamespace Enable share process namespace between containers
+  shareProcessNamespace: false
+
+  ## @param agentSubtitles.sidecars Add sidecars containers to agentSubtitles deployment
+  sidecars: []
+
+  ## @param agentSubtitles.securityContext Configure agentSubtitles Container security context
+  securityContext: null
+
+  ## @param agentSubtitles.podSecurityContext Configure agentSubtitles Pod security context
+  podSecurityContext: null
+
+  ## @param agentSubtitles.envVars Configure agentSubtitles container environment variables
+  ## @extra agentSubtitles.envVars.BY_VALUE Example environment variable by setting value directly
+  ## @extra agentSubtitles.envVars.FROM_CONFIGMAP.configMapKeyRef.name Name of a ConfigMap when configuring env vars from a ConfigMap
+  ## @extra agentSubtitles.envVars.FROM_CONFIGMAP.configMapKeyRef.key Key within a ConfigMap when configuring env vars from a ConfigMap
+  ## @extra agentSubtitles.envVars.FROM_SECRET.secretKeyRef.name Name of a Secret when configuring env vars from a Secret
+  ## @extra agentSubtitles.envVars.FROM_SECRET.secretKeyRef.key Key within a Secret when configuring env vars from a Secret
+  ## @extra agentSubtitles.envVars.DEEPGRAM_STT_MODEL Deepgram model to use for speech-to-text (default: nova-3)
+  ## @extra agentSubtitles.envVars.DEEPGRAM_STT_LANGUAGE Language code for transcription or 'multi' for automatic multilingual support with real-time code-switching (default: multi, supports: en, es, fr, de, hi, ru, pt, ja, it, nl)
+  ## @skip agentSubtitles.envVars
   envVars:
     <<: *commonEnvVars
     # Deepgram Speech-to-Text configuration for real-time streaming
@@ -988,34 +1238,34 @@ agents:
     # are NOT supported by the LiveKit Deepgram plugin in streaming mode.
     # Use language="multi" for automatic multilingual support (10 languages).
 
-  ## @param agents.podAnnotations Annotations to add to the agents Pod
+  ## @param agentSubtitles.podAnnotations Annotations to add to the agentSubtitles Pod
   podAnnotations: {}
 
-  ## @param agents.resources Resource requirements for the agents container
+  ## @param agentSubtitles.resources Resource requirements for the agentSubtitles container
   resources: {}
 
-  ## @param agents.nodeSelector Node selector for the agents Pod
+  ## @param agentSubtitles.nodeSelector Node selector for the agentSubtitles Pod
   nodeSelector: {}
 
-  ## @param agents.tolerations Tolerations for the agents Pod
+  ## @param agentSubtitles.tolerations Tolerations for the agentSubtitles Pod
   tolerations: []
 
-  ## @param agents.affinity Affinity for the agents Pod
+  ## @param agentSubtitles.affinity Affinity for the agentSubtitles Pod
   affinity: {}
 
-  ## @param agents.persistence Additional volumes to create and mount on the agents. Used for debugging purposes
-  ## @extra agents.persistence.volume-name.size Size of the additional volume
-  ## @extra agents.persistence.volume-name.type Type of the additional volume, persistentVolumeClaim or emptyDir
-  ## @extra agents.persistence.volume-name.mountPath Path where the volume should be mounted to
+  ## @param agentSubtitles.persistence Additional volumes to create and mount on the agentSubtitles. Used for debugging purposes
+  ## @extra agentSubtitles.persistence.volume-name.size Size of the additional volume
+  ## @extra agentSubtitles.persistence.volume-name.type Type of the additional volume, persistentVolumeClaim or emptyDir
+  ## @extra agentSubtitles.persistence.volume-name.mountPath Path where the volume should be mounted to
   persistence: {}
 
-  ## @param agents.extraVolumeMounts Additional volumes to mount on the agents.
+  ## @param agentSubtitles.extraVolumeMounts Additional volumes to mount on the agentSubtitles.
   extraVolumeMounts: []
 
-  ## @param agents.extraVolumes Additional volumes to mount on the agents.
+  ## @param agentSubtitles.extraVolumes Additional volumes to mount on the agentSubtitles.
   extraVolumes: []
 
-  ## @param agents.pdb.enabled Enable pdb on agents
+  ## @param agentSubtitles.pdb.enabled Enable pdb on agentSubtitles
   pdb:
     enabled: false
 

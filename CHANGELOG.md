@@ -17,9 +17,183 @@ and this project adheres to
 
 ### Changed
 
-- ⬆️(dependencies) update python dependencies
 - ♻️(backend) a failed Twake upload now retries / notifies instead of
   silently falling back to a direct-link email
+
+## [1.21.0] - 2026-06-15
+
+### Added
+
+- ✨(frontend) allow disabling silent login via a URL parameter
+- ✨(frontend) allow hiding the login button via a URL parameter
+- ✨(summary) add optional satisfaction survey footer
+
+### Changed
+
+- ✨(frontend) enhance noise reduction with BBBA audio processing pipeline
+- 🚸(frontend) mute join notification sound in larger rooms
+- 🚸(frontend) mute participants by default when joining a large meeting
+
+### Fixed
+
+- 🐛(frontend) fix metadata agent collector enabled check
+
+### Fixed
+
+- ♿️(frontend) improve accessibilty of the Effects panel #1401
+
+## [1.20.0] - 2026-06-12
+
+### Changed
+
+- ♻️(addon) improve Outlook add-on: i18n support, feedback link, smarter link
+- ⬆️(frontend) upgrade react-i18next from 15.1.1 to 17.0.8
+
+### Fixed
+
+- 🐛(frontend) fix noise reduction left-channel-only audio
+
+## [1.19.0] - 2026-06-04
+
+### Added
+
+- ✨(backend) add file specific admin #1387
+
+### Changed
+
+- 🐛(agents) fix bug when closing metadata-collector
+- ⬆️(dependencies) update python dependencies
+- ⬆️(frontend) update js dependencies
+- ♻️(agents) replace deprecated room options API
+
+### Fixed
+
+- 🔇(summary) make ffmpeg quiet #1404
+- 🔒️(backend) prevent accessing files if they are not ready #1395
+- # ⬆️(backend) upgrade idna to >=3.15 to address CVE-2026-45409
+
+## [1.18.0] - 2026-06-03
+
+### Added
+
+- 🔧(backend) backport logging configuration from docs
+- 🧑‍💻(backend) add management command to merge duplicate users
+- 👷(helm) add Kubernetes job for duplicate user merge command
+
+### Fixed
+
+- 🐛(backend) prevent duplicate pending users on concurrent requests
+- 🔒️(backend) prevent file change post checks #1377
+
+## [1.17.0] - 2026-05-31
+
+### Added
+
+- ✨(fullstack) allow participants to mute others based on room configuration
+- ✨(frontend) add synchronizer for room metadata updates
+- ✨(frontend) make reaction toolbar responsive on small viewports
+- ✨(frontend) enable reactions on mobile devices
+- ✨(frontend) introduce picture-in-picture meeting
+- ✨(backend) add core.recording.event.parsers.S3Parser
+- ✨(summary) extended support for all video / audio files #1358
+
+### Changed
+
+- ♻️(fullstack) simplify source serialization
+- ✨(backend) expose room configuration to all API consumers
+- 🩹(frontend) improve reaction toolbar centering with dynamic positioning
+- 🚀 (paas) remove buildpack requirements.txt to use the new uv.lock #1349
+- ✨(backend) allow room configuration and access level via external api #1260
+- ♻️(backend) prefix Swagger routes with /api
+
+### Fixed
+
+- 🩹(backend) fix swagger and redoc documentation URLs
+
+## [1.16.0] - 2026-05-13
+
+### Added
+
+- 🔒️(backend) add validation of Room.configuration
+- ✨(helm) add support multiple transcribe worker / endpoint #1247
+- ✨(backend) make LiveKit Egress recording encoding configurable #1288
+- ✨(summary) add speaker-to-participant assignment
+
+### Changed
+
+- ♻️(summary) change tasks endpoint signature
+- ⬆️(dependencies) update urllib3 to v2.7.0 [SECURITY]
+- 🧑‍💻(agents) use `uv` for package management
+- ✨(summary) improve speaker-to-participant assignment
+
+### Fixed
+
+- ♻(frontend) standardize role terminology across localizations
+- 🐛(backend) make start-recording atomic and fault-tolerant
+- 🔒️(frontend) room ids are generated with non-cryptographic rand
+- ⬆️(mail) fix dependencies not having resolved or integrity field #1321
+- 🐛(summary) complete webm support #1328
+- 🐛(backend) add link to "Open" text in recording email
+- 🩹(frontend) fix spacing regression in mobile control bar
+
+## [1.15.0] - 2026-04-30
+
+### Added
+
+- ✨(backend) add metadata collection of VAD, connection and chat events
+- ✨(backend) introduce add-ons authentication backend
+- 💬(backend) clarify french transcription audio download link text #1299
+- 🚧(addons) introduce initial Microsoft Outlook add-in support (alpha)
+- 🔧(backend) add setting to toggle application token exchange mechanism
+- ✨(backend) support add-ons authentication in external viewset
+
+### Fixed
+
+- 🐛(summary) support webm #1290
+- ⬆️(backend) bump django-lasuite to v0.0.26
+- 🩹(frontend) use a more standard (quality) rating scale
+- 🩹(frontend) fix access control for screen recording feature flag
+- 🩹(frontend) fix reconnect loop caused by connectionObserverStore updates
+
+## [1.14.0] - 2026-04-16
+
+### Added
+
+- 🔒️(helm) Add pod and container securityContext #1197
+- ✨(summary) add routes v2 for async STT and summary tasks #1171
+- ✅(backend) add unit tests for JwtTokenService #1232
+
+### Changed
+
+- ⬆️(backend) bump lodash from 4.17.23 to 4.18.1 in /src/mail
+- ⬆️(frontend) bump hono from 4.12.8 to 4.12.12 in /src/frontend
+- ⬆️(backend) bump pygments from 2.19.2 to 2.20.0 in /src/backend
+- ♻️(backend) use Authorization header for LiveKit token authentication
+- 🥅(backend) refine Twirp error handling for participant operations
+- ✨(summary) allow more file extensions #1265
+- ♿️(frontend) refocus reactions toolbar with ctrl+shift+e is activated #1262
+- ♿️(frontend) set an explicit document title on recording download page #1261
+- ♿️(frontend) add customizable accessibility fonts #1270
+
+### Fixed
+
+- ⬆️(dependencies) update aiohttp to v3.13.4 [SECURITY]
+- ⬆️(dependencies) update vite to v7.3.2 [SECURITY]
+- ⬆️(dependencies) update django to v5.2.13 [SECURITY]
+- 🔒(backend) rely on backend to allow participant update their metadata
+- 🐛(summary) fix failure webhook notification #1233
+- 🐛(summary) relax whisperX payload format #1233
+- ⬆️(backend) upgrade dependencies to fix Pillow CVE-2026-40192
+- ⬆️(frontend) upgrade frontend image to Alpine 3.23 to address CVEs
+
+## [1.13.0] - 2026-03-31
+
+### Changed
+
+- ⬆️(dependencies) update python dependencies
+- ♿️(frontend) add explicit region for call controls #1216
+- ♿️(frontend) improve accessibility of the reaction toolbar #1216
+- ♿️(frontend) enhance sidepanel navigation accessibility #1216
 
 ### Fixed
 

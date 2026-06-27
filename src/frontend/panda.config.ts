@@ -274,6 +274,12 @@ const config: Config = {
         min: { value: 'min-content' },
         max: { value: 'max-content' },
         fit: { value: 'fit-content' },
+        // room layout
+        'room-side-panel': { value: '360px' },
+        'room-side-panel-margin': { value: '1.5rem' },
+        'room-control-bar': { value: '80px' },
+        'room-reaction-toolbar-height': { value: '42px' },
+        'tooltip-spacing': { value: '8px' },
       },
       spacing,
     }),

@@ -1,6 +1,6 @@
 import { supportsScreenSharing } from '@livekit/components-core'
 import { useTranslation } from 'react-i18next'
-import { ControlBarAuxProps } from './ControlBar'
+import type { ControlBarAuxProps } from './ControlBar'
 import React from 'react'
 import { css } from '@/styled-system/css'
 import { LeaveButton } from '../../components/controls/LeaveButton'
@@ -25,6 +25,8 @@ import { useConfig } from '@/api/useConfig'
 import { AudioDevicesControl } from '../../components/controls/Device/AudioDevicesControl'
 import { VideoDeviceControl } from '../../components/controls/Device/VideoDeviceControl'
 import { useSettingsDialog } from '@/features/settings/hook/useSettingsDialog'
+import { ControlBarRegion } from '@/features/layout/components/ControlBarRegion'
+import { ReactionsToggle } from '@/features/reactions/components/ReactionsToggle'
 
 export function MobileControlBar({
   onDeviceError,
@@ -43,21 +45,11 @@ export function MobileControlBar({
         className={css({
           width: '100vw',
           display: 'flex',
-          position: 'absolute',
           padding: '1.125rem',
           justifyContent: 'center',
-          bottom: 0,
-          left: 0,
-          right: 0,
         })}
       >
-        <div
-          className={css({
-            display: 'flex',
-            justifyContent: 'space-between',
-            width: '330px',
-          })}
-        >
+        <ControlBarRegion mobile>
           <LeaveButton />
           <AudioDevicesControl
             onDeviceError={(error) =>
@@ -71,6 +63,7 @@ export function MobileControlBar({
             }
             hideMenu={true}
           />
+          <ReactionsToggle />
           <HandToggle />
           <Button
             id="room-options-trigger"
@@ -82,7 +75,7 @@ export function MobileControlBar({
           >
             <RiMore2Line />
           </Button>
-        </div>
+        </ControlBarRegion>
       </div>
       <ResponsiveMenu
         isOpened={isMenuOpened}

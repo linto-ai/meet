@@ -8,7 +8,7 @@ import { useSize } from '../../hooks/useResizeObserver'
 import { useState, RefObject } from 'react'
 import { Dialog, DialogTrigger, Popover } from 'react-aria-components'
 import { Button } from '@/primitives'
-import { ToggleButtonProps } from '@/primitives/ToggleButton'
+import type { ToggleButtonProps } from '@/primitives/ToggleButton'
 import { RiArrowDownSLine, RiArrowUpSLine } from '@remixicon/react'
 import { useTranslation } from 'react-i18next'
 
@@ -73,7 +73,7 @@ export const MoreOptions = ({
 }) => {
   const { width: parentWidth } = useSize(parentElement)
   return (
-    <div
+    <nav
       className={css({
         display: 'flex',
         justifyContent: 'flex-end',
@@ -88,6 +88,6 @@ export const MoreOptions = ({
       ) : (
         <LateralMenu />
       )}
-    </div>
+    </nav>
   )
 }

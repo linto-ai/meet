@@ -1,7 +1,7 @@
-import { useMutation, UseMutationOptions } from '@tanstack/react-query'
+import { useMutation, type UseMutationOptions } from '@tanstack/react-query'
 import { fetchApi } from '@/api/fetchApi'
-import { ApiError } from '@/api/ApiError'
-import { ApiRoom } from '@/features/rooms/api/ApiRoom'
+import type { ApiError } from '@/api/ApiError'
+import type { ApiRoom } from '@/features/rooms/api/ApiRoom'
 
 export interface StartSubtitleParams {
   id: string
@@ -14,9 +14,9 @@ const startSubtitle = ({
 }: StartSubtitleParams): Promise<ApiRoom> => {
   return fetchApi(`rooms/${id}/start-subtitle/`, {
     method: 'POST',
-    body: JSON.stringify({
-      token,
-    }),
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
   })
 }
 

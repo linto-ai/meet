@@ -2,6 +2,8 @@ import { fetchApi } from './fetchApi'
 import { keys } from './queryKeys'
 import { useQuery } from '@tanstack/react-query'
 import { RecordingMode, RecordingPermission } from '@/features/recording'
+import type { Track } from 'livekit-client'
+type Source = Track.Source
 
 export interface ApiConfig {
   analytics?: {
@@ -44,7 +46,7 @@ export interface ApiConfig {
   }
   telephony: {
     enabled: boolean
-    phone_number?: string
+    international_phone_number?: string
     default_country?: string
   }
   manifest_link?: string
@@ -52,9 +54,11 @@ export interface ApiConfig {
     url: string
     force_wss_protocol: boolean
     enable_firefox_proxy_workaround: boolean
-    default_sources: string[]
+    default_sources: Source[]
   }
   transcription_destination?: string
+  max_participants_for_sound: number
+  auto_mute_on_join_threshold: number
 }
 
 const fetchConfig = (): Promise<ApiConfig> => {

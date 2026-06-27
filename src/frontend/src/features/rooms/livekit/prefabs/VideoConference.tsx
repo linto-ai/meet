@@ -5,7 +5,7 @@ import {
   isWeb,
   log,
 } from '@livekit/components-core'
-import { Participant, RoomEvent, Track } from 'livekit-client'
+import { type Participant, RoomEvent, Track } from 'livekit-client'
 import React, { useCallback, useRef, useState, useEffect } from 'react'
 import {
   ConnectionStateToast,
@@ -20,13 +20,9 @@ import {
 import { useTranslation } from 'react-i18next'
 
 import { ControlBar } from './ControlBar/ControlBar'
-import { styled } from '@/styled-system/jsx'
-import { cva } from '@/styled-system/css'
-import { MainNotificationToast } from '@/features/notifications/MainNotificationToast'
 import { FocusLayout } from '../components/FocusLayout'
 import { ParticipantTile } from '../components/ParticipantTile'
 import { SidePanel } from '../components/SidePanel'
-import { useSidePanel } from '../hooks/useSidePanel'
 import { RecordingProvider } from '@/features/recording'
 import { ScreenShareErrorModal } from '../components/ScreenShareErrorModal'
 import { useConnectionObserver } from '../hooks/useConnectionObserver'
@@ -36,36 +32,17 @@ import { useRegisterKeyboardShortcut } from '@/features/shortcuts/useRegisterKey
 import { useSettingsDialog } from '@/features/settings'
 import { SettingsDialogExtendedKey } from '@/features/settings/type'
 import { useVideoResolutionSubscription } from '../hooks/useVideoResolutionSubscription'
+import { useSyncLiveKitMetadata } from '../hooks/useSyncLiveKitMetadata'
 import { SettingsDialogProvider } from '@/features/settings/components/SettingsDialogProvider'
-import { useSubtitles } from '@/features/subtitle/hooks/useSubtitles'
-import { Subtitles } from '@/features/subtitle/component/Subtitles'
-import { CarouselLayout } from '../components/layout/CarouselLayout'
-import { GridLayout } from '../components/layout/GridLayout'
 import { IsIdleDisconnectModal } from '../components/IsIdleDisconnectModal'
 import { getParticipantName } from '@/features/rooms/utils/getParticipantName'
 import { useScreenReaderAnnounce } from '@/hooks/useScreenReaderAnnounce'
-
-const LayoutWrapper = styled(
-  'div',
-  cva({
-    base: {
-      position: 'relative',
-      display: 'flex',
-      width: '100%',
-      transition: 'height .5s cubic-bezier(0.4,0,0.2,1) 5ms',
-    },
-    variants: {
-      areSubtitlesOpen: {
-        true: {
-          height: 'calc(100% - 12rem)',
-        },
-        false: {
-          height: '100%',
-        },
-      },
-    },
-  })
-)
+import { ReactionPortals } from '@/features/reactions/components/ReactionPortals'
+import { CarouselLayout } from '@/features/layout/components/CarouselLayout'
+import { GridLayout } from '@/features/layout/components/GridLayout'
+import { RoomContentArea } from '@/features/layout/components/RoomContentArea'
+import { usePictureInPicture } from '@/features/pip/hooks/usePictureInPicture'
+import { PipRoomPlaceholder } from '@/features/pip/components/PipRoomPlaceholder'
 
 /**
  * @public
@@ -116,6 +93,7 @@ export function VideoConference({ ...props }: VideoConferenceProps) {
   useConnectionObserver()
   useRoomPageTitle()
   useVideoResolutionSubscription()
+  useSyncLiveKitMetadata()
 
   useRegisterKeyboardShortcut({
     id: 'open-shortcuts',
@@ -144,6 +122,8 @@ export function VideoConference({ ...props }: VideoConferenceProps) {
   const carouselTracks = tracks.filter(
     (track) => !isEqualTrackRef(track, focusTrack)
   )
+
+  const { isOpen: isPictureInPictureOpen } = usePictureInPicture()
 
   // handle pin announcements
 
@@ -253,9 +233,6 @@ export function VideoConference({ ...props }: VideoConferenceProps) {
   ])
   /* eslint-enable react-hooks/exhaustive-deps */
 
-  const { isSidePanelOpen } = useSidePanel()
-  const { areSubtitlesOpen } = useSubtitles()
-
   const [isShareErrorVisible, setIsShareErrorVisible] = useState(false)
 
   return (
@@ -276,25 +253,11 @@ export function VideoConference({ ...props }: VideoConferenceProps) {
             onClose={() => setIsShareErrorVisible(false)}
           />
           <IsIdleDisconnectModal />
-          <div
-            // todo - extract these magic values into constant
-            style={{
-              position: 'absolute',
-              inset: isSidePanelOpen
-                ? `var(--lk-grid-gap) calc(358px + 3rem) calc(80px + var(--lk-grid-gap)) 16px`
-                : `var(--lk-grid-gap) var(--lk-grid-gap) calc(80px + var(--lk-grid-gap))`,
-              transition: 'inset .5s cubic-bezier(0.4,0,0.2,1) 5ms',
-              maxHeight: '100%',
-            }}
-          >
-            <LayoutWrapper areSubtitlesOpen={areSubtitlesOpen}>
-              <div
-                style={{
-                  display: 'flex',
-                  position: 'relative',
-                  width: '100%',
-                }}
-              >
+          <RoomContentArea>
+            {isPictureInPictureOpen ? (
+              <PipRoomPlaceholder />
+            ) : (
+              <>
                 {!focusTrack ? (
                   <div
                     className="lk-grid-layout-wrapper"
@@ -322,11 +285,9 @@ export function VideoConference({ ...props }: VideoConferenceProps) {
                     </FocusLayoutContainer>
                   </div>
                 )}
-              </div>
-            </LayoutWrapper>
-            <Subtitles />
-            <MainNotificationToast />
-          </div>
+              </>
+            )}
+          </RoomContentArea>
           <ControlBar
             onDeviceError={(e) => {
               console.error(e)
@@ -346,6 +307,7 @@ export function VideoConference({ ...props }: VideoConferenceProps) {
       <ConnectionStateToast />
       <RecordingProvider />
       <SettingsDialogProvider />
+      <ReactionPortals />
     </div>
   )
 }

@@ -4,7 +4,7 @@ import { HStack, Stack } from '@/styled-system/jsx'
 import { useTranslation } from 'react-i18next'
 import { Button, Text } from '@/primitives'
 import { SettingsButton } from '@/features/settings'
-import { useUser } from '@/features/auth'
+import { useUser } from '@/features/auth/api/useUser'
 import { useMatchesRoute } from '@/navigation/useMatchesRoute'
 import { FeedbackBanner } from '@/components/FeedbackBanner'
 import { Menu } from '@/primitives/Menu'
@@ -14,6 +14,8 @@ import { VisualOnlyTooltip } from '@/primitives/VisualOnlyTooltip'
 
 import { useLoginHint } from '@/hooks/useLoginHint'
 import { getEnv } from '@/utils/getEnv'
+import { logout } from '@/features/auth/utils/logout'
+import { useMemo } from 'react'
 
 const Logo = () => (
   <img
@@ -84,6 +86,16 @@ const LoginHint = () => {
   )
 }
 
+const HIDE_LOGIN_PARAM = 'hideLogin'
+
+const isLoginButtonHidden = () => {
+  if (typeof window === 'undefined') return false
+  const value = new URLSearchParams(window.location.search).get(
+    HIDE_LOGIN_PARAM
+  )
+  return value === 'true'
+}
+
 export const Header = () => {
   const { t } = useTranslation()
   const isHome = useMatchesRoute('home')
@@ -91,7 +103,10 @@ export const Header = () => {
   const isAccessibility = useMatchesRoute('accessibility')
   const isTermsOfService = useMatchesRoute('termsOfService')
   const isRoom = useMatchesRoute('room')
-  const { user, isLoggedIn, logout } = useUser()
+  const { user, isLoggedIn } = useUser()
+
+  const loginButtonDisabledByUrl = useMemo(() => isLoginButtonHidden(), [])
+
   const userLabel = user?.full_name || user?.email
   const loggedInTooltip = t('loggedInUserTooltip')
   const loggedInAriaLabel = userLabel
@@ -158,7 +173,8 @@ export const Header = () => {
                 !isHome &&
                 !isLegalTerms &&
                 !isAccessibility &&
-                !isTermsOfService && (
+                !isTermsOfService &&
+                !loginButtonDisabledByUrl && (
                   <>
                     <LoginButton proConnectHint={false} />
                     <LoginHint />

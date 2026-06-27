@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
@@ -9,7 +9,7 @@ import {
   DisconnectReason,
   MediaDeviceFailure,
   Room,
-  RoomOptions,
+  type RoomOptions,
   VideoPresets,
 } from 'livekit-client'
 import { keys } from '@/api/queryKeys'
@@ -18,7 +18,7 @@ import { Screen } from '@/layout/Screen'
 import { QueryAware } from '@/components/QueryAware'
 import { ErrorScreen } from '@/components/ErrorScreen'
 import { fetchRoom } from '../api/fetchRoom'
-import { ApiRoom } from '../api/ApiRoom'
+import type { ApiRoom } from '../api/ApiRoom'
 import { useCreateRoom } from '../api/createRoom'
 import { InviteDialog } from './InviteDialog'
 import { VideoConference } from '../livekit/prefabs/VideoConference'
@@ -31,6 +31,11 @@ import { useConfig } from '@/api/useConfig'
 import { isFireFox } from '@/utils/livekit'
 import { useIsMobile } from '@/utils/useIsMobile'
 import { navigateTo } from '@/navigation/navigateTo'
+import { connectionObserverStore } from '@/stores/connectionObserver'
+import { PictureInPictureConference } from '@/features/pip/components/PictureInPictureConference'
+import { notifyAutoMutedOnJoin } from '@/features/notifications/utils'
+import { useSnapshot } from 'valtio'
+import { userPreferencesStore } from '@/stores/userPreferences'
 
 export const Conference = ({
   roomId,
@@ -55,6 +60,8 @@ export const Conference = ({
 
   const [isConnectionWarmedUp, setIsConnectionWarmedUp] = useState(false)
 
+  const userPreferencesSnap = useSnapshot(userPreferencesStore)
+
   const {
     mutateAsync: createRoom,
     status: createStatus,
@@ -70,7 +77,6 @@ export const Conference = ({
     isError: isFetchError,
     data,
   } = useQuery({
-    /* eslint-disable @tanstack/query/exhaustive-deps */
     queryKey: fetchKey,
     staleTime: 6 * 60 * 60 * 1000, // By default, LiveKit access tokens expire 6 hours after generation
     initialData: initialRoomData,
@@ -172,6 +178,8 @@ export const Conference = ({
 
   const isMobile = useIsMobile()
 
+  const hasAutoMutedRef = useRef(false)
+
   /*
    * Ensure stable WebSocket connection URL. This is critical for legacy browser compatibility
    * (Firefox <124, Chrome <125, Edge <125) where HTTPS URLs in WebSocket() constructor
@@ -227,10 +235,48 @@ export const Conference = ({
           onError={(e) => {
             posthog.captureException(e)
           }}
+          onConnected={async () => {
+            if (!apiConfig) return
+            if (
+              userPreferencesSnap.is_auto_mute_large_room_enabled &&
+              !hasAutoMutedRef.current &&
+              userConfig.audioEnabled &&
+              room.numParticipants > apiConfig.auto_mute_on_join_threshold
+            ) {
+              hasAutoMutedRef.current = true
+              await room.localParticipant.setMicrophoneEnabled(false)
+              notifyAutoMutedOnJoin()
+            }
+          }}
           onDisconnected={(e) => {
+            const metadata = {
+              room_id: roomId,
+              pc_publisher: connectionObserverStore.publisher && {
+                ...connectionObserverStore.publisher,
+              },
+              pc_subscriber: connectionObserverStore.subscriber && {
+                ...connectionObserverStore.subscriber,
+              },
+              pc_publisher_changes_count:
+                connectionObserverStore.publisherChangesCount,
+              pc_subscriber_changes_count:
+                connectionObserverStore.subscriberChangesCount,
+            }
+
+            connectionObserverStore.publisher = null
+            connectionObserverStore.publisherChangesCount = 0
+            connectionObserverStore.subscriber = null
+            connectionObserverStore.subscriberChangesCount = 0
+
             switch (e) {
               case DisconnectReason.CLIENT_INITIATED:
-                navigateTo('feedback')
+                navigateTo(
+                  'feedback',
+                  {},
+                  {
+                    state: { ...metadata },
+                  }
+                )
                 return
               case DisconnectReason.DUPLICATE_IDENTITY:
               case DisconnectReason.PARTICIPANT_REMOVED:
@@ -238,7 +284,10 @@ export const Conference = ({
                   'feedback',
                   {},
                   {
-                    state: { reason: e },
+                    state: {
+                      reason: e,
+                      ...metadata,
+                    },
                   }
                 )
                 return
@@ -262,6 +311,7 @@ export const Conference = ({
             {...mediaDeviceError}
             onClose={() => setMediaDeviceError({ error: null, kind: null })}
           />
+          <PictureInPictureConference />
         </LiveKitRoom>
       </Screen>
     </QueryAware>

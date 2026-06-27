@@ -14,6 +14,8 @@ class FeatureFlag:
         "storage_event": "RECORDING_STORAGE_EVENT_ENABLE",
         "subtitle": "ROOM_SUBTITLE_ENABLED",
         "file_upload": "FILE_UPLOAD_ENABLED",
+        "addons": "ADDONS_ENABLED",
+        "application": "APPLICATION_ENABLED",
     }
 
     @classmethod

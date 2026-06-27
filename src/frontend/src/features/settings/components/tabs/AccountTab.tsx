@@ -1,32 +1,42 @@
 import { A, Badge, Button, DialogProps, Field, H, P } from '@/primitives'
 import { Trans, useTranslation } from 'react-i18next'
 import { useRoomContext } from '@livekit/components-react'
-import { useUser } from '@/features/auth'
+import { useUser } from '@/features/auth/api/useUser'
 import { css } from '@/styled-system/css'
 import { TabPanel, TabPanelProps } from '@/primitives/Tabs'
 import { HStack } from '@/styled-system/jsx'
 import { useState } from 'react'
 import { LoginButton } from '@/components/LoginButton'
-import { usePersistentUserChoices } from '@/features/rooms/livekit/hooks/usePersistentUserChoices'
+import { useRenameParticipant } from '@/features/rooms/api/renameParticipant'
+import { saveUsername } from '@/stores/userChoices'
+import { logout } from '@/features/auth/utils/logout'
 
 export type AccountTabProps = Pick<DialogProps, 'onOpenChange'> &
   Pick<TabPanelProps, 'id'>
 
 export const AccountTab = ({ id, onOpenChange }: AccountTabProps) => {
   const { t } = useTranslation('settings')
-  const { saveUsername } = usePersistentUserChoices()
   const room = useRoomContext()
-  const { user, isLoggedIn, logout } = useUser()
+  const { user, isLoggedIn } = useUser()
+
+  const { renameParticipant } = useRenameParticipant()
+
   const [name, setName] = useState(room?.localParticipant.name ?? '')
   const userDisplay =
     user?.full_name && user?.email
       ? `${user.full_name} (${user.email})`
       : user?.email
 
-  const handleOnSubmit = () => {
-    if (room) room.localParticipant.setName(name)
-    saveUsername(name)
-    if (onOpenChange) onOpenChange(false)
+  const handleOnSubmit = async () => {
+    try {
+      if (room) await renameParticipant(name)
+      saveUsername(name)
+      onOpenChange?.(false) // only close on success
+    } catch (error) {
+      console.error(
+        `Failed to rename participant: ${error instanceof Error ? error.message : 'Unknown error'}`
+      )
+    }
   }
   const handleOnCancel = () => {
     if (onOpenChange) onOpenChange(false)
@@ -51,7 +61,7 @@ export const AccountTab = ({ id, onOpenChange }: AccountTabProps) => {
             <Trans
               i18nKey="settings:account.currentlyLoggedAs"
               values={{ user: userDisplay }}
-              components={[<Badge />]}
+              components={[<Badge key="user-badge" />]}
             />
           </P>
           <P>

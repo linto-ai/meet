@@ -3,7 +3,7 @@ import { RiShapesLine } from '@remixicon/react'
 import { useTranslation } from 'react-i18next'
 import { useSidePanel } from '../../hooks/useSidePanel'
 import { css } from '@/styled-system/css'
-import { ToggleButtonProps } from '@/primitives/ToggleButton'
+import type { ToggleButtonProps } from '@/primitives/ToggleButton'
 import { useRegisterKeyboardShortcut } from '@/features/shortcuts/useRegisterKeyboardShortcut'
 
 export const ToolsToggle = ({
@@ -34,6 +34,7 @@ export const ToolsToggle = ({
         aria-label={t(tooltipLabel)}
         tooltip={t(tooltipLabel)}
         isSelected={isToolsOpen}
+        aria-expanded={isToolsOpen}
         onPress={(e) => {
           toggleTools()
           onPress?.(e)

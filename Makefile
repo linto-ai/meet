@@ -73,7 +73,9 @@ create-env-files: \
 	env.d/development/crowdin \
 	env.d/development/postgresql \
 	env.d/development/kc_postgresql \
-	env.d/development/summary
+	env.d/development/summary \
+	env.d/development/kube-secret \
+	env.d/development/multi_user_transcriber
 .PHONY: create-env-files
 
 bootstrap: ## Prepare Docker images for the project
@@ -94,6 +96,7 @@ bootstrap: \
 build: ## build the project containers
 	@$(MAKE) build-backend
 	@$(MAKE) build-frontend
+	@$(MAKE) build-agents
 .PHONY: build
 
 build-backend: ## build the app-dev container
@@ -104,6 +107,10 @@ build-backend: ## build the app-dev container
 build-frontend: ## build the frontend container
 	@$(COMPOSE) build frontend
 .PHONY: build-frontend
+
+build-agents: ## build the multi-user-transcriber agent container
+	@$(COMPOSE) build multi-user-transcriber-dev
+.PHONY: build-agents
 
 down: ## stop and remove containers, networks, images, and volumes
 	@$(COMPOSE) down
@@ -125,10 +132,24 @@ run-summary: ## start only the summary application and all needed services
 	@$(COMPOSE) up --force-recreate -d celery-summary-summarize
 .PHONY: run-summary
 
+run-agents: ## start the multi-user-transcriber agent
+	@$(MAKE) run-agent-multi-user-transcriber
+	@$(MAKE) run-agent-metadata-collector
+.PHONY: run-agents
+
+run-agent-multi-user-transcriber: ## start the LiveKit agents (multi users transcriber)
+	@$(COMPOSE) up --force-recreate -d multi-user-transcriber-dev
+.PHONY: run-agent-multi-user-transcriber
+
+run-agent-metadata-collector: ## start the LiveKit agents (metadata collector)
+	@$(COMPOSE) up --force-recreate -d metadata-collector-dev
+.PHONY: run-agent-metadata-collector
+
 run:
 run: ## start the wsgi (production) and development server
 	@$(MAKE) run-backend
 	@$(MAKE) run-summary
+	@$(MAKE) run-agents
 	@$(COMPOSE) up --force-recreate -d frontend
 .PHONY: run
 
@@ -265,6 +286,12 @@ env.d/development/kc_postgresql:
 env.d/development/summary:
 	cp -n env.d/development/summary.dist env.d/development/summary
 
+env.d/development/kube-secret:
+	cp -n env.d/development/kube-secret.dist env.d/development/kube-secret
+
+env.d/development/multi_user_transcriber:
+	cp -n env.d/development/multi_user_transcriber.dist env.d/development/multi_user_transcriber
+
 # -- Internationalization
 
 env.d/development/crowdin:
@@ -352,15 +379,9 @@ frontend-i18n-generate: \
 
 # -- K8S
 build-k8s-cluster: ## build the kubernetes cluster using kind
-	./bin/start-kind.sh
-.PHONY: build-k8s-cluster
-
-install-external-secrets: ## install the kubernetes secrets from Vaultwarden
-	./bin/install-external-secrets.sh
-.PHONY: build-k8s-cluster
-
-start-tilt: ## start the kubernetes cluster using kind
-	tilt up --namespace=meet -f ./bin/Tiltfile
+build-k8s-cluster: \
+    env.d/development/kube-secret \
+    ./bin/start-kind.sh
 .PHONY: build-k8s-cluster
 
 start-tilt-keycloak: ## start the kubernetes cluster using kind, without Pro Connect for authentication, use keycloak

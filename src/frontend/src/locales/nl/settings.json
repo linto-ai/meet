@@ -12,6 +12,10 @@
     "idleDisconnectModal": {
       "label": "Verlaat oproepen zonder deelnemers",
       "description": "Verlaat automatisch een oproep na een paar minuten als geen andere deelnemer meedoet"
+    },
+    "autoMuteLargeRoom": {
+      "label": "Mijn microfoon automatisch dempen",
+      "description": "Uw microfoon wordt automatisch gedempt wanneer u deelneemt aan een grote vergadering."
     }
   },
   "audio": {
@@ -116,6 +120,16 @@
   "accessibility": {
     "announceReactions": {
       "label": "Reacties hardop aankondigen"
+    },
+    "font": {
+      "label": "Weergavelettertype",
+      "description": "Pas het lettertype van de interface aan om uw leescomfort te verbeteren.",
+      "options": {
+        "default": "Standaard",
+        "lexend": "Lexend (verbeterde leesbaarheid)",
+        "atkinson-hyperlegible": "Atkinson Hyperlegible (slechtziend)",
+        "opendyslexic": "OpenDyslexic (dyslexie)"
+      }
     },
     "captions": {
       "heading": "Ondertitels",

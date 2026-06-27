@@ -7,6 +7,7 @@ import { usePostHog } from 'posthog-js/react'
 import type { PostHog } from 'posthog-js'
 import { Button as RACButton } from 'react-aria-components'
 import { useIsAnalyticsEnabled } from '@/features/analytics/hooks/useIsAnalyticsEnabled'
+import type { CandidateInfo } from '@/stores/connectionObserver'
 
 const Card = styled('div', {
   base: {
@@ -73,9 +74,11 @@ const labelRecipe = cva({
 const OpenFeedback = ({
   posthog,
   onNext,
+  metadata,
 }: {
   posthog: PostHog
   onNext: () => void
+  metadata?: Record<string, unknown>
 }) => {
   const { t } = useTranslation('rooms', { keyPrefix: 'openFeedback' })
   const [feedback, setFeedback] = useState('')
@@ -87,9 +90,9 @@ const OpenFeedback = ({
 
   const onSubmit = () => {
     try {
-      posthog.capture('survey sent', {
-        $survey_id: '01933c5a-5a1d-0000-ada8-e39f5918c2d4',
-        $survey_response: feedback,
+      posthog.capture('open-feedback', {
+        feedback,
+        ...metadata,
       })
     } catch (e) {
       console.warn(e)
@@ -140,10 +143,12 @@ const OpenFeedback = ({
 const RateQuality = ({
   posthog,
   onNext,
-  maxRating = 7,
+  metadata,
+  maxRating = 5,
 }: {
   posthog: PostHog
   onNext: () => void
+  metadata?: Record<string, unknown>
   maxRating?: number
 }) => {
   const { t } = useTranslation('rooms', { keyPrefix: 'rating' })
@@ -155,9 +160,9 @@ const RateQuality = ({
 
   const onSubmit = () => {
     try {
-      posthog.capture('survey sent', {
-        $survey_id: '01933c22-d005-0000-b623-20b752171e2e',
-        $survey_response: `${selectedRating}`,
+      posthog.capture('quality-rating', {
+        rating: selectedRating,
+        ...metadata,
       })
     } catch (e) {
       console.warn(e)
@@ -299,7 +304,19 @@ const AuthenticationMessage = ({
   )
 }
 
-export const Rating = () => {
+type RatingMetadata = {
+  room_id?: string
+  pc_publisher?: CandidateInfo
+  pc_subscriber?: CandidateInfo
+  pc_publisher_changes_count?: number
+  pc_subscriber_changes_count?: number
+}
+
+export const Rating = ({
+  metadata: metadataProp,
+}: {
+  metadata: RatingMetadata
+}) => {
   const isAnalyticsEnabled = useIsAnalyticsEnabled()
   const posthog = usePostHog()
 
@@ -309,14 +326,36 @@ export const Rating = () => {
 
   const [step, setStep] = useState(0)
 
+  const sessionId = useMemo(() => crypto.randomUUID(), [])
+
+  const metadata = useMemo(
+    () => ({
+      session_id: sessionId,
+      ...metadataProp,
+    }),
+    [sessionId, metadataProp]
+  )
+
   if (!isAnalyticsEnabled) return
 
   if (step == 0) {
-    return <RateQuality posthog={posthog} onNext={() => setStep(step + 1)} />
+    return (
+      <RateQuality
+        posthog={posthog}
+        onNext={() => setStep(step + 1)}
+        metadata={metadata}
+      />
+    )
   }
 
   if (step == 1) {
-    return <OpenFeedback posthog={posthog} onNext={() => setStep(step + 1)} />
+    return (
+      <OpenFeedback
+        posthog={posthog}
+        onNext={() => setStep(step + 1)}
+        metadata={metadata}
+      />
+    )
   }
 
   if (step == 2) {

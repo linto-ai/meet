@@ -7,7 +7,6 @@ import {
   RecordingMode,
   useHasRecordingAccess,
   useHasFeatureWithoutAdminRights,
-  useHumanizeRecordingMaxDuration,
   useRecordingStatuses,
 } from '../index'
 import { useState } from 'react'
@@ -32,11 +31,13 @@ import { NoAccessView } from './NoAccessView'
 import { ControlsButton } from './ControlsButton'
 import { RowWrapper } from './RowWrapper'
 import { useMutateRecording } from '../hooks/useMutateRecording'
+import { useIsMetadataCollectorEnabled } from '../hooks/useMetadataCollectorEnabled'
 import { useSidePanel } from '@/features/rooms/livekit/hooks/useSidePanel'
+import { useIsAdminOrOwner } from '@/features/rooms/livekit/hooks/useIsAdminOrOwner'
+import { LimitDescription } from './LimitDescription'
 
 export const TranscriptSidePanel = () => {
   const { data } = useConfig()
-  const recordingMaxDuration = useHumanizeRecordingMaxDuration()
 
   const keyPrefix = 'transcript'
   const { t } = useTranslation('rooms', { keyPrefix })
@@ -58,6 +59,10 @@ export const TranscriptSidePanel = () => {
     RecordingMode.Transcript,
     FeatureFlags.Transcript
   )
+
+  const isAdminOrOwner = useIsAdminOrOwner()
+
+  const isMetadataCollectorEnabled = useIsMetadataCollectorEnabled()
 
   const roomId = useRoomId()
 
@@ -106,6 +111,7 @@ export const TranscriptSidePanel = () => {
             transcribe: true,
             original_mode: RecordingMode.Transcript,
           }),
+          collect_metadata: isMetadataCollectorEnabled,
         }
 
         await startRecording({
@@ -149,6 +155,7 @@ export const TranscriptSidePanel = () => {
         imagePath="/assets/intro-slider/3.png"
         handleRequest={handleRequestTranscription}
         isActive={statuses.isActive}
+        isAdminOrOwner={isAdminOrOwner}
       />
     )
   }
@@ -185,22 +192,10 @@ export const TranscriptSidePanel = () => {
         <H lvl={1} margin={'sm'}>
           {t('heading')}
         </H>
-        <Text variant="body" fullWidth>
-          {recordingMaxDuration
-            ? t('body', { max_duration: recordingMaxDuration })
-            : t('bodyWithoutMaxDuration')}{' '}
-          {data?.support?.help_article_transcript && (
-            <A
-              href={data.support.help_article_transcript}
-              target="_blank"
-              rel="noopener noreferrer"
-              externalIcon
-              aria-label={t('linkAriaLabel')}
-            >
-              {t('linkMore')}
-            </A>
-          )}
-        </Text>
+        <LimitDescription
+          keyPrefix={'transcript'}
+          supportArticleLink={data?.support?.help_article_transcript}
+        />
       </VStack>
       <VStack gap={0} marginBottom={25}>
         <RowWrapper iconName="article" position="first">

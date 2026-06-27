@@ -2,7 +2,7 @@ load('ext://uibutton', 'cmd_button', 'bool_input', 'location')
 load('ext://namespace', 'namespace_create', 'namespace_inject')
 namespace_create('meet')
 
-DEV_ENV = os.getenv('DEV_ENV', 'dev')
+DEV_ENV = os.getenv('DEV_ENV', 'dev-keycloak')
 
 if DEV_ENV == 'dev-dinum':
     update_settings(suppress_unused_image_warnings=["localhost:5001/meet-frontend-generic:latest"])
@@ -23,8 +23,8 @@ docker_build(
     live_update=[
         sync('../src/backend', '/app'),
         run(
-            'pip install -r /app/requirements.txt',
-            trigger=['./api/requirements.txt']
+            'uv sync --locked --no-dev',
+            trigger=['../src/backend/uv.lock', '../src/backend/pyproject.toml']
         )
     ]
 )
@@ -34,10 +34,11 @@ docker_build(
     'localhost:5001/meet-frontend-dinum:latest',
     context='..',
     dockerfile='../docker/dinum-frontend/Dockerfile',
-    only=['./src/frontend', './docker', './.dockerignore'],
+    only=['./src/frontend', './src/addons', './docker', './.dockerignore'],
     target = 'frontend-production',
     live_update=[
         sync('../src/frontend', '/home/frontend'),
+        sync('../src/addons', '/home/addons'),
     ]
 )
 clean_old_images('localhost:5001/meet-frontend-dinum')
@@ -95,18 +96,34 @@ docker_build(
 )
 clean_old_images('localhost:5001/meet-livekit')
 
-k8s_yaml(local('cd ../src/helm && helmfile -n meet -e ${DEV_ENV:-dev} template .'))
+load('ext://secret', 'secret_yaml_generic')
+k8s_yaml(secret_yaml_generic(
+    name="secret-dev",
+    from_env_file="../env.d/development/kube-secret"
+))
+
+k8s_yaml(local('cd ../src/helm && helmfile -n meet -e ${DEV_ENV:-dev-keycloak} template .'))
 
 k8s_resource('minio-bucket', resource_deps=['minio'])
 k8s_resource('meet-backend', resource_deps=['postgresql', 'minio', 'redis', 'livekit-livekit-server'])
 k8s_resource('meet-celery-backend', resource_deps=['redis'])
 k8s_resource('meet-celery-summarize', resource_deps=['redis'])
-k8s_resource('meet-celery-transcribe', resource_deps=['redis'])
-k8s_resource('meet-backend-migrate', resource_deps=['meet-backend'])
+k8s_resource('meet-celery-summary-backend', resource_deps=['redis'])
+k8s_resource('meet-celery-transcribe-default', resource_deps=['redis'])
 k8s_resource('livekit-livekit-server', resource_deps=['redis'])
 k8s_resource('livekit-livekit-server-test-connection', resource_deps=['livekit-livekit-server'])
 k8s_resource('keycloak', resource_deps=['kc-postgresql'])
-k8s_resource('meet-backend-createsuperuser', resource_deps=['meet-backend-migrate'])
+# Trigger once on launch
+k8s_resource(
+    'meet-backend-createsuperuser',
+    resource_deps=['meet-backend-migrate'],
+    trigger_mode=TRIGGER_MODE_MANUAL,
+)
+k8s_resource(
+    'meet-backend-migrate',
+    resource_deps=['meet-backend'],
+    trigger_mode=TRIGGER_MODE_MANUAL,
+)
 
 migration = '''
 set -eu

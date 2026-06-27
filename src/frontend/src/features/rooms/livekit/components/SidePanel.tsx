@@ -14,6 +14,7 @@ import { Admin } from './Admin'
 import { Tools } from './Tools'
 import { Info } from './Info'
 import { HStack } from '@/styled-system/jsx'
+import { useReactionsToolbar } from '@/features/reactions/hooks/useReactionsToolbar'
 
 type StyledSidePanelProps = {
   title: string
@@ -25,6 +26,7 @@ type StyledSidePanelProps = {
   isSubmenu: boolean
   onBack: () => void
   backButtonLabel: string
+  isReactionToolbarOpen?: boolean
 }
 
 const StyledSidePanel = ({
@@ -33,6 +35,7 @@ const StyledSidePanel = ({
   children,
   onClose,
   isClosed,
+  isReactionToolbarOpen,
   closeButtonTooltip,
   isSubmenu = false,
   onBack,
@@ -51,17 +54,23 @@ const StyledSidePanel = ({
       overflow: 'hidden',
       display: 'flex',
       flexDirection: 'column',
-      margin: '1.5rem 1.5rem 1.5rem 0',
+      margin: 'var(--sizes-room-side-panel-margin)',
+      marginLeft: 0,
+      marginBottom: 0,
       padding: 0,
       gap: 0,
       right: 0,
       top: 0,
-      bottom: '80px',
-      width: '360px',
+      width: 'var(--sizes-room-side-panel)',
       transition: '.5s cubic-bezier(.4,0,.2,1) 5ms',
     })}
     style={{
-      transform: isClosed ? 'translateX(calc(360px + 1.5rem))' : 'none',
+      transform: isClosed
+        ? 'translateX(calc(var(--sizes-room-side-panel) + var(--sizes-room-side-panel-margin)))'
+        : 'none',
+      bottom: isReactionToolbarOpen
+        ? 'calc( var(--sizes-room-control-bar) + var(--sizes-room-reaction-toolbar-height) + calc(var(--lk-grid-gap) / 2))'
+        : 'var(--sizes-room-control-bar)',
     }}
     aria-hidden={isClosed}
     aria-label={ariaLabel}
@@ -151,6 +160,8 @@ export const SidePanel = () => {
   const { t } = useTranslation('rooms', { keyPrefix: 'sidePanel' })
   const title = t(`heading.${activeSubPanelId || activePanelId}`)
 
+  const { isOpen: isReactionToolbarOpen } = useReactionsToolbar()
+
   return (
     <StyledSidePanel
       title={title}
@@ -164,6 +175,7 @@ export const SidePanel = () => {
       })}
       isClosed={!isSidePanelOpen}
       isSubmenu={isSubPanelOpen}
+      isReactionToolbarOpen={isReactionToolbarOpen}
       backButtonLabel={t('backToTools')}
       onBack={() => (layoutStore.activeSubPanelId = null)}
     >
