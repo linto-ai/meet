@@ -25,6 +25,7 @@ and this project adheres to
 
 - 🔒️(backend) fix email disclosure in room invitation endpoint #1200
 - 🐛(backend) fix regression in update-participant endpoint #1204
+- 🐛(frontend) prefill prejoin name from the user profile #1435
 
 ## [1.12.0] - 2026-03-24
 
