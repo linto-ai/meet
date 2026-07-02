@@ -13,6 +13,7 @@ from rest_framework.test import APIClient
 
 from ...factories import RoomFactory, UserFactory
 from ...models import Recording, RecordingStatusChoices
+from ...services.room_management import RoomManagement
 
 pytestmark = pytest.mark.django_db
 
@@ -553,8 +554,8 @@ def test_recording_permissions_in_room_response_for_non_admin(settings):
         response.json()["recording_permissions"]["transcript_permission"]
         == "admin_owner"
     )
-    # configuration should NOT be visible to non-admin
-    assert "configuration" not in response.json()
+    # configuration is exposed to all API consumers (upstream contract)
+    assert "configuration" in response.json()
 
 
 def test_recording_permissions_reflect_room_override(settings):
@@ -586,7 +587,8 @@ def test_recording_permissions_reflect_room_override(settings):
     )
 
 
-def test_admin_can_patch_room_recording_config(settings):
+@mock.patch.object(RoomManagement, "update_metadata")
+def test_admin_can_patch_room_recording_config(mock_update_metadata, settings):
     """Admin should be able to patch room configuration with recording permissions."""
     settings.RECORDING_ENABLE = True
     settings.RECORDING_SCREEN_PERMISSION = "admin_owner"

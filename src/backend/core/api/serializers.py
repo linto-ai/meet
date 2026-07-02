@@ -211,9 +211,6 @@ class RoomSerializer(serializers.ModelSerializer):
             ),
         }
 
-        if not is_admin_or_owner:
-            del output["configuration"]
-
         should_access_room = (
             (
                 instance.access_level == models.RoomAccessLevel.TRUSTED
@@ -230,7 +227,7 @@ class RoomSerializer(serializers.ModelSerializer):
                 room_id=room_id,
                 user=request.user,
                 username=username,
-                configuration=output["configuration"],
+                configuration=configuration,
                 role=role,
             )
         else:

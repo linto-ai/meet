@@ -96,15 +96,8 @@ class RecordingEventsService:
         if not recording.is_savable():
             raise RecordingNotSavableError
 
-        # Attempt to notify external services about the recording
-        # This is a non-blocking operation - failures are logged but don't interrupt the flow
-        notification_succeeded = notification_service.notify_external_services(
-            recording
-        )
-
-        recording.status = (
-            models.RecordingStatusChoices.NOTIFICATION_SUCCEEDED
-            if notification_succeeded
-            else models.RecordingStatusChoices.SAVED
-        )
-        recording.save()
+        # Delegate notification + status persistence to the shared, idempotent helper
+        # so the storage-hook webhook path and the S3 polling fallback behave identically:
+        # never downgrade a terminal NOTIFICATION_FAILED and only write the status field,
+        # which avoids clobbering the linto_state checkpoint from a stale in-memory instance.
+        notification_service.notify_and_update_status(recording)
