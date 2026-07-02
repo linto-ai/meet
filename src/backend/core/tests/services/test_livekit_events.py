@@ -69,10 +69,20 @@ def test_initialization(
         ("transcript", "transcriptionLimitReached"),
     ),
 )
+@mock.patch(
+    "core.recording.services.recording_events.notification_service."
+    "notify_external_services",
+    return_value=False,
+)
 @mock.patch("core.utils.notify_participants")
 @mock.patch("core.utils.update_room_metadata")
-def test_handle_egress_ended_success(
-    mock_update_room_metadata, mock_notify, mode, notification_type, service
+def test_handle_egress_ended_success(  # noqa: PLR0913
+    mock_update_room_metadata,
+    mock_notify,
+    mock_notify_external_services,
+    mode,
+    notification_type,
+    service,
 ):
     """Should successfully stop recording and notifies all participant."""
 
@@ -152,10 +162,20 @@ def test_handle_egress_updated_non_handled(
         ("transcript", "transcriptionLimitReached"),
     ),
 )
+@mock.patch(
+    "core.recording.services.recording_events.notification_service."
+    "notify_external_services",
+    return_value=False,
+)
 @mock.patch("core.utils.notify_participants")
 @mock.patch("core.utils.update_room_metadata")
-def test_handle_egress_ended_metadata_update_fails(
-    mock_update_room_metadata, mock_notify, mode, notification_type, service
+def test_handle_egress_ended_metadata_update_fails(  # noqa: PLR0913
+    mock_update_room_metadata,
+    mock_notify,
+    mock_notify_external_services,
+    mode,
+    notification_type,
+    service,
 ):
     """Should successfully stop and save recording when metadata's update fails."""
 

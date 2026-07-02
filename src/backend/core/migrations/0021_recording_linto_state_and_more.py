@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("core", "0018_rename_active_application_is_active"),
+        ("core", "0020_alter_file_upload_state"),
     ]
 
     operations = [

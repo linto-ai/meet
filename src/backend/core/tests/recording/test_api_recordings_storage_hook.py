@@ -203,8 +203,15 @@ def test_save_recording_non_savable_recording(
     }
 
 
+@mock.patch(
+    "core.recording.services.recording_events.notification_service."
+    "notify_external_services",
+    return_value=False,
+)
 @pytest.mark.parametrize("status", ["active", "stopped"])
-def test_save_recording_success(recording_settings, mock_get_parser, client, status):
+def test_save_recording_success(
+    mock_notify_external_services, recording_settings, mock_get_parser, client, status
+):
     """Test successful saving of recordings in valid states."""
 
     recording = RecordingFactory(status=status)
