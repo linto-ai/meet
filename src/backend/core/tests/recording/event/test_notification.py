@@ -695,6 +695,7 @@ def test_notify_summary_service_failure_is_audited(settings, audit_events):
     assert event["lasuite"]["outcome"] == "failure"
     assert event["entity"]["target"]["id"] == str(recording.id)
 
+
 class TestNotifyAndUpdateStatus:
     """Status transition persisted after notification, incl. the terminal-failure guard."""
 

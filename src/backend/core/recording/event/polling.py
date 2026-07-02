@@ -1,16 +1,17 @@
 """Bucket polling fallback for S3 backends without native notifications.
 
-Some S3-compatible providers (e.g. OVH Public Cloud Object Storage) do not
-support bucket event notifications (PutBucketNotificationConfiguration).
-When the storage-hook webhook cannot be wired, this polling task offers an
-opt-in alternative.
+Recordings are finalized on the LiveKit egress_ended webhook. This polling
+task is an opt-in fallback that finalizes them from the bucket itself, for
+deployments where that webhook may be missed; it needs no bucket event
+notifications (which some S3-compatible providers, e.g. OVH Public Cloud
+Object Storage, do not support).
 
 Algorithm:
 - Query recordings whose status is savable and that were created within the
   configured lookback window. Bounded by the number of in-flight recordings,
   not by the number of objects in the bucket.
 - For each candidate, issue a single HEAD_OBJECT on the expected key.
-- When the object exists, run the same notification flow as the webhook.
+- When the object exists, run the same notification flow as the webhook handler.
 
 The cost per run scales with the number of recordings awaiting notification,
 not with bucket size: a bucket holding millions of historical recordings has

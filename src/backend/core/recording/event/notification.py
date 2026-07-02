@@ -57,7 +57,7 @@ class NotificationService:
         """Notify external services then persist the resulting recording status.
 
         Centralizes the post-notification status transition shared by the
-        storage-hook webhook and the polling fallback.
+        LiveKit egress_ended handler and the polling fallback.
         """
         succeeded = self.notify_external_services(recording)
 
