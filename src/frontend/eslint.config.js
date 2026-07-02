@@ -15,6 +15,8 @@ export default tseslint.config(
       'node_modules/**',
       'coverage/**',
       'src/styled-system/**',
+      // Runtime config template emitted at container startup (uses browser globals)
+      'public/config.js',
     ],
   },
 
