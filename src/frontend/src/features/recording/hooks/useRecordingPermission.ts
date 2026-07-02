@@ -5,7 +5,7 @@ import { useIsRecordingModeEnabled } from './useIsRecordingModeEnabled'
 import { useIsAdminOrOwner } from '@/features/rooms/livekit/hooks/useIsAdminOrOwner'
 import { FeatureFlags } from '@/features/analytics/enums'
 import { useConfig } from '@/api/useConfig'
-import { useUser } from '@/features/auth'
+import { useUser } from '@/features/auth/api/useUser'
 import { useRoomData } from '@/features/rooms/livekit/hooks/useRoomData'
 
 /**
