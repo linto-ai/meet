@@ -230,6 +230,36 @@ async def _process_linto_transcription_sync(recording_id):
             recording_id,
             language,
         )
+        # Speaker identification (org-level only): when enabled, resolve the
+        # organization's default voiceprint collection so Studio identifies
+        # members during diarization. Soft-fail — any error (feature or
+        # permission unavailable, no collection) falls back to plain diarization
+        # rather than aborting the transcription.
+        speaker_collection_ids = None
+        if getattr(settings, "LINTO_SPEAKER_IDENTIFICATION_ENABLED", False):
+            try:
+                collection_id = await linto.get_org_voiceprint_collection_id()
+                if collection_id:
+                    speaker_collection_ids = [collection_id]
+                    logger.info(
+                        "Speaker identification enabled for %s (collection=%s)",
+                        recording_id,
+                        collection_id,
+                    )
+                else:
+                    logger.warning(
+                        "Speaker identification enabled but no org voiceprint "
+                        "collection found for %s; continuing without it",
+                        recording_id,
+                    )
+            except Exception:
+                # Best-effort: never let identification lookup block the upload.
+                logger.exception(
+                    "Speaker identification resolution failed for %s, "
+                    "continuing without it",
+                    recording_id,
+                )
+
         # RuntimeError (no ASR service / no organizations) is permanent and
         # must propagate without being wrapped → no retry, straight to
         # on_failure. Only network/HTTP-5xx failures become TransientError.
@@ -242,6 +272,7 @@ async def _process_linto_transcription_sync(recording_id):
                 enablePunctuation=True,
                 name=conversation_name,
                 members_right=getattr(settings, "LINTO_STUDIO_MEMBERS_RIGHT", 0),
+                speaker_collection_ids=speaker_collection_ids,
             )
         state["conversation_id"] = conversation_id
         await save_state(recording)

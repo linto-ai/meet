@@ -922,6 +922,18 @@ class Base(Configuration):
         environ_name="LINTO_STUDIO_MEMBERS_RIGHT",
         environ_prefix=None,
     )
+    # Speaker identification: when enabled, transcriptions ask LinTO Studio to
+    # identify speakers against the organization's default voiceprint collection
+    # (org-level only — no group selection). Identified members' names then
+    # replace generic "Speaker N" labels in the transcript, and propagate to the
+    # Twake note / PDF automatically. Requires the org to hold the
+    # speaker-identification permission and enrolled members; soft-fails to plain
+    # diarization otherwise.
+    LINTO_SPEAKER_IDENTIFICATION_ENABLED = values.BooleanValue(
+        False,
+        environ_name="LINTO_SPEAKER_IDENTIFICATION_ENABLED",
+        environ_prefix=None,
+    )
 
     # Twake Drive integration (Cloudery + Cozy Stack)
     CLOUDERY_URL = values.Value(None, environ_name="CLOUDERY_URL", environ_prefix=None)
