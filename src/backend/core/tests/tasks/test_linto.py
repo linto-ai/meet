@@ -166,3 +166,69 @@ class TestResume:
             sdk.get_media.assert_called_once_with("conv-1")
             # No upload and twake not configured → the S3 GET is skipped too.
             storage.connection.meta.client.get_object.assert_not_called()
+
+
+class TestSpeakerIdentification:
+    """Org-level speaker identification is opt-in and always soft-fails."""
+
+    def _run_until_poll(self, stack, rec, collection):
+        """Wire the SDK so the run halts in poll_media, right after upload."""
+        sdk = _patch_sdk(stack)
+        sdk.get_org_voiceprint_collection_id = mock.AsyncMock(**collection)
+        sdk.upload = mock.AsyncMock(return_value="new-conv")
+        sdk.poll_media = mock.AsyncMock(side_effect=RuntimeError("stop-poll"))
+        with pytest.raises(RuntimeError, match="stop-poll"):
+            linto_task._process_linto_transcription_sync(str(rec.id))
+        return sdk
+
+    def test_disabled_by_default_skips_resolution(self):
+        """Default (setting off): the org collection is never resolved."""
+        rec = _make_recording(models.RecordingModeChoices.TRANSCRIPT)
+
+        with contextlib.ExitStack() as stack:
+            _patch_storage(stack, b"OggS raw")
+            sdk = self._run_until_poll(stack, rec, {"return_value": "col-org"})
+
+        sdk.get_org_voiceprint_collection_id.assert_not_called()
+        _, kwargs = sdk.upload.call_args
+        assert kwargs["speaker_collection_ids"] is None
+
+    def test_enabled_passes_org_collection(self, settings):
+        """Setting on + collection resolved: upload carries the collection id."""
+        settings.LINTO_SPEAKER_IDENTIFICATION_ENABLED = True
+        rec = _make_recording(models.RecordingModeChoices.TRANSCRIPT)
+
+        with contextlib.ExitStack() as stack:
+            _patch_storage(stack, b"OggS raw")
+            sdk = self._run_until_poll(stack, rec, {"return_value": "col-org"})
+
+        sdk.get_org_voiceprint_collection_id.assert_awaited_once()
+        _, kwargs = sdk.upload.call_args
+        assert kwargs["speaker_collection_ids"] == ["col-org"]
+
+    def test_enabled_but_no_collection_uploads_without_it(self, settings):
+        """Setting on but org has no collection: fall back to plain diarization."""
+        settings.LINTO_SPEAKER_IDENTIFICATION_ENABLED = True
+        rec = _make_recording(models.RecordingModeChoices.TRANSCRIPT)
+
+        with contextlib.ExitStack() as stack:
+            _patch_storage(stack, b"OggS raw")
+            sdk = self._run_until_poll(stack, rec, {"return_value": None})
+
+        _, kwargs = sdk.upload.call_args
+        assert kwargs["speaker_collection_ids"] is None
+
+    def test_resolution_error_soft_fails(self, settings):
+        """A resolution error (e.g. missing permission) must not abort upload."""
+        settings.LINTO_SPEAKER_IDENTIFICATION_ENABLED = True
+        rec = _make_recording(models.RecordingModeChoices.TRANSCRIPT)
+
+        with contextlib.ExitStack() as stack:
+            _patch_storage(stack, b"OggS raw")
+            sdk = self._run_until_poll(
+                stack, rec, {"side_effect": RuntimeError("no permission")}
+            )
+
+        sdk.upload.assert_called_once()
+        _, kwargs = sdk.upload.call_args
+        assert kwargs["speaker_collection_ids"] is None
