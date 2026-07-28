@@ -25,9 +25,9 @@ STRINGS = LocaleStrings(
     download_header_template=(
         "\n*[Скачать вашу запись (внешняя ссылка)]({download_link})*\n"
     ),
-    hallucination_replacement_text="[Не удалось расшифровать текст]",
-    document_default_title="Транскрипция",
-    document_title_template=(
-        'Встреча «{room}» {room_recording_date} в {room_recording_time}'
+    form_footer_template=(
+        "\n\n*[Поделитесь с нами своим мнением об этой транскрипции]({form_link})*\n"
     ),
+    hallucination_replacement_text="[Не удалось расшифровать текст]",
+    summary_title_template="Резюме {title}",
 )
