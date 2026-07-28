@@ -25,9 +25,9 @@ Một vài điều chúng tôi khuyên bạn nên kiểm tra:
     download_header_template=(
         "\n*[Tải xuống bản ghi của bạn (liên kết bên ngoài)]({download_link})*\n"
     ),
-    hallucination_replacement_text="[Không thể chuyển văn bản]",
-    document_default_title="Bản chép lời",
-    document_title_template=(
-        'Cuộc họp "{room}" ngày {room_recording_date} lúc {room_recording_time}'
+    form_footer_template=(
+        "\n\n*[Hãy cho chúng tôi biết ý kiến của bạn về bản chép lời này]({form_link})*\n"
     ),
+    hallucination_replacement_text="[Không thể chuyển văn bản]",
+    summary_title_template="Tóm tắt {title}",
 )
