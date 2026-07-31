@@ -10,10 +10,33 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='recording',
-            name='linto_state',
-            field=models.JSONField(blank=True, default=dict, help_text='Idempotent checkpoint of the transcription/notification pipeline: conversation_id, per-step completion flags and attempt count. Used to resume after a crash/retry without re-running completed steps.', verbose_name='LinTO pipeline state'),
+        # ``linto_state`` may already exist on databases that applied this migration
+        # under its pre-rebase name (0021_recording_linto_state_and_more) before it
+        # was renumbered to 0022. A plain AddField would then crash the migrate step
+        # with "DuplicateColumn: column linto_state already exists", leaving the
+        # history desynced forever (and blocking every later migration). We keep the
+        # Django *state* as a normal AddField but make the *database* operation
+        # idempotent with ADD COLUMN IF NOT EXISTS, so migrate self-heals at deploy
+        # time: a fresh database gets the column, a desynced one is a no-op, and 0022
+        # is recorded as applied either way. DROP DEFAULT makes the fresh-database
+        # schema identical to what Django's AddField would have produced.
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.AddField(
+                    model_name='recording',
+                    name='linto_state',
+                    field=models.JSONField(blank=True, default=dict, help_text='Idempotent checkpoint of the transcription/notification pipeline: conversation_id, per-step completion flags and attempt count. Used to resume after a crash/retry without re-running completed steps.', verbose_name='LinTO pipeline state'),
+                ),
+            ],
+            database_operations=[
+                migrations.RunSQL(
+                    sql=[
+                        "ALTER TABLE meet_recording ADD COLUMN IF NOT EXISTS linto_state jsonb NOT NULL DEFAULT '{}';",
+                        "ALTER TABLE meet_recording ALTER COLUMN linto_state DROP DEFAULT;",
+                    ],
+                    reverse_sql="ALTER TABLE meet_recording DROP COLUMN IF EXISTS linto_state;",
+                ),
+            ],
         ),
         migrations.AlterField(
             model_name='recording',
