@@ -38,6 +38,7 @@ and this project adheres to
 - 🔒️(docker) upgrade musl-utils to 1.2.6-r3 to fix CVE-2026-107891
 - ♿️(frontend) close the invite dialog with the Escape key #1916
 - 🐛(mail) load i18n tags in transcription email so it renders
+- 🐛(backend) make linto_state migration idempotent to self-heal history desync
 
 ## [1.37.0] - 2026-11-01
 
