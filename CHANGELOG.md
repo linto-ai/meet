@@ -15,6 +15,7 @@ and this project adheres to
 
 ## Fixed
 
+- 🐛(mail) load i18n tags in transcription email so it renders
 - 🐛(transcription) fix silent bug in speaker assignment
 - 🐛(summary) extend tasks auto retry logic
 - 🐛(summary) properly detect when failure webhook should be sent
