@@ -8,6 +8,10 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Fixed
+
+- 🐛(mail) load i18n tags in transcription email so it renders
+
 ## [1.28.0] - 2026-08-24
 
 ### Added
