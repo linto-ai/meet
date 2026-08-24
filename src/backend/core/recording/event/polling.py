@@ -74,8 +74,7 @@ def poll_storage_for_new_recordings() -> int:
     )
 
     logger.info(
-        "Storage polling tick: %d savable recording(s) in last %dh "
-        "(batch_size=%d)",
+        "Storage polling tick: %d savable recording(s) in last %dh (batch_size=%d)",
         len(candidates),
         settings.RECORDING_STORAGE_POLLING_LOOKBACK_HOURS,
         batch_size,

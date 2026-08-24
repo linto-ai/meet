@@ -27,9 +27,9 @@ export const useRecordingPermission = (
   const permissionLevel =
     mode === RecordingMode.ScreenRecording
       ? (roomData?.recording_permissions?.screen_recording_permission ??
-          config?.recording?.screen_recording_permission)
+        config?.recording?.screen_recording_permission)
       : (roomData?.recording_permissions?.transcript_permission ??
-          config?.recording?.transcript_permission)
+        config?.recording?.transcript_permission)
 
   const hasPermission =
     permissionLevel === RecordingPermission.Authenticated
