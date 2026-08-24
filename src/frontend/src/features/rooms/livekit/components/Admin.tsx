@@ -318,7 +318,9 @@ export const Admin = () => {
                 readOnlyData?.recording_permissions?.transcript_permission ??
                 RecordingPermission.AdminOwner
               }
-              onChange={handleRecordingPermissionChange('transcript_permission')}
+              onChange={handleRecordingPermissionChange(
+                'transcript_permission'
+              )}
             />
           )}
         </AdminSection>

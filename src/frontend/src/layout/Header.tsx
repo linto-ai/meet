@@ -106,9 +106,7 @@ export const Header = () => {
     : loggedInTooltip
 
   if (window !== window.top) {
-    return (
-      <div className={css({ height: '76px', lg: { height: '88px' } })} />
-    )
+    return <div className={css({ height: '76px', lg: { height: '88px' } })} />
   }
 
   return (
