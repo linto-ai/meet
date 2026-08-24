@@ -6,7 +6,10 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('core', '0021_recording_external_process_id_alter_recording_status'),
+        # Sits on top of the upstream 0022 so the fork keeps a single migration
+        # leaf after a rebase. The file name is deliberately NOT renumbered:
+        # deployed databases already recorded this migration under this name.
+        ('core', '0022_user_default_room_access_level_and_more'),
     ]
 
     operations = [
