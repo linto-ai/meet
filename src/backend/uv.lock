@@ -180,6 +180,18 @@ wheels = [
 ]
 
 [[package]]
+name = "bleach"
+version = "6.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "webencodings" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/76/9a/0e33f5054c54d349ea62c277191c020c2d6ef1d65ab2cb1993f91ec846d1/bleach-6.2.0.tar.gz", hash = "sha256:123e894118b8a599fd80d3ec1a6d4cc7ce4e5882b1317a7e1ba69b56e95f991f", size = 203083, upload-time = "2024-10-29T18:30:40.477Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fc/55/96142937f66150805c25c4d0f31ee4132fd33497753400734f9dfdcbdc66/bleach-6.2.0-py3-none-any.whl", hash = "sha256:117d9c6097a7c3d22fd578fcd8d35ff1e125df6736f554da4e432fdd63f31e5e", size = 163406, upload-time = "2024-10-29T18:30:38.186Z" },
+]
+
+[[package]]
 name = "boto3"
 version = "1.43.56"
 source = { registry = "https://pypi.org/simple" }
@@ -1127,6 +1139,18 @@ redis = [
 ]
 
 [[package]]
+name = "linto"
+version = "1.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiohttp" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ee/79/a97b3c1e5fb07d0e32f51d7a52e1d1a3054a8c811726347eb2df4879aa38/linto-1.4.0.tar.gz", hash = "sha256:bf1a181b365c65c954e3eb9b011e117a6993d4c4ec713db794514c2160b7c9c3", size = 39470, upload-time = "2026-07-20T13:36:40.346Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8a/30/db7a2b53042c5d31d21e4a41d4eb42b61e5b15bd3d647b73f5486685bb61/linto-1.4.0-py3-none-any.whl", hash = "sha256:a3bf33f7c046c8fda9dda1d82491042dc408992fe5434fbe85ba575f218ae73f", size = 38681, upload-time = "2026-07-20T13:36:39.198Z" },
+]
+
+[[package]]
 name = "livekit-api"
 version = "1.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1191,6 +1215,7 @@ version = "1.28.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
+    { name = "bleach" },
     { name = "boto3" },
     { name = "brevo-python" },
     { name = "brotli" },
@@ -1215,6 +1240,7 @@ dependencies = [
     { name = "factory-boy" },
     { name = "gunicorn" },
     { name = "jsonschema" },
+    { name = "linto" },
     { name = "livekit-api" },
     { name = "markdown" },
     { name = "mozilla-django-oidc" },
@@ -1256,6 +1282,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", specifier = "==3.14.3" },
+    { name = "bleach", specifier = "==6.2.0" },
     { name = "boto3", specifier = "==1.43.56" },
     { name = "brevo-python", specifier = "==1.2.0" },
     { name = "brotli", specifier = "==1.2.0" },
@@ -1280,6 +1307,7 @@ requires-dist = [
     { name = "factory-boy", specifier = "==3.3.3" },
     { name = "gunicorn", specifier = "==26.0.0" },
     { name = "jsonschema", specifier = "==4.26.0" },
+    { name = "linto", specifier = "==1.4.0" },
     { name = "livekit-api", specifier = "==1.2.0" },
     { name = "markdown", specifier = "==3.10.2" },
     { name = "mozilla-django-oidc", specifier = "==5.0.2" },
@@ -2388,6 +2416,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/34/74/c6428f875774288bec1396f5bfcbc2d925700a4dad61727fd5f2b12f249d/wcwidth-0.8.2.tar.gz", hash = "sha256:91fbef97204b96a3d4d421609b80340b760cf33e26da123ff243d76b1fda8dda", size = 1466253, upload-time = "2026-06-29T18:11:11.601Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/96/42/3e5985a0a7e57de470b320c6d6a1a67c844f6737a587f3d44dd13d1819e7/wcwidth-0.8.2-py3-none-any.whl", hash = "sha256:d63947694a0539a1d51e01eda7caf800c291020e6cdd7e28ad7b14dd33ad4f85", size = 323166, upload-time = "2026-06-29T18:11:09.888Z" },
+]
+
+[[package]]
+name = "webencodings"
+version = "0.6.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/d5/a0/8fd707bcb776a7be556bad06a2ea5fb9bd519df78ef8e26f70ccf0f38bff/webencodings-0.6.1.tar.gz", hash = "sha256:565f9ad031c702dae404e27a099e3e09186a3ab1b9520f06d215502b651fd910", size = 15001, upload-time = "2026-08-15T14:22:57.549Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/77/c6/040cbc72480d789a5f40d63fb484d3106554c4dfa2d2b70ad5022057750f/webencodings-0.6.1-py3-none-any.whl", hash = "sha256:7fab6269c8bf237c657876b52058ccb182e861518d1c695c1a9aaa8c1c105d5b", size = 8745, upload-time = "2026-08-15T14:22:56.31Z" },
 ]
 
 [[package]]
