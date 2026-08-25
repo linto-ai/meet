@@ -44,7 +44,7 @@ async def upload_recording_files(recording, owner_access, files):
     dirname = f"Reunion_{meeting_time}"
     dir_id = await ensure_meeting_directory(instance, drive_token, dirname)
 
-    any_success = False
+    uploaded = []
     for f in files:
         try:
             ok = await save_file(
@@ -55,11 +55,35 @@ async def upload_recording_files(recording, owner_access, files):
                 f["content"],
                 f["content_type"],
             )
-            any_success = any_success or bool(ok)
+            if ok:
+                uploaded.append(f["filename"])
         except Exception:
             logger.exception("Failed to upload %s to Twake Drive", f.get("filename"))
 
-    if not any_success:
+    if not uploaded:
+        logger.warning(
+            "No file could be uploaded to Twake Drive for recording %s", recording.id
+        )
         return None
+
+    # Log the outcome explicitly: this is the only trace the screen-recording
+    # path leaves behind (unlike the transcription task, which logs its own
+    # summary line), and a silent success is indistinguishable from a silent
+    # skip when reading production logs.
+    if len(uploaded) < len(files):
+        logger.warning(
+            "Partially uploaded %d/%d file(s) to Twake Drive for recording %s: %s",
+            len(uploaded),
+            len(files),
+            recording.id,
+            ", ".join(uploaded),
+        )
+    else:
+        logger.info(
+            "Uploaded %d file(s) to Twake Drive for recording %s: %s",
+            len(uploaded),
+            recording.id,
+            ", ".join(uploaded),
+        )
 
     return build_drive_link(instance, dir_id)
