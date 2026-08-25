@@ -8,6 +8,10 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Changed
+
+- 📝(backend) log the outcome of every Twake Drive recording upload
+
 ### Fixed
 
 - 🐛(backend) make linto_state migration idempotent to self-heal history desync
