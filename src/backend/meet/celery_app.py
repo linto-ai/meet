@@ -28,9 +28,15 @@ app.autodiscover_tasks()
 # Registered only when explicitly enabled, so default deployments are
 # unaffected and `celery beat` is not required.
 if settings.RECORDING_STORAGE_POLLING_ENABLED:
-    # Eager import so the worker registers the task even though no other
-    # module imports it (autodiscovery only walks installed app modules).
-    import core.tasks.storage_polling
+    # The worker must import this module to register the task: autodiscovery
+    # only picks up the `core.tasks` package itself, which does not re-export
+    # storage_polling. Declaring it in `conf.imports` rather than importing it
+    # here is deliberate — Celery imports those modules at worker startup, once
+    # the Django fixup has run django.setup(). Importing it at module scope
+    # would pull in core.tasks.__init__ -> core.tasks.file -> core.models while
+    # the app registry is still empty, and every worker would die on boot with
+    # "AppRegistryNotReady: Apps aren't loaded yet."
+    app.conf.imports = (*app.conf.imports, "core.tasks.storage_polling")
 
     app.conf.beat_schedule = {
         **app.conf.beat_schedule,
