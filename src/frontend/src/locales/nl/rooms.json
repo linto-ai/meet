@@ -423,7 +423,8 @@
       "screenRecording": "Opnemen",
       "admin": "Beheerdersbediening",
       "tools": "Meer tools",
-      "info": "Vergaderinformatie"
+      "info": "Vergaderinformatie",
+      "linto": "LinTO"
     },
     "content": {
       "participants": "deelnemers",
@@ -433,7 +434,8 @@
       "transcript": "transcriberen",
       "admin": "beheerdersbediening",
       "tools": "meer tools",
-      "info": "vergaderinformatie"
+      "info": "vergaderinformatie",
+      "linto": "de LinTO-transcriptie"
     },
     "closeButton": "Verberg {{content}}"
   },

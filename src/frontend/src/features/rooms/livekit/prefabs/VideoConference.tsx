@@ -10,6 +10,7 @@ import {
 import { ControlBar } from './ControlBar/ControlBar'
 import { SidePanel } from '../components/SidePanel'
 import { RecordingProvider } from '@/features/recording'
+import { LintoProvider } from '@/features/transcription-bot'
 import { ScreenShareErrorModal } from '../components/ScreenShareErrorModal'
 import { ConnectionObserver } from '../components/ConnectionObserver'
 import { captureMediaEvent, reportError } from '@/features/analytics/telemetry'
@@ -150,6 +151,7 @@ export function VideoConference({ ...props }: VideoConferenceProps) {
         <RoomAudioRenderer />
         <ConnectionStateToast />
         <RecordingProvider />
+        <LintoProvider />
         <SettingsDialogProvider />
         <MuteAlertDialogProvider />
         <ReactionPortals />

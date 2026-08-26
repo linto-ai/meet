@@ -12,12 +12,14 @@ import {
   ScreenRecordingSidePanel,
 } from '@/features/recording'
 import { useConfig } from '@/api/useConfig'
+import { LintoSidePanel, useLintoConfig } from '@/features/transcription-bot'
 
 export interface ToolsButtonProps {
   icon: ReactNode
   title: string
   description: string
   onPress: () => void
+  dataAttr?: string
 }
 
 const ToolButton = ({
@@ -25,9 +27,11 @@ const ToolButton = ({
   title,
   description,
   onPress,
+  dataAttr,
 }: ToolsButtonProps) => {
   return (
     <RACButton
+      data-attr={dataAttr}
       className={css({
         display: 'flex',
         flexDirection: 'row',
@@ -98,11 +102,16 @@ export const Tools = () => {
   const {
     openTranscript,
     openScreenRecording,
+    openLinto,
     activeSubPanelId,
     isToolsOpen,
     isSidePanelOpen,
   } = useSidePanel()
   const { t } = useTranslation('rooms', { keyPrefix: 'moreTools' })
+  const { t: tLinto } = useTranslation('transcription-bot', {
+    keyPrefix: 'tools.lintoBot',
+  })
+  const { enabled: isLintoEnabled, hideLegacyTools } = useLintoConfig()
 
   // Restore focus to the element that opened the Tools panel
   // following the same pattern as Chat.
@@ -134,6 +143,8 @@ export const Tools = () => {
       return <TranscriptSidePanel />
     case SubPanelId.SCREEN_RECORDING:
       return <ScreenRecordingSidePanel />
+    case SubPanelId.LINTO:
+      return <LintoSidePanel />
     default:
       break
   }
@@ -172,7 +183,16 @@ export const Tools = () => {
           </A>
         )}
       </Text>
-      {isTranscriptEnabled && (
+      {isLintoEnabled && (
+        <ToolButton
+          icon={<Icon name="speech_to_text" />}
+          title={tLinto('title')}
+          description={tLinto('body')}
+          onPress={() => openLinto()}
+          dataAttr="tool-linto-transcription"
+        />
+      )}
+      {isTranscriptEnabled && !(isLintoEnabled && hideLegacyTools) && (
         <ToolButton
           icon={<Icon name="speech_to_text" />}
           title={t('tools.transcript.title')}

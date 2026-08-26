@@ -13,6 +13,8 @@ export enum PanelId {
 export enum SubPanelId {
   TRANSCRIPT = 'transcript',
   SCREEN_RECORDING = 'screenRecording',
+  // LinTO live transcription (fork).
+  LINTO = 'linto',
 }
 
 export const useSidePanel = () => {
@@ -28,6 +30,7 @@ export const useSidePanel = () => {
   const isInfoOpen = activePanelId == PanelId.INFO
   const isTranscriptOpen = activeSubPanelId == SubPanelId.TRANSCRIPT
   const isScreenRecordingOpen = activeSubPanelId == SubPanelId.SCREEN_RECORDING
+  const isLintoOpen = activeSubPanelId == SubPanelId.LINTO
   const isSidePanelOpen = !!activePanelId
   const isSubPanelOpen = !!activeSubPanelId
 
@@ -71,7 +74,14 @@ export const useSidePanel = () => {
     layoutStore.activePanelId = PanelId.TOOLS
   }
 
+  const openLinto = () => {
+    layoutStore.activeSubPanelId = SubPanelId.LINTO
+    layoutStore.activePanelId = PanelId.TOOLS
+  }
+
   return {
+    openLinto,
+    isLintoOpen,
     activePanelId,
     activeSubPanelId,
     toggleParticipants,

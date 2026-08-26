@@ -144,6 +144,47 @@ def generate_token(  # noqa: PLR0917
     return token.to_jwt()
 
 
+def generate_bot_join_token(room: str, channel_id: str) -> str:
+    """Mint a LiveKit join token for the native LinTO visio bot.
+
+    Meet owns this room's LiveKit credentials and mints the bot's join token
+    itself, so the bot service stays credential-agnostic: the signing secret
+    never leaves Meet, only a bearer JWT that is room-scoped, subscribe-only
+    (audio/video), data-publishing (it republishes captions as transcription
+    segments), hidden and TTL-bounded travels.
+
+    Args:
+        room (str): LiveKit room name (== the meet room id).
+        channel_id (str): Studio channel id serving this room. Part of the bot's
+            identity so two channels on the SAME room don't evict each other.
+
+    Returns:
+        str: The signed LiveKit JWT the bot presents to join the room.
+    """
+
+    video_grants = VideoGrants(
+        room=room,
+        room_join=True,
+        can_subscribe=True,
+        can_publish=False,
+        can_publish_data=True,
+        hidden=True,
+    )
+
+    token = (
+        AccessToken(
+            api_key=settings.LIVEKIT_CONFIGURATION["api_key"],
+            api_secret=settings.LIVEKIT_CONFIGURATION["api_secret"],
+        )
+        .with_grants(video_grants)
+        .with_identity(f"linto-visio-bot-{room}-{channel_id}")
+        .with_name("LinTO")
+        .with_ttl(timedelta(seconds=settings.LINTO_NATIVE_TOKEN_TTL))
+    )
+
+    return token.to_jwt()
+
+
 def generate_livekit_config(  # noqa: PLR0917
     room_id: str,
     user,

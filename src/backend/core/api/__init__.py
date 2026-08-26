@@ -67,6 +67,11 @@ def get_frontend_configuration(request):
             "default_access_level": settings.RESOURCE_DEFAULT_ACCESS_LEVEL,
         },
         "subtitle": {"enabled": settings.ROOM_SUBTITLE_ENABLED},
+        # LinTO live transcription (fork): the in-meeting "LinTO" tool.
+        "linto": {
+            "enabled": settings.LINTO_FEATURE_ENABLED,
+            "hide_legacy_tools": settings.LINTO_HIDE_LEGACY_TOOLS,
+        },
         "diagnostics": {"connection_test_enabled": settings.CONNECTION_TEST_ENABLED},
         "livekit": {
             "url": settings.LIVEKIT_CONFIGURATION["url"],

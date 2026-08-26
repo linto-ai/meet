@@ -291,3 +291,24 @@ class LiveKitEventsService:
             raise ActionFailedError(
                 f"Failed to clear room cache for room {room_id}"
             ) from e
+
+        # LinTO live transcription (fork): the room is gone, so any bot still
+        # attached must be torn down (finalizing the Studio session) — otherwise
+        # it would keep the Studio quick-meeting open until its own timeouts.
+        # Best-effort and idempotent: a room without a running bot is a no-op.
+        try:
+            room = models.Room.objects.filter(id=room_id).first()
+            if room is not None and (room.configuration or {}).get("linto"):
+                # Local import: the service imports the recording mediator, which
+                # would be a circular import at module scope.
+                from core.services.bot_transcription import (  # noqa: PLC0415
+                    BotTranscriptionService,
+                )
+
+                BotTranscriptionService().stop_bot(room, enforce_permission=False)
+        except Exception:
+            logger.warning(
+                "Failed to stop the LinTO bot for finished room %s",
+                room_id,
+                exc_info=True,
+            )
