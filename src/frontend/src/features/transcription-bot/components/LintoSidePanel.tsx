@@ -128,6 +128,10 @@ export const LintoSidePanel = () => {
       console.warn('LinTO bot: missing room id or token')
       return
     }
+    // Debounce an accidental start right after a local action (a stray click can
+    // land on the Start button as it replaces the Stop button when a run ends —
+    // it must not immediately relaunch the bot).
+    if (lintoStore.running || Date.now() < lintoStore.localActionUntil) return
     // Clear any previous error / transcript before starting a new run.
     lintoStore.error = undefined
     clearTranscript()

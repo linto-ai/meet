@@ -166,7 +166,7 @@ const Transcription = ({ row }: { row: TranscriptionRow }) => {
         maxWidth: '800px',
         width: '100%',
       })}
-      data-attr="caption-overlay-line"
+      data-testid="caption-overlay-line"
     >
       <div
         className={css({
