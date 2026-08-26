@@ -5,223 +5,239 @@ import {
 } from '@tanstack/react-query'
 import { fetchApi } from '@/api/fetchApi'
 import { ApiError } from '@/api/ApiError'
+import type { LintoRuntimeConfig } from '@/api/useConfig'
+import { LintoBotConfig, LintoBotProfilesResult } from '../types/linto'
 import {
-  LintoBotConfig,
-  LintoBotProfile,
-  LintoBotProfilesReason,
-  LintoBotProfilesResult,
-  LintoBotStatus,
-  LintoCaption,
-} from '../types/linto'
+  StudioAuthUnavailable,
+  StudioClient,
+  useStudioClient,
+} from './studioAuth'
 
-// ── Wire (snake_case) shapes the backend actually speaks ──────────────────────
+// ── Browser-first data flow ──────────────────────────────────────────────────
+// The panel drives LinTO Studio DIRECTLY via the JS SDK (authenticated as the
+// user): it lists the quickMeeting profiles, creates the session, chooses the
+// translations and starts/stops the bot. The Meet backend is only asked to do
+// what the browser cannot: mint the native bot join token (`linto/prepare`) and
+// run the room-wide lifecycle (`linto/started` / `linto/stopped`).
 
-interface ApiBotConfig {
-  language?: string
-  asr_profile_id?: string
-  summary: boolean
-  record: boolean
-  translations?: string[]
-  token: string
+// Identifiers of a running LinTO transcription, kept so a later Stop can tear it
+// down through the SDK.
+export interface LintoRun {
+  sessionId: string
+  channelId: string
+  botId: string | null
+  organizationId: string
 }
 
-interface ApiCaption {
-  segment_id?: string | null
-  text: string
-  locutor: string
-  participant_id?: string | null
-  language?: string
-  start?: number
-  translations?: Record<string, string>
-}
-
-interface ApiBotStatusResponse {
-  status: 'running' | 'idle' | 'stopped'
-  session_id?: string
-  org_id?: string
-  user_id?: string
-  summary?: boolean
-  record?: boolean
-  captions?: ApiCaption[]
-}
-
-interface ApiBotProfile {
-  id: string
-  name: string
-  languages?: string[]
-  translations?: string[]
-}
-
-interface ApiBotProfilesResponse {
-  profiles?: ApiBotProfile[]
-  hasDefault?: boolean
-  reason?: LintoBotProfilesReason
-}
-
-// ── snake_case ↔ camelCase conversion at the boundary ─────────────────────────
-
-const toCaption = (c: ApiCaption, index: number): LintoCaption => ({
-  // Hydrated (finalized) lines share the bot's segment-id namespace so the live
-  // feed and the history merge by id; a line without id gets a stable fallback.
-  id: c.segment_id || `linto:hydrated:${index}`,
-  text: c.text,
-  locutor: c.locutor,
-  participantIdentity: c.participant_id || undefined,
-  language: c.language || undefined,
-  startTime: typeof c.start === 'number' ? c.start * 1000 : undefined,
-  translations: c.translations,
-  partial: false,
-  receivedAt: 0,
-})
-
-const toBotProfile = (p: ApiBotProfile): LintoBotProfile => ({
-  id: p.id,
-  name: p.name,
-  languages: p.languages ?? [],
-  translations: p.translations ?? [],
-})
-
-const toStatus = (res: ApiBotStatusResponse): LintoBotStatus => ({
-  status: res.status,
-  sessionId: res.session_id,
-  orgId: res.org_id,
-  userId: res.user_id,
-  summary: res.summary,
-  record: res.record,
-  captions: (res.captions ?? []).map(toCaption),
-})
-
-const configToBody = (config: LintoBotConfig, token: string): ApiBotConfig => ({
-  // Only forward set values — the backend has sensible defaults.
-  ...(config.language && { language: config.language }),
-  ...(config.asrProfileId && { asr_profile_id: config.asrProfileId }),
-  ...(config.translations.length > 0 && { translations: config.translations }),
-  summary: config.summary,
-  record: config.record,
-  // Same room-token-in-body mechanism as start-subtitle / recording:
-  // LiveKitTokenAuthentication reads request.data["token"].
-  token,
-})
-
-// ── Params ────────────────────────────────────────────────────────────────────
-
-export interface StartLintoBotParams {
-  roomId: string
-  token: string
-  config: LintoBotConfig
-}
-
-export interface StopLintoBotParams {
-  roomId: string
-  token: string
-}
-
-// ── Raw fetchers (calque startRecording.ts / startSubtitle.ts) ────────────────
-
-const startLintoBot = async ({
-  roomId,
-  token,
-  config,
-}: StartLintoBotParams): Promise<LintoBotStatus> => {
-  const res = await fetchApi<ApiBotStatusResponse>(
-    `rooms/${roomId}/start-bot/`,
-    {
-      method: 'POST',
-      body: JSON.stringify(configToBody(config, token)),
-    }
-  )
-  return toStatus(res)
-}
-
-const stopLintoBot = ({
-  roomId,
-  token,
-}: StopLintoBotParams): Promise<{ status: string }> => {
-  return fetchApi(`rooms/${roomId}/stop-bot/`, {
-    method: 'POST',
-    body: JSON.stringify({ token }),
-  })
-}
-
-const fetchLintoBotStatus = async (
+// The Studio session `meta` descriptor the native bot reads to join the room.
+const nativeMeta = (
+  livekitUrl: string,
   roomId: string,
-  token: string
-): Promise<LintoBotStatus> => {
-  // bot-status is a GET; a browser fetch cannot carry a request body, so the
-  // room token is passed as a query parameter (the POST siblings send it in the
-  // body) — LiveKitTokenAuthentication reads request.query_params["token"].
-  const search = token ? `?token=${encodeURIComponent(token)}` : ''
-  const res = await fetchApi<ApiBotStatusResponse>(
-    `rooms/${roomId}/bot-status/${search}`
-  )
-  return toStatus(res)
-}
-
-const fetchLintoBotProfiles = async (
-  roomId: string,
-  token: string
-): Promise<LintoBotProfilesResult> => {
-  const search = token ? `?token=${encodeURIComponent(token)}` : ''
-  const res = await fetchApi<ApiBotProfilesResponse>(
-    `rooms/${roomId}/bot-profiles/${search}`
-  )
+  token?: string
+): Record<string, unknown> => {
+  const descriptor: Record<string, unknown> = { livekitUrl, room: roomId }
+  if (token) descriptor.token = token
   return {
-    profiles: (res.profiles ?? []).map(toBotProfile),
-    hasDefault: res.hasDefault ?? false,
-    reason: res.reason ?? 'ok',
+    native: { 'visio-native': descriptor },
+    // One-release back-compat alias consumed by the Scheduler.
+    linto_native: descriptor,
   }
 }
 
-// ── react-query hooks ─────────────────────────────────────────────────────────
-
-export function useStartLintoBot(
-  options?: UseMutationOptions<LintoBotStatus, ApiError, StartLintoBotParams>
-) {
-  return useMutation<LintoBotStatus, ApiError, StartLintoBotParams>({
-    mutationFn: startLintoBot,
-    ...options,
-  })
-}
-
-export function useStopLintoBot(
-  options?: UseMutationOptions<{ status: string }, ApiError, StopLintoBotParams>
-) {
-  return useMutation<{ status: string }, ApiError, StopLintoBotParams>({
-    mutationFn: stopLintoBot,
-    ...options,
-  })
-}
+// ── Profiles (SDK) ────────────────────────────────────────────────────────────
 
 /**
- * Bot status + finalized captions. Fetched ONCE when enabled (a participant
- * opening the panel while a transcription runs); the live feed itself comes
- * from LiveKit, and the running state from the room metadata.
- */
-export function useLintoBotStatus(
-  roomId: string | undefined,
-  token: string | undefined,
-  enabled: boolean
-) {
-  return useQuery<LintoBotStatus, ApiError>({
-    queryKey: ['lintoBotStatus', roomId],
-    queryFn: () => fetchLintoBotStatus(roomId as string, token as string),
-    enabled: enabled && !!roomId && !!token,
-    staleTime: 10 * 1000,
-  })
-}
-
-/**
- * Fetches the quickMeeting transcriber profiles available to this room's
- * organization (bot-profiles). Populates the profile dropdown.
+ * quickMeeting ASR profiles for the user's organization, via the SDK. Same
+ * `{ profiles, hasDefault, reason }` shape the panel/LintoSettings expect:
+ * `reason='unprovisioned'` (org has none), `'ok'`, or `'upstream_error'` when
+ * Studio is unreachable / the browser has no Studio auth yet.
  */
 export function useLintoBotProfiles(
   roomId: string | undefined,
   token: string | undefined
 ) {
+  const { getClient, config } = useStudioClient()
   return useQuery<LintoBotProfilesResult, ApiError>({
     queryKey: ['lintoBotProfiles', roomId],
-    queryFn: () => fetchLintoBotProfiles(roomId as string, token as string),
-    enabled: !!roomId && !!token,
+    queryFn: async (): Promise<LintoBotProfilesResult> => {
+      try {
+        const { linto, organizationId } = await getClient(
+          roomId as string,
+          token as string
+        )
+        const profiles = await linto.listQuickMeetingProfiles({
+          organizationId,
+        })
+        return {
+          profiles,
+          hasDefault: profiles.length > 0,
+          reason: profiles.length > 0 ? 'ok' : 'unprovisioned',
+        }
+      } catch (err) {
+        if (err instanceof StudioAuthUnavailable) {
+          return { profiles: [], hasDefault: false, reason: 'upstream_error' }
+        }
+        // Any other failure (network / Studio down) degrades the same way.
+        return { profiles: [], hasDefault: false, reason: 'upstream_error' }
+      }
+    },
+    enabled: !!roomId && !!token && !!config?.enabled,
     staleTime: 5 * 60 * 1000,
+  })
+}
+
+// ── Start / stop orchestration (SDK + Meet lifecycle hooks) ───────────────────
+
+export interface StartLintoLiveParams {
+  roomId: string
+  token: string
+  roomSlug: string
+  config: LintoBotConfig
+  lintoConfig: LintoRuntimeConfig
+}
+
+type GetClient = (roomId: string, token: string) => Promise<StudioClient>
+
+const startLintoLive = async (
+  { roomId, token, roomSlug, config, lintoConfig }: StartLintoLiveParams,
+  getClient: GetClient
+): Promise<LintoRun> => {
+  const { linto, organizationId } = await getClient(roomId, token)
+
+  const channel = {
+    name: 'Main',
+    ...(config.asrProfileId && { transcriberProfileId: config.asrProfileId }),
+    enableLiveTranscripts: true,
+    diarization: true,
+    // Live transcription is text-only; the summary reads the finalized
+    // conversation text, never stored audio.
+    keepAudio: false,
+    translations: config.translations,
+  }
+
+  const native = lintoConfig.visio_native_enabled
+  // The public room URL the bot navigates to (SSRF-checked server-side).
+  const botUrl = `${window.location.origin}/${roomSlug}`
+
+  const run = await linto.launchVisioBot({
+    organizationId,
+    channel,
+    // Declare the native descriptor up front (without the token); the token is
+    // added by the metaWithToken hook once the channel id exists.
+    meta: native
+      ? nativeMeta(lintoConfig.native_livekit_url, roomId)
+      : undefined,
+    botUrl,
+    provider: lintoConfig.bot_provider || 'visio',
+    makePublic: true,
+    metaWithToken: native
+      ? async (_sessionId: string, channelId: string) => {
+          // Mint the native bot join token via the Meet backend (needs Meet's
+          // LiveKit secret) and inject it into the session meta.
+          const prepared = await fetchApi<{ token: string }>(
+            `rooms/${roomId}/linto/prepare/`,
+            {
+              method: 'POST',
+              body: JSON.stringify({ channel_id: channelId, token }),
+            }
+          )
+          return nativeMeta(
+            lintoConfig.native_livekit_url,
+            roomId,
+            prepared.token
+          )
+        }
+      : undefined,
+  })
+
+  // Record the run + light the room-wide state (banner, egress, summary hook).
+  await fetchApi(`rooms/${roomId}/linto/started/`, {
+    method: 'POST',
+    body: JSON.stringify({
+      session_id: run.sessionId,
+      channel_id: run.channelId,
+      org_id: run.organizationId ?? organizationId,
+      bot_id: run.botId,
+      summary: config.summary,
+      record: config.record,
+      token,
+    }),
+  })
+
+  return {
+    sessionId: run.sessionId,
+    channelId: run.channelId,
+    botId: run.botId,
+    organizationId: run.organizationId ?? organizationId,
+  }
+}
+
+export interface StopLintoLiveParams {
+  roomId: string
+  token: string
+  run: Partial<LintoRun>
+}
+
+const stopLintoLive = async (
+  { roomId, token, run }: StopLintoLiveParams,
+  getClient: GetClient
+): Promise<{ status: string }> => {
+  const conversationName = `linto-${roomId}-${Math.floor(Date.now() / 1000)}`
+
+  // Tear the run down through the SDK (best-effort) when we hold its ids.
+  if (run.sessionId || run.botId) {
+    try {
+      const { linto } = await getClient(roomId, token)
+      const organizationId = run.organizationId as string
+      if (run.botId) {
+        await linto
+          .stopBot({ organizationId, botId: run.botId })
+          .catch(() => {})
+      }
+      if (run.sessionId) {
+        await linto
+          .stopQuickMeeting({
+            organizationId,
+            sessionId: run.sessionId,
+            name: conversationName,
+          })
+          .catch(() => {})
+      }
+    } catch {
+      // Studio auth/teardown failure is non-fatal — the backend `stopped` hook
+      // (and, on an abnormal exit, `room_finished` teardown) still clean up.
+    }
+  }
+
+  // Clear the room-wide state + enqueue the summary (uses the conversation name).
+  return fetchApi(`rooms/${roomId}/linto/stopped/`, {
+    method: 'POST',
+    body: JSON.stringify({ conversation_name: conversationName, token }),
+  })
+}
+
+// ── react-query mutations ─────────────────────────────────────────────────────
+
+export function useStartLintoLive(
+  options?: UseMutationOptions<LintoRun, ApiError, StartLintoLiveParams>
+) {
+  const { getClient } = useStudioClient()
+  return useMutation<LintoRun, ApiError, StartLintoLiveParams>({
+    mutationFn: (params) => startLintoLive(params, getClient),
+    ...options,
+  })
+}
+
+export function useStopLintoLive(
+  options?: UseMutationOptions<
+    { status: string },
+    ApiError,
+    StopLintoLiveParams
+  >
+) {
+  const { getClient } = useStudioClient()
+  return useMutation<{ status: string }, ApiError, StopLintoLiveParams>({
+    mutationFn: (params) => stopLintoLive(params, getClient),
+    ...options,
   })
 }
