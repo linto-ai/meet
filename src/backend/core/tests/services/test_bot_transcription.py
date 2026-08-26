@@ -1,14 +1,15 @@
 """
-Test the LinTO transcription-bot service (BotTranscriptionService).
+Test the LinTO live-transcription lifecycle service (browser-first).
 
-The service talks to LinTO Studio and Session-API over HTTP via ``requests``;
-every outbound call is mocked (``responses`` / ``unittest.mock``) so the tests
-NEVER hit the network.
+The BROWSER drives Studio via the JS SDK; this service only mints the native bot
+join token, gates on permissions, drives the banner/egress/summary lifecycle, and
+(teardown/summary) talks to Studio under the service account. Studio HTTP is
+mocked; LiveKit side effects (banner metadata, native-agent stop, token mint,
+egress) are patched.
 """
 
-# pylint: disable=redefined-outer-name,protected-access,too-many-public-methods
+# pylint: disable=redefined-outer-name,protected-access
 
-import json
 from unittest import mock
 
 import pytest
@@ -19,438 +20,231 @@ from core.factories import RoomFactory, UserFactory
 from core.services.bot_transcription import (
     BotTranscriptionException,
     BotTranscriptionService,
-    NoQuickMeetingProfile,
+    PermissionDeniedError,
 )
 
 pytestmark = pytest.mark.django_db
 
 STUDIO = "http://studio.test"
-SESSION_API = "http://session.test"
 
 
 @pytest.fixture
 def studio_settings(settings):
-    """Wire the service to fake Studio/Session-API endpoints with a static token."""
+    """Wire the service to fake Studio endpoints with a static service token."""
     settings.LINTO_STUDIO_BASE_URL = STUDIO
-    settings.LINTO_SESSION_API_URL = SESSION_API
     settings.LINTO_STUDIO_API_TOKEN = "static-token"
     settings.LINTO_STUDIO_AUTH_EMAIL = ""
     settings.LINTO_STUDIO_AUTH_PASSWORD = ""
-    settings.LINTO_STUDIO_DEFAULT_ORG_ID = ""
-    settings.LINTO_STUDIO_DEFAULT_PROFILE_ID = ""
-    settings.LINTO_VISIO_NATIVE_ENABLED = False
-    settings.LINTO_BOT_PROVIDER = "visio"
-    settings.MEET_PUBLIC_URL = "http://meet.test"
+    settings.LINTO_STUDIO_BROWSER_API_URL = "http://studio.browser"
+    settings.LINTO_NATIVE_LIVEKIT_URL = "ws://livekit:7880"
     return settings
 
 
-class TestAuthAndHeaders:
-    """_login / _headers: static-token fallback, login flow, and no-credentials error."""
-
-    def test_headers_use_static_token_without_network(self, studio_settings):
-        """With only a static API token set, _headers must NOT call the network."""
-        service = BotTranscriptionService()
-        # responses is not active here → any HTTP call would raise ConnectionError.
-        assert service._headers() == {"Authorization": "Bearer static-token"}
-
-    @responses.activate
-    def test_login_prefers_credentials(self, studio_settings):
-        """When email/password are set, _login authenticates and uses auth_token."""
-        studio_settings.LINTO_STUDIO_AUTH_EMAIL = "svc@test"
-        studio_settings.LINTO_STUDIO_AUTH_PASSWORD = "pw"
-        responses.post(
-            f"{STUDIO}/auth/login", json={"auth_token": "live-token"}, status=200
-        )
-        service = BotTranscriptionService()
-        assert service._headers() == {"Authorization": "Bearer live-token"}
-
-    def test_login_without_any_credential_raises(self, studio_settings):
-        """No email/password and no static token → BotTranscriptionException."""
-        studio_settings.LINTO_STUDIO_API_TOKEN = None
-        service = BotTranscriptionService()
-        with pytest.raises(BotTranscriptionException):
-            service._login()
+def _owner_room():
+    owner = UserFactory()
+    room = RoomFactory()
+    room.accesses.create(user=owner, role=models.RoleChoices.OWNER)
+    return room, owner
 
 
-class TestResolveOrg:
-    """_resolve_org: configured default, dynamic discovery (Visio-preferred), empty."""
+class TestPrepare:
+    """prepare: permission gate + native token mint + native-subtitle stop."""
 
-    def test_prefers_configured_default(self, studio_settings):
-        """A configured LINTO_STUDIO_DEFAULT_ORG_ID short-circuits discovery."""
-        studio_settings.LINTO_STUDIO_DEFAULT_ORG_ID = "org-default"
-        service = BotTranscriptionService()
-        assert service._resolve_org({}) == "org-default"
-
-    @responses.activate
-    def test_prefers_visio_org(self, studio_settings):
-        """Among discovered orgs, a "Visio" org wins over the first one."""
-        responses.get(
-            f"{STUDIO}/api/organizations/",
-            json=[
-                {"_id": "org-a", "name": "Other"},
-                {"_id": "org-visio", "name": "My Visio Org"},
-            ],
-            status=200,
-        )
-        service = BotTranscriptionService()
-        assert service._resolve_org({}) == "org-visio"
-
-    @responses.activate
-    def test_no_org_raises(self, studio_settings):
-        """No organization available → BotTranscriptionException."""
-        responses.get(f"{STUDIO}/api/organizations/", json=[], status=200)
-        service = BotTranscriptionService()
-        with pytest.raises(BotTranscriptionException):
-            service._resolve_org({})
-
-
-class TestResolveProfile:
-    """_resolve_profile: explicit id, configured default, discovery, empty → NoQuickMeetingProfile."""
-
-    def test_explicit_profile_from_config(self, studio_settings):
-        """asr_profile_id in the config wins with no HTTP call."""
-        service = BotTranscriptionService()
-        assert service._resolve_profile({}, "org", {"asr_profile_id": "p-1"}) == "p-1"
-
-    @responses.activate
-    def test_first_discovered_profile(self, studio_settings):
-        """With no explicit/default id, the first quickMeeting profile is used."""
-        responses.get(
-            f"{STUDIO}/api/organizations/org/transcriber_profiles",
-            json=[{"id": "p-first"}, {"id": "p-second"}],
-            status=200,
-        )
-        service = BotTranscriptionService()
-        assert service._resolve_profile({}, "org", {}) == "p-first"
-
-    @responses.activate
-    def test_empty_profiles_raises_no_quickmeeting_profile(self, studio_settings):
-        """An org with no quickMeeting profile → NoQuickMeetingProfile (→ 409)."""
-        responses.get(
-            f"{STUDIO}/api/organizations/org/transcriber_profiles", json=[], status=200
-        )
-        service = BotTranscriptionService()
-        with pytest.raises(NoQuickMeetingProfile):
-            service._resolve_profile({}, "org", {})
-
-
-class TestListProfiles:
-    """list_profiles / list_profiles_for_room: shape normalization + org resolution."""
-
-    @responses.activate
-    def test_list_profiles_flattens_languages_and_translations(self, studio_settings):
-        """languages (dict candidates) and dict-shaped translations are flattened."""
-        responses.get(
-            f"{STUDIO}/api/organizations/org/transcriber_profiles",
-            json=[
-                {
-                    "id": "p-1",
-                    "config": {
-                        "name": "French",
-                        "languages": [{"candidate": "fr"}, "en"],
-                        "availableTranslations": {
-                            "discrete": ["de"],
-                            "external": ["es"],
-                        },
-                    },
-                }
-            ],
-            status=200,
-        )
-        service = BotTranscriptionService()
-        result = service.list_profiles("org", headers={})
-        assert result == [
-            {
-                "id": "p-1",
-                "name": "French",
-                "languages": ["fr", "en"],
-                "translations": ["de", "es"],
-            }
-        ]
-
-    @responses.activate
-    def test_list_profiles_for_room_resolves_org(self, studio_settings):
-        """list_profiles_for_room resolves the org, then lists its profiles."""
-        responses.get(
-            f"{STUDIO}/api/organizations/",
-            json=[{"_id": "org-x", "name": "Visio"}],
-            status=200,
-        )
-        responses.get(
-            f"{STUDIO}/api/organizations/org-x/transcriber_profiles",
-            json=[{"id": "p-1", "config": {"name": "N"}}],
-            status=200,
-        )
-        service = BotTranscriptionService()
+    def test_denied_for_non_admin(self, studio_settings):
         room = RoomFactory()
-        result = service.list_profiles_for_room(room)
-        assert [p["id"] for p in result] == ["p-1"]
+        user = (
+            UserFactory()
+        )  # not admin/owner → transcript_permission defaults admin_owner
+        with pytest.raises(PermissionDeniedError):
+            BotTranscriptionService().prepare(room, "chan-1", user=user)
 
-
-class TestResolveConversationId:
-    """resolve_conversation_id: from_session_id match, name fallback, not-found."""
-
-    @responses.activate
-    def test_match_by_from_session_id(self, studio_settings):
-        """A conversation whose type.from_session_id matches wins."""
-        responses.get(
-            f"{STUDIO}/api/organizations/org/conversations",
-            json=[
-                {"_id": "c-other", "name": "n", "type": {"from_session_id": "other"}},
-                {"_id": "c-hit", "name": "n", "type": {"from_session_id": "sess-1"}},
-            ],
-            status=200,
-        )
-        service = BotTranscriptionService()
-        assert service.resolve_conversation_id("org", "sess-1", "n") == "c-hit"
-
-    @responses.activate
-    def test_fallback_to_exact_name(self, studio_settings):
-        """With no session match, an exact-name match is returned."""
-        responses.get(
-            f"{STUDIO}/api/organizations/org/conversations",
-            json=[{"_id": "c-name", "name": "linto-xyz", "type": {}}],
-            status=200,
-        )
-        service = BotTranscriptionService()
-        assert service.resolve_conversation_id("org", "sess-1", "linto-xyz") == "c-name"
-
-    @responses.activate
-    def test_not_found_returns_none(self, studio_settings):
-        """No matching conversation → None (caller retries)."""
-        responses.get(
-            f"{STUDIO}/api/organizations/org/conversations", json=[], status=200
-        )
-        service = BotTranscriptionService()
-        assert service.resolve_conversation_id("org", "sess-1", "n") is None
-
-
-class TestBanner:
-    """_set_banner: pushes/clears the dedicated LiveKit room-metadata flag."""
-
-    def test_set_and_clear_banner(self, studio_settings):
-        """active=True sets the flag; active=False clears it (best-effort)."""
-        room = RoomFactory()
-        user = UserFactory()
-        service = BotTranscriptionService()
-        # update_metadata is already @async_to_sync (called synchronously here).
-        with mock.patch(
-            "core.services.bot_transcription.RoomManagement.update_metadata",
-        ) as meta:
-            service._set_banner(room, True, user=user)
-            service._set_banner(room, False)
-        assert meta.call_count == 2
-        # First call sets the active flag + the starter id.
-        assert meta.call_args_list[0].args[0] == str(room.id)
-        assert meta.call_args_list[0].args[1] == {
-            "linto_transcription_status": "active",
-            "linto_transcription_started_by": str(user.id),
-        }
-        # Second call clears it (empty patch + the keys in the removal list).
-        assert meta.call_args_list[1].args[1] == {}
-        assert meta.call_args_list[1].args[2] == [
-            "linto_transcription_status",
-            "linto_transcription_started_by",
-        ]
-
-    def test_banner_failure_is_swallowed(self, studio_settings):
-        """A LiveKit metadata failure must never break start/stop."""
-        room = RoomFactory()
-        service = BotTranscriptionService()
-        with mock.patch(
-            "core.services.bot_transcription.RoomManagement.update_metadata",
-            side_effect=RuntimeError("livekit down"),
-        ):
-            service._set_banner(room, True)  # no raise
-
-
-class TestStartBot:
-    """start_bot: permission gate, happy path, and bot-start rollback failure."""
-
-    @pytest.fixture(autouse=True)
-    def _no_livekit(self):
-        """Silence the LiveKit side effects (banner metadata, native agent stop)."""
+    def test_mints_token_and_stops_native_subtitles(self, studio_settings):
+        room, owner = _owner_room()
         with (
-            mock.patch.object(BotTranscriptionService, "_set_banner") as banner,
             mock.patch.object(
                 BotTranscriptionService, "_stop_native_subtitles"
             ) as stop_native,
+            mock.patch(
+                "core.services.bot_transcription.generate_bot_join_token",
+                return_value="lk-jwt",
+            ) as mint,
+        ):
+            result = BotTranscriptionService().prepare(room, "chan-1", user=owner)
+        mint.assert_called_once_with(str(room.id), "chan-1")
+        stop_native.assert_called_once_with(room)
+        assert result == {
+            "token": "lk-jwt",
+            "livekit_url": "ws://livekit:7880",
+            "room": str(room.id),
+        }
+
+
+class TestMarkStarted:
+    """mark_started: persist state + banner; record add-on gated."""
+
+    @pytest.fixture(autouse=True)
+    def _no_livekit(self):
+        with (
+            mock.patch.object(BotTranscriptionService, "_set_banner") as banner,
+            mock.patch.object(
+                BotTranscriptionService, "_start_recording", return_value="rec-1"
+            ) as rec,
         ):
             self.banner = banner
-            self.stop_native = stop_native
+            self.rec = rec
             yield
 
-    def test_permission_denied_for_non_admin(self, studio_settings):
-        """transcript_permission defaults to admin_owner → a plain user is denied."""
-        studio_settings.LINTO_STUDIO_DEFAULT_ORG_ID = "org"
-        studio_settings.LINTO_STUDIO_DEFAULT_PROFILE_ID = "prof"
+    def test_denied_for_non_admin(self, studio_settings):
         room = RoomFactory()
-        user = UserFactory()  # not an admin/owner of the room
-        service = BotTranscriptionService()
-        with pytest.raises(BotTranscriptionException):  # PermissionDeniedError subclass
-            service.start_bot(room, {}, user=user)
-        assert (room.configuration or {}).get("linto") is None
+        user = UserFactory()
+        with pytest.raises(PermissionDeniedError):
+            BotTranscriptionService().mark_started(
+                room, {"session_id": "s", "channel_id": "c"}, user=user
+            )
 
-    @responses.activate
-    def test_happy_path_persists_config_and_returns_running(self, studio_settings):
-        """Owner starts the bot: quickMeeting + bots are POSTed, config persisted."""
-        studio_settings.LINTO_STUDIO_DEFAULT_ORG_ID = "org"
-        studio_settings.LINTO_STUDIO_DEFAULT_PROFILE_ID = "prof"
-        studio_settings.LINTO_VISIO_NATIVE_ENABLED = True
-        studio_settings.LINTO_NATIVE_LIVEKIT_URL = "ws://livekit:7880"
-        quick = responses.post(
-            f"{STUDIO}/api/organizations/org/quickMeeting/",
-            json={"id": "sess-1", "channels": [{"id": "chan-1"}]},
-            status=201,
-        )
-        meta_patch = responses.patch(
-            f"{STUDIO}/api/organizations/org/sessions/sess-1", json={}, status=200
-        )
-        bots = responses.post(
-            f"{STUDIO}/api/organizations/org/bots", json={"id": "bot-1"}, status=201
-        )
-        owner = UserFactory()
-        room = RoomFactory()
-        room.accesses.create(user=owner, role=models.RoleChoices.OWNER)
-        service = BotTranscriptionService()
-
-        with mock.patch(
-            "core.services.bot_transcription.generate_bot_join_token",
-            return_value="lk-jwt",
-        ) as mint:
-            result = service.start_bot(room, {"summary": True}, user=owner)
-
+    def test_persists_state_and_lights_banner(self, studio_settings):
+        room, owner = _owner_room()
+        data = {
+            "session_id": "sess-1",
+            "channel_id": "chan-1",
+            "org_id": "org-1",
+            "bot_id": "bot-1",
+            "summary": True,
+            "record": False,
+        }
+        result = BotTranscriptionService().mark_started(room, data, user=owner)
         assert result["status"] == "running"
-        assert result["session_id"] == "sess-1"
-        assert "live" not in result
         room.refresh_from_db()
         linto = room.configuration["linto"]
         assert linto["session_id"] == "sess-1"
         assert linto["channel_id"] == "chan-1"
         assert linto["bot_id"] == "bot-1"
+        assert linto["org_id"] == "org-1"
         assert linto["user_id"] == str(owner.id)
-        assert "live" not in linto
-
-        # The native bot descriptor: declared on the quickMeeting, then completed
-        # with the Meet-minted join token (identity carries room + channel).
-        quick_body = json.loads(quick.calls[0].request.body)
-        assert quick_body["meta"]["native"]["visio-native"] == {
-            "livekitUrl": "ws://livekit:7880",
-            "room": str(room.id),
-        }
-        mint.assert_called_once_with(str(room.id), "chan-1")
-        patched = json.loads(meta_patch.calls[0].request.body)["meta"]
-        assert patched["native"]["visio-native"]["token"] == "lk-jwt"
-        assert patched["linto_native"]["token"] == "lk-jwt"
-        assert json.loads(bots.calls[0].request.body)["provider"] == "visio"
-
-        # LinTO takes over the captions: native agent stopped, banner lit.
-        self.stop_native.assert_called_once_with(room)
+        assert "recording_id" not in linto  # record was False → no egress
         self.banner.assert_called_once_with(room, True, user=owner)
+        self.rec.assert_not_called()
 
-    @responses.activate
-    def test_bot_start_failure_rolls_back_and_raises(self, studio_settings):
-        """A failed /bots POST deletes the orphan session and raises."""
-        studio_settings.LINTO_STUDIO_DEFAULT_ORG_ID = "org"
-        studio_settings.LINTO_STUDIO_DEFAULT_PROFILE_ID = "prof"
-        responses.post(
-            f"{STUDIO}/api/organizations/org/quickMeeting/",
-            json={"id": "sess-1", "channels": [{"id": "chan-1"}]},
-            status=201,
+    def test_record_add_on_dropped_without_screen_permission(self, studio_settings):
+        # transcript authenticated (any logged user), screen_recording admin_owner.
+        room = RoomFactory(configuration={"transcript_permission": "authenticated"})
+        user = UserFactory()  # logged in but not admin/owner
+        result = BotTranscriptionService().mark_started(
+            room, {"session_id": "s", "channel_id": "c", "record": True}, user=user
         )
-        responses.post(f"{STUDIO}/api/organizations/org/bots", body="boom", status=500)
-        rollback = responses.delete(
-            f"{STUDIO}/api/organizations/org/quickMeeting/sess-1", status=200
-        )
-        owner = UserFactory()
-        room = RoomFactory()
-        room.accesses.create(user=owner, role=models.RoleChoices.OWNER)
-        service = BotTranscriptionService()
-
-        with pytest.raises(BotTranscriptionException):
-            service.start_bot(room, {}, user=owner)
-        assert rollback.call_count == 1
-        room.refresh_from_db()
-        assert (room.configuration or {}).get("linto") is None
+        assert result["record"] is False
+        self.rec.assert_not_called()
 
 
-class TestStopBot:
-    """stop_bot: idle, permission gate, and happy path (finalize + enqueue summary)."""
+class TestMarkStopped:
+    """mark_stopped: who-can-stop gate, banner off, summary enqueue, state clear."""
 
     @pytest.fixture(autouse=True)
-    def _no_banner(self):
-        with mock.patch.object(BotTranscriptionService, "_set_banner"):
+    def _no_livekit(self):
+        with (
+            mock.patch.object(BotTranscriptionService, "_set_banner"),
+            mock.patch.object(BotTranscriptionService, "_stop_recording"),
+            mock.patch.object(BotTranscriptionService, "_enqueue_summary") as enqueue,
+        ):
+            self.enqueue = enqueue
             yield
 
-    def test_idle_when_no_bot(self, studio_settings):
-        """No running bot → {"status": "idle"} with no upstream call."""
+    def test_idle_when_no_run(self, studio_settings):
         room = RoomFactory()
-        service = BotTranscriptionService()
-        assert service.stop_bot(room) == {"status": "idle"}
+        assert BotTranscriptionService().mark_stopped(room, {}, user=None) == {
+            "status": "idle"
+        }
 
-    def test_permission_denied_for_stranger(self, studio_settings):
-        """A non-starter, non-admin participant cannot stop someone else's bot."""
-        starter = UserFactory()
-        room = RoomFactory(
-            configuration={
-                "linto": {
-                    "org_id": "org",
-                    "session_id": "sess-1",
-                    "user_id": str(starter.id),
-                }
-            }
-        )
-        stranger = UserFactory()
-        service = BotTranscriptionService()
-        with pytest.raises(BotTranscriptionException):  # PermissionDeniedError subclass
-            service.stop_bot(room, user=stranger)
+    def test_denied_for_stranger(self, studio_settings):
+        room = RoomFactory()
+        room.configuration = {"linto": {"user_id": "999", "session_id": "s"}}
+        room.save()
+        with pytest.raises(PermissionDeniedError):
+            BotTranscriptionService().mark_stopped(room, {}, user=UserFactory())
 
-    @responses.activate
-    def test_happy_path_finalizes_and_enqueues_summary(self, studio_settings):
-        """Starter stops: bot + quickMeeting DELETEd, config cleared, summary enqueued."""
-        responses.delete(f"{STUDIO}/api/organizations/org/bots/bot-1", status=200)
-        responses.delete(
-            f"{STUDIO}/api/organizations/org/quickMeeting/sess-1", status=200
-        )
+    def test_starter_stops_and_enqueues_summary(self, studio_settings):
+        room = RoomFactory()
         starter = UserFactory()
-        room = RoomFactory(
-            configuration={
-                "linto": {
-                    "org_id": "org",
-                    "session_id": "sess-1",
-                    "bot_id": "bot-1",
-                    "summary": True,
-                    "user_id": str(starter.id),
-                }
+        room.configuration = {
+            "linto": {
+                "user_id": str(starter.id),
+                "org_id": "org-1",
+                "session_id": "sess-1",
+                "summary": True,
             }
+        }
+        room.save()
+        result = BotTranscriptionService().mark_stopped(
+            room, {"conversation_name": "linto-x"}, user=starter
         )
-        service = BotTranscriptionService()
-        with mock.patch("core.tasks.linto.process_bot_live_summary") as task:
-            result = service.stop_bot(room, user=starter)
         assert result == {"status": "stopped"}
-        task.delay.assert_called_once_with(str(room.id))
         room.refresh_from_db()
         assert "linto" not in room.configuration
-        assert room.configuration["linto_summary"]["session_id"] == "sess-1"
+        summary = room.configuration["linto_summary"]
+        assert summary["conversation_name"] == "linto-x"
+        assert summary["session_id"] == "sess-1"
+        self.enqueue.assert_called_once_with(room)
 
 
-class TestBotStatus:
-    """bot_status: idle vs running (captions polled from Session-API)."""
+class TestTeardown:
+    """teardown: service-account DELETEs then the stopped path (no perm gate)."""
 
-    def test_idle(self, studio_settings):
-        """No running bot → idle with empty captions."""
+    @responses.activate
+    def test_deletes_bot_and_session_then_clears(self, studio_settings):
         room = RoomFactory()
-        service = BotTranscriptionService()
-        assert service.bot_status(room) == {"status": "idle", "captions": []}
-
-    def test_running_without_session_api(self, studio_settings):
-        """Running bot with no Session-API configured → captions safely empty."""
-        studio_settings.LINTO_SESSION_API_URL = None
-        room = RoomFactory(
-            configuration={"linto": {"session_id": "sess-1", "org_id": "org"}}
+        room.configuration = {
+            "linto": {
+                "org_id": "org-1",
+                "session_id": "sess-1",
+                "bot_id": "bot-1",
+                "summary": False,
+            }
+        }
+        room.save()
+        del_bot = responses.delete(
+            f"{STUDIO}/api/organizations/org-1/bots/bot-1", json={}, status=200
         )
-        service = BotTranscriptionService()
-        payload = service.bot_status(room)
-        assert payload["status"] == "running"
-        assert payload["session_id"] == "sess-1"
-        assert payload["captions"] == []
+        del_qm = responses.delete(
+            f"{STUDIO}/api/organizations/org-1/quickMeeting/sess-1",
+            json={"success": True},
+            status=200,
+        )
+        with (
+            mock.patch.object(BotTranscriptionService, "_set_banner"),
+            mock.patch.object(BotTranscriptionService, "_enqueue_summary"),
+        ):
+            BotTranscriptionService().teardown(room)
+        assert del_bot.call_count == 1
+        assert del_qm.call_count == 1
+        room.refresh_from_db()
+        assert "linto" not in room.configuration
+
+
+class TestDevStudioToken:
+    def test_returns_service_token_and_browser_base(self, studio_settings):
+        result = BotTranscriptionService().dev_studio_token()
+        assert result == {"token": "static-token", "base_url": "http://studio.browser"}
+
+    def test_raises_without_credentials(self, studio_settings):
+        studio_settings.LINTO_STUDIO_API_TOKEN = None
+        with pytest.raises(BotTranscriptionException):
+            BotTranscriptionService().dev_studio_token()
+
+
+class TestResolveConversationId:
+    """resolve_conversation_id stays for the summary task (service account)."""
+
+    @responses.activate
+    def test_match_by_from_session_id(self, studio_settings):
+        responses.get(
+            f"{STUDIO}/api/organizations/org-1/conversations",
+            json=[
+                {"_id": "c-other", "type": {"from_session_id": "zzz"}},
+                {"_id": "c-match", "type": {"from_session_id": "sess-1"}},
+            ],
+            status=200,
+        )
+        got = BotTranscriptionService().resolve_conversation_id(
+            "org-1", "sess-1", "linto-x"
+        )
+        assert got == "c-match"
