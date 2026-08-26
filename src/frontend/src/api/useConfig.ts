@@ -47,6 +47,11 @@ export interface ApiConfig {
   subtitle: {
     enabled: boolean
   }
+  // LinTO live transcription (fork).
+  linto?: {
+    enabled: boolean
+    hide_legacy_tools: boolean
+  }
   diagnostics: {
     connection_test_enabled?: boolean
   }

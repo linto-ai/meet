@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSubtitles } from '../hooks/useSubtitles'
 import { css, cva } from '@/styled-system/css'
 import { styled } from '@/styled-system/jsx'
@@ -16,6 +16,8 @@ import {
   CAPTION_BACKGROUND_COLOR_VALUES,
   type CaptionTextSize,
 } from '@/stores/accessibility'
+import { parseLintoSegmentId } from '@/features/transcription-bot/store/transcriptStore'
+import { UNATTRIBUTED_SPEAKER } from '@/features/transcription-bot/hooks/useLintoTranscriptFeed'
 
 const FONT_SIZE_CONFIG: Record<
   CaptionTextSize,
@@ -30,6 +32,14 @@ const CAPTION_FONT_SIZES = Object.fromEntries(
   CAPTION_TEXT_SIZE_OPTIONS.map((size) => [size, FONT_SIZE_CONFIG[size]])
 ) as Record<CaptionTextSize, { fontSize: string; lineHeight: string }>
 
+// Keep the overlay bounded: only the tail of a long meeting matters here (the
+// LinTO side panel keeps the full transcript).
+const MAX_SEGMENTS = 200
+
+// Fallback colour for lines that cannot be attributed to a participant (e.g.
+// LinTO lines published under the hidden bot's identity).
+const UNATTRIBUTED_COLOR = 'rgb(87, 44, 216)'
+
 export interface TranscriptionSegment {
   id: string
   text: string
@@ -41,54 +51,92 @@ export interface TranscriptionSegment {
   lastReceivedTime: number
 }
 
-export interface TranscriptionSegmentWithParticipant extends TranscriptionSegment {
-  participant: Participant
+/**
+ * Who said it. Native LiveKit segments resolve to a room participant; LinTO
+ * segments the bot could not attribute (or from a participant who already
+ * left) fall back to a synthetic speaker so the line is still shown.
+ */
+export interface TranscriptionSpeaker {
+  identity: string
+  name: string
+  color: string
+}
+
+export interface TranscriptionSegmentWithSpeaker extends TranscriptionSegment {
+  speaker: TranscriptionSpeaker
 }
 
 export interface TranscriptionRow {
   id: string
-  participant: Participant
+  speaker: TranscriptionSpeaker
   segments: TranscriptionSegment[]
   startTime?: number
   lastUpdateTime: number
   lastReceivedTime: number
 }
 
+const speakerOf = (
+  participant: Participant | undefined,
+  segmentId: string
+): TranscriptionSpeaker => {
+  const isBot = participant?.identity.startsWith('linto-visio-bot-')
+  if (participant && !isBot) {
+    return {
+      identity: participant.identity,
+      name: getParticipantName(participant),
+      color: getParticipantColor(participant),
+    }
+  }
+  return {
+    identity: `unattributed:${parseLintoSegmentId(segmentId) ? 'linto' : 'native'}`,
+    name: UNATTRIBUTED_SPEAKER,
+    color: UNATTRIBUTED_COLOR,
+  }
+}
+
 const useTranscriptionState = () => {
   const [transcriptionSegments, setTranscriptionSegments] = useState<
-    TranscriptionSegmentWithParticipant[]
+    TranscriptionSegmentWithSpeaker[]
   >([])
 
-  const updateTranscriptionSegments = (
-    segments: TranscriptionSegment[],
-    participant?: Participant
-  ) => {
-    console.log(participant, segments)
+  const updateTranscriptionSegments = useCallback(
+    (segments: TranscriptionSegment[], participant?: Participant) => {
+      if (segments.length === 0) return
 
-    if (!participant || segments.length === 0) return
+      setTranscriptionSegments((prevSegments) => {
+        let next = prevSegments
+        for (const segment of segments) {
+          // LinTO translations ride on the same event with a language-suffixed
+          // id; the overlay only shows the spoken language.
+          if (parseLintoSegmentId(segment.id)?.lang) continue
+          const speaker = speakerOf(participant, segment.id)
+          const index = next.findIndex((s) => s.id === segment.id)
+          if (index === -1) {
+            next = [...next, { ...segment, speaker }]
+          } else {
+            // Partial → final (or a longer partial) of the SAME utterance:
+            // replace in place instead of ignoring it.
+            const existing = next[index]
+            if (existing.final && !segment.final) continue
+            next = next.slice()
+            next[index] = { ...existing, ...segment, speaker: existing.speaker }
+          }
+        }
+        if (next.length > MAX_SEGMENTS) next = next.slice(-MAX_SEGMENTS)
+        return next
+      })
+    },
+    []
+  )
 
-    if (segments.length > 1) {
-      console.warn('Unexpected error more segments')
-      return
-    }
-
-    const segment = segments[0]
-
-    setTranscriptionSegments((prevSegments) => {
-      const existingSegmentIds = new Set(prevSegments.map((s) => s.id))
-      if (existingSegmentIds.has(segment.id)) return prevSegments
-      return [
-        ...prevSegments,
-        {
-          participant: participant,
-          ...segment,
-        },
-      ]
-    })
-  }
+  const clearTranscriptionSegments = useCallback(
+    () => setTranscriptionSegments([]),
+    []
+  )
 
   return {
     updateTranscriptionSegments,
+    clearTranscriptionSegments,
     transcriptionSegments,
   }
 }
@@ -96,8 +144,6 @@ const useTranscriptionState = () => {
 const Transcription = ({ row }: { row: TranscriptionRow }) => {
   const { captionTextSize, captionFontColor, captionBackgroundColor } =
     useSnapshot(accessibilityStore)
-  const participantColor = getParticipantColor(row.participant)
-  const participantName = getParticipantName(row.participant)
   const { fontSize, lineHeight } = CAPTION_FONT_SIZES[captionTextSize]
   const fontColor = CAPTION_FONT_COLOR_VALUES[captionFontColor]
   const backgroundColor =
@@ -120,6 +166,7 @@ const Transcription = ({ row }: { row: TranscriptionRow }) => {
         maxWidth: '800px',
         width: '100%',
       })}
+      data-attr="caption-overlay-line"
     >
       <div
         className={css({
@@ -128,8 +175,8 @@ const Transcription = ({ row }: { row: TranscriptionRow }) => {
         })}
       >
         <Avatar
-          name={participantName}
-          bgColor={participantColor}
+          name={row.speaker.name}
+          bgColor={row.speaker.color}
           context="subtitles"
         />
         <div
@@ -139,7 +186,7 @@ const Transcription = ({ row }: { row: TranscriptionRow }) => {
           style={{ color: fontColor }}
         >
           <Text variant="h3" margin={false}>
-            {participantName}
+            {row.speaker.name}
           </Text>
           <p
             className={css({
@@ -182,16 +229,21 @@ export const Subtitles = () => {
   const { areSubtitlesOpen } = useSubtitles()
   const room = useRoomContext()
 
-  const { transcriptionSegments, updateTranscriptionSegments } =
-    useTranscriptionState()
+  const {
+    transcriptionSegments,
+    updateTranscriptionSegments,
+    clearTranscriptionSegments,
+  } = useTranscriptionState()
 
   useEffect(() => {
     if (!room) return
     room.on(RoomEvent.TranscriptionReceived, updateTranscriptionSegments)
+    room.on(RoomEvent.Disconnected, clearTranscriptionSegments)
     return () => {
       room.off(RoomEvent.TranscriptionReceived, updateTranscriptionSegments)
+      room.off(RoomEvent.Disconnected, clearTranscriptionSegments)
     }
-  }, [room, updateTranscriptionSegments])
+  }, [room, updateTranscriptionSegments, clearTranscriptionSegments])
 
   const transcriptionRows = useMemo(() => {
     if (transcriptionSegments.length === 0) return []
@@ -201,13 +253,12 @@ export const Subtitles = () => {
 
     for (const segment of transcriptionSegments) {
       const shouldStartNewRow =
-        !currentRow ||
-        currentRow.participant.identity !== segment.participant.identity
+        !currentRow || currentRow.speaker.identity !== segment.speaker.identity
 
       if (shouldStartNewRow) {
         currentRow = {
-          id: `${segment.participant.identity}-${segment.firstReceivedTime}`,
-          participant: segment.participant,
+          id: `${segment.speaker.identity}-${segment.firstReceivedTime}`,
+          speaker: segment.speaker,
           segments: [segment],
           startTime: segment.startTime,
           lastUpdateTime: segment.lastReceivedTime,

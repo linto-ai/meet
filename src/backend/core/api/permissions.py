@@ -17,6 +17,28 @@ ACTION_FOR_METHOD_TO_PERMISSION = {
 }
 
 
+def get_recording_permission_level(mode, room=None):
+    """Return the configured permission level for a recording ``mode``.
+
+    The room's ``configuration`` overrides the global default. Levels are
+    ``"authenticated"`` (any logged-in user) or ``"admin_owner"`` (room admins
+    and owners only). Shared by :class:`HasRecordingPermission` (DRF) and the
+    LinTO transcription-bot service so both gate on the SAME rule.
+    """
+    if mode == "screen_recording":
+        key = "screen_recording_permission"
+        default = getattr(settings, "RECORDING_SCREEN_PERMISSION", "admin_owner")
+    elif mode == "transcript":
+        key = "transcript_permission"
+        default = getattr(settings, "RECORDING_TRANSCRIPT_PERMISSION", "admin_owner")
+    else:
+        return "admin_owner"
+
+    if room and room.configuration:
+        return room.configuration.get(key, default)
+    return default
+
+
 class IsAuthenticated(permissions.BasePermission):
     """
     Allows access only to authenticated users. Alternative method checking the presence
@@ -114,20 +136,7 @@ class HasRecordingPermission(IsAuthenticated):
 
     def _get_permission_level(self, mode, room=None):
         """Return the permission level for the given mode, checking room config first."""
-        if mode == "screen_recording":
-            key = "screen_recording_permission"
-            default = getattr(settings, "RECORDING_SCREEN_PERMISSION", "admin_owner")
-        elif mode == "transcript":
-            key = "transcript_permission"
-            default = getattr(
-                settings, "RECORDING_TRANSCRIPT_PERMISSION", "admin_owner"
-            )
-        else:
-            return "admin_owner"
-
-        if room and room.configuration:
-            return room.configuration.get(key, default)
-        return default
+        return get_recording_permission_level(mode, room=room)
 
     def has_object_permission(self, request, view, obj):
         """Check object-level permissions based on recording mode."""

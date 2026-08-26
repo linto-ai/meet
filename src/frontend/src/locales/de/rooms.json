@@ -423,7 +423,8 @@
       "screenRecording": "Aufzeichnen",
       "admin": "Admin-Einstellungen",
       "tools": "Weitere Tools",
-      "info": "Meeting-Informationen"
+      "info": "Meeting-Informationen",
+      "linto": "LinTO"
     },
     "content": {
       "participants": "Teilnehmende",
@@ -433,7 +434,8 @@
       "screenRecording": "aufzeichnen",
       "admin": "Admin-Einstellungen",
       "tools": "Weitere Tools",
-      "info": "Meeting-Informationen"
+      "info": "Meeting-Informationen",
+      "linto": "die LinTO-Transkription"
     },
     "closeButton": "{{content}} ausblenden"
   },

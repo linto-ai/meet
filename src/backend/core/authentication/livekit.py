@@ -14,18 +14,22 @@ class LiveKitTokenAuthentication(authentication.BaseAuthentication):
     """Authenticate using LiveKit token and load the associated Django user."""
 
     def authenticate(self, request):
+        # A standard "Authorization: Bearer <token>" header is accepted; POSTs may
+        # instead carry the room token in the body, and GET actions (e.g. the LinTO
+        # bot-status/bot-profiles) can only pass it as a query param.
         auth_header = request.headers.get("Authorization")
+        if auth_header:
+            parts = auth_header.split()
+            if len(parts) != 2 or parts[0].lower() != "bearer":
+                raise exceptions.AuthenticationFailed(
+                    "Authorization header must be: Bearer <token>"
+                )
+            token = parts[1]
+        else:
+            token = request.data.get("token") or request.query_params.get("token")
 
-        if not auth_header:
+        if not token:
             return None  # No authentication attempted
-
-        parts = auth_header.split()
-        if len(parts) != 2 or parts[0].lower() != "bearer":
-            raise exceptions.AuthenticationFailed(
-                "Authorization header must be: Bearer <token>"
-            )
-
-        token = parts[1]
 
         try:
             verifier = TokenVerifier(

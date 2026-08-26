@@ -915,6 +915,70 @@ class Base(Configuration):
     LINTO_VISIO_FOLDER_NAME = values.Value(
         "Visio", environ_name="LINTO_VISIO_FOLDER_NAME", environ_prefix=None
     )
+
+    # ── LinTO live transcription (in-meeting "LinTO" tool) ───────────────────
+    # The Meet backend drives a Studio quick-meeting bot exactly as the Studio UI
+    # does (POST /api/organizations/{org}/quickMeeting + /bots): the native LinTO
+    # visio bot joins the LiveKit room, transcribes live and republishes the
+    # captions into the room as LiveKit transcription segments; a finalized Studio
+    # conversation + LLM summary is produced on stop. Reuses LINTO_STUDIO_BASE_URL
+    # above for the control plane.
+    LINTO_FEATURE_ENABLED = values.BooleanValue(
+        False, environ_name="LINTO_FEATURE_ENABLED", environ_prefix=None
+    )
+    # When True, the single LinTO tool REPLACES the legacy "Transcrire" tool
+    # (egress recording + offline transcription). "Enregistrer" stays.
+    LINTO_HIDE_LEGACY_TOOLS = values.BooleanValue(
+        False, environ_name="LINTO_HIDE_LEGACY_TOOLS", environ_prefix=None
+    )
+    # Bot provider requested from Studio. The Scheduler routes "visio" to the
+    # native LiveKit bot first (capability "visio-native") and falls back to the
+    # web bot when no native replica can serve it.
+    LINTO_BOT_PROVIDER = values.Value(
+        "visio", environ_name="LINTO_BOT_PROVIDER", environ_prefix=None
+    )
+    # When True, inject session.meta.native["visio-native"] (+ the linto_native
+    # alias) so the native LiveKit bot can join the room with a Meet-minted token.
+    LINTO_VISIO_NATIVE_ENABLED = values.BooleanValue(
+        True, environ_name="LINTO_VISIO_NATIVE_ENABLED", environ_prefix=None
+    )
+    # LiveKit signaling URL the native bot connects to (from its own network).
+    LINTO_NATIVE_LIVEKIT_URL = values.Value(
+        None, environ_name="LINTO_NATIVE_LIVEKIT_URL", environ_prefix=None
+    )
+    # TTL (seconds) of the room-scoped join token Meet mints for the native bot.
+    # LiveKit never drops a CONNECTED session when the token expires; only a
+    # post-expiry reconnection re-validates it, so a generous TTL is safe.
+    LINTO_NATIVE_TOKEN_TTL = values.IntegerValue(
+        43200, environ_name="LINTO_NATIVE_TOKEN_TTL", environ_prefix=None
+    )
+    # Session-API base (with /v1), read directly (no auth on the internal net) to
+    # hydrate the finalized captions for participants joining mid-transcription.
+    LINTO_SESSION_API_URL = values.Value(
+        None, environ_name="LINTO_SESSION_API_URL", environ_prefix=None
+    )
+    # Public room URL base recorded on the Studio bot (and used by the web bot
+    # fallback to navigate to the room), e.g. https://visio.example.com.
+    MEET_PUBLIC_URL = values.Value(
+        None, environ_name="MEET_PUBLIC_URL", environ_prefix=None
+    )
+    # Service auth to Studio (org-scoped quickMeeting/bots need BOT+MICROPHONE
+    # rights). Set LINTO_STUDIO_AUTH_EMAIL/PASSWORD to a dedicated service account,
+    # or rely on a static LINTO_STUDIO_API_TOKEN carrying those rights (fallback).
+    LINTO_STUDIO_AUTH_EMAIL = values.Value(
+        "", environ_name="LINTO_STUDIO_AUTH_EMAIL", environ_prefix=None
+    )
+    LINTO_STUDIO_AUTH_PASSWORD = values.Value(
+        "", environ_name="LINTO_STUDIO_AUTH_PASSWORD", environ_prefix=None
+    )
+    # Optional pins; empty → resolved dynamically (a "Visio" org or the first one /
+    # the first quickMeeting ASR profile).
+    LINTO_STUDIO_DEFAULT_ORG_ID = values.Value(
+        "", environ_name="LINTO_STUDIO_DEFAULT_ORG_ID", environ_prefix=None
+    )
+    LINTO_STUDIO_DEFAULT_PROFILE_ID = values.Value(
+        "", environ_name="LINTO_STUDIO_DEFAULT_PROFILE_ID", environ_prefix=None
+    )
     # Default org-member rights on uploaded conversations. 0 = no rights
     # (only MAINTAINER+ and explicitly shared users see it). 1 = READ.
     LINTO_STUDIO_MEMBERS_RIGHT = values.IntegerValue(

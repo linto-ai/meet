@@ -328,7 +328,8 @@
       "screenRecording": "Ghi",
       "admin": "Cài đặt quản trị",
       "tools": "Thêm công cụ",
-      "info": "Thông tin cuộc họp"
+      "info": "Thông tin cuộc họp",
+      "linto": "LinTO"
     },
     "content": {
       "participants": "người tham gia",
@@ -338,7 +339,8 @@
       "screenRecording": "ghi",
       "admin": "cài đặt quản trị",
       "tools": "thêm công cụ",
-      "info": "thông tin cuộc họp"
+      "info": "thông tin cuộc họp",
+      "linto": "phiên âm LinTO"
     },
     "closeButton": "Ẩn {{content}}"
   },
