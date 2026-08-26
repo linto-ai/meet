@@ -18,7 +18,6 @@ from django.utils import timezone
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 
-import requests
 from django_filters import rest_framework as django_filters
 from rest_framework import (
     decorators,
@@ -78,7 +77,6 @@ from core.recording.worker.mediator import (
 from core.services.bot_transcription import (
     BotTranscriptionException,
     BotTranscriptionService,
-    NoQuickMeetingProfile,
     PermissionDeniedError,
 )
 from core.services.invitation import InvitationService
@@ -755,151 +753,133 @@ class RoomViewSet(
             {"status": "success"}, status=drf_status.HTTP_200_OK
         )
 
-    # ── LinTO live transcription (fork): the in-meeting "LinTO" tool ─────────
+    # ── LinTO live transcription (fork), browser-first ──────────────────────
+    # The FRONTEND drives Studio via the JS SDK as the user; these endpoints only
+    # do what the browser cannot: mint the LiveKit bot join token, gate on the
+    # organizer's permissions, and drive the banner/egress/summary lifecycle.
     @decorators.action(
         detail=True,
         methods=["post"],
-        url_path="start-bot",
+        url_path="linto/prepare",
         permission_classes=[permissions.HasLiveKitRoomAccess],
         authentication_classes=[LiveKitTokenAuthentication],
     )
     @FeatureFlag.require("linto")
-    def start_bot(self, request, pk=None):  # pylint: disable=unused-argument
-        """Start the LinTO transcription bot on this room.
+    def linto_prepare(self, request, pk=None):  # pylint: disable=unused-argument
+        """Gate the run + mint the native bot join token for a channel.
 
-        Drives a Studio quick-meeting bot the way the Studio UI does, so live
-        captions flow into the room AND a finalized Studio conversation + LLM
-        summary is produced on stop. The organizer's ``transcript_permission``
-        decides who may start it (enforced by the service).
+        Body: ``{channel_id}``. Enforces transcript_permission, stops the native
+        subtitle agent, returns ``{token, livekit_url, room}`` the browser injects
+        into the Studio session meta before starting the bot.
         """
         room = self.get_object()
-        serializer = serializers.BotConfigSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        try:
-            result = BotTranscriptionService().start_bot(
-                room, serializer.validated_data, user=request.user
-            )
-        except NoQuickMeetingProfile as exc:
-            # Empty-state, not an upstream failure: the org has no quickMeeting ASR
-            # profile and no default is configured. Answer a machine code so the
-            # panel can show a friendly admin note instead of a generic error.
-            logger.warning(
-                "LinTO start-bot: no quickMeeting profile for room %s", room.id
-            )
+        channel_id = request.data.get("channel_id")
+        if not channel_id:
             return drf_response.Response(
-                {"error": str(exc), "code": "no_quickmeeting_profile"},
-                status=drf_status.HTTP_409_CONFLICT,
+                {"error": "channel_id is required"},
+                status=drf_status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            result = BotTranscriptionService().prepare(
+                room, channel_id, user=request.user
             )
         except PermissionDeniedError as exc:
-            logger.warning("LinTO start-bot denied for room %s: %s", room.id, exc)
             return drf_response.Response(
                 {"error": str(exc), "code": "permission_denied"},
                 status=drf_status.HTTP_403_FORBIDDEN,
             )
         except BotTranscriptionException as exc:
-            logger.exception("LinTO bot failed to start for room %s", room.id)
+            logger.exception("LinTO prepare failed for room %s", room.id)
             return drf_response.Response(
-                {"error": str(exc)},
-                status=drf_status.HTTP_502_BAD_GATEWAY,
+                {"error": str(exc)}, status=drf_status.HTTP_502_BAD_GATEWAY
             )
         return drf_response.Response(result, status=drf_status.HTTP_200_OK)
 
     @decorators.action(
         detail=True,
         methods=["post"],
-        url_path="stop-bot",
+        url_path="linto/started",
         permission_classes=[permissions.HasLiveKitRoomAccess],
         authentication_classes=[LiveKitTokenAuthentication],
     )
     @FeatureFlag.require("linto")
-    def stop_bot(self, request, pk=None):  # pylint: disable=unused-argument
-        """Stop the LinTO transcription bot → finalizes the Studio conversation."""
+    def linto_started(self, request, pk=None):  # pylint: disable=unused-argument
+        """Record a browser-started run + light the room-wide state.
+
+        Body: ``{session_id, channel_id, org_id, bot_id, summary?, record?}``.
+        """
         room = self.get_object()
         try:
-            result = BotTranscriptionService().stop_bot(room, user=request.user)
+            result = BotTranscriptionService().mark_started(
+                room, request.data, user=request.user
+            )
         except PermissionDeniedError as exc:
-            # Only the starter or a room admin/owner may stop the transcription.
-            logger.warning("LinTO stop-bot denied for room %s: %s", room.id, exc)
             return drf_response.Response(
                 {"error": str(exc), "code": "permission_denied"},
                 status=drf_status.HTTP_403_FORBIDDEN,
             )
         except BotTranscriptionException as exc:
-            logger.exception("LinTO bot failed to stop for room %s", room.id)
+            logger.exception("LinTO started failed for room %s", room.id)
             return drf_response.Response(
-                {"error": str(exc)},
-                status=drf_status.HTTP_502_BAD_GATEWAY,
+                {"error": str(exc)}, status=drf_status.HTTP_502_BAD_GATEWAY
             )
         return drf_response.Response(result, status=drf_status.HTTP_200_OK)
 
     @decorators.action(
         detail=True,
-        methods=["get"],
-        url_path="bot-status",
+        methods=["post"],
+        url_path="linto/stopped",
         permission_classes=[permissions.HasLiveKitRoomAccess],
         authentication_classes=[LiveKitTokenAuthentication],
     )
     @FeatureFlag.require("linto")
-    def bot_status(self, request, pk=None):  # pylint: disable=unused-argument
-        """Current bot status + finalized captions (hydrates a late-joining panel)."""
-        room = self.get_object()
-        try:
-            result = BotTranscriptionService().bot_status(room)
-        except BotTranscriptionException as exc:
-            return drf_response.Response(
-                {"error": str(exc)},
-                status=drf_status.HTTP_502_BAD_GATEWAY,
-            )
-        return drf_response.Response(result, status=drf_status.HTTP_200_OK)
+    def linto_stopped(self, request, pk=None):  # pylint: disable=unused-argument
+        """Clear a run (banner off, egress stop, enqueue summary).
 
-    @decorators.action(
-        detail=True,
-        methods=["get"],
-        url_path="bot-profiles",
-        permission_classes=[permissions.HasLiveKitRoomAccess],
-        authentication_classes=[LiveKitTokenAuthentication],
-    )
-    @FeatureFlag.require("linto")
-    def bot_profiles(self, request, pk=None):  # pylint: disable=unused-argument
-        """List the Studio quickMeeting ASR profiles offered in the panel.
-
-        Always 200 with ``{profiles, hasDefault, reason}``: an EMPTY profile list
-        is a provisioning state (``reason='unprovisioned'``), not a failure. A
-        transient upstream blip degrades to ``reason='upstream_error'``; only a
-        real auth/credentials failure (no Studio token at all) answers 502.
+        Body: ``{conversation_name?}`` — the unique name the browser used on the
+        quickMeeting DELETE so the summary task can resolve the conversation.
         """
         room = self.get_object()
-        has_default = bool(settings.LINTO_STUDIO_DEFAULT_PROFILE_ID)
         try:
-            profiles = BotTranscriptionService().list_profiles_for_room(room)
+            result = BotTranscriptionService().mark_stopped(
+                room, request.data, user=request.user
+            )
+        except PermissionDeniedError as exc:
+            return drf_response.Response(
+                {"error": str(exc), "code": "permission_denied"},
+                status=drf_status.HTTP_403_FORBIDDEN,
+            )
         except BotTranscriptionException as exc:
-            logger.warning(
-                "LinTO bot-profiles auth failure for room %s: %s", room.id, exc
-            )
+            logger.exception("LinTO stopped failed for room %s", room.id)
             return drf_response.Response(
-                {"error": str(exc)},
-                status=drf_status.HTTP_502_BAD_GATEWAY,
+                {"error": str(exc)}, status=drf_status.HTTP_502_BAD_GATEWAY
             )
-        except requests.RequestException as exc:
-            logger.warning(
-                "LinTO bot-profiles upstream error for room %s: %s", room.id, exc
-            )
+        return drf_response.Response(result, status=drf_status.HTTP_200_OK)
+
+    @decorators.action(
+        detail=True,
+        methods=["get"],
+        url_path="linto/studio-token",
+        permission_classes=[permissions.HasLiveKitRoomAccess],
+        authentication_classes=[LiveKitTokenAuthentication],
+    )
+    @FeatureFlag.require("linto")
+    def linto_studio_token(self, request, pk=None):  # pylint: disable=unused-argument
+        """DEV ONLY: a Studio JWT for the SDK, minted from the service account.
+
+        Disabled unless ``LINTO_STUDIO_DEV_TOKEN_ENABLED`` — in production the
+        browser gets its Studio token from the shared-IdP SSO, never from here.
+        """
+        if not settings.LINTO_STUDIO_DEV_TOKEN_ENABLED:
+            raise Http404
+        self.get_object()  # room access check
+        try:
+            result = BotTranscriptionService().dev_studio_token()
+        except BotTranscriptionException as exc:
             return drf_response.Response(
-                {
-                    "profiles": [],
-                    "hasDefault": has_default,
-                    "reason": "upstream_error",
-                },
-                status=drf_status.HTTP_200_OK,
+                {"error": str(exc)}, status=drf_status.HTTP_502_BAD_GATEWAY
             )
-        return drf_response.Response(
-            {
-                "profiles": profiles,
-                "hasDefault": has_default or bool(profiles),
-                "reason": "ok" if profiles else "unprovisioned",
-            },
-            status=drf_status.HTTP_200_OK,
-        )
+        return drf_response.Response(result, status=drf_status.HTTP_200_OK)
 
     @decorators.action(
         detail=True,

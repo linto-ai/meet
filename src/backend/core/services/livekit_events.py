@@ -305,7 +305,7 @@ class LiveKitEventsService:
                     BotTranscriptionService,
                 )
 
-                BotTranscriptionService().stop_bot(room, enforce_permission=False)
+                BotTranscriptionService().teardown(room)
         except Exception:
             logger.warning(
                 "Failed to stop the LinTO bot for finished room %s",

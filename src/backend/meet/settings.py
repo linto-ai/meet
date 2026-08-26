@@ -979,6 +979,31 @@ class Base(Configuration):
     LINTO_STUDIO_DEFAULT_PROFILE_ID = values.Value(
         "", environ_name="LINTO_STUDIO_DEFAULT_PROFILE_ID", environ_prefix=None
     )
+    # ── Browser-first live transcription (SDK + user identity) ───────────────
+    # Browser-facing studio-api base URL the LinTO JS SDK talks to (the user's own
+    # token; NOT the internal LINTO_STUDIO_BASE_URL). Surfaced in the frontend
+    # config. e.g. dev "http://127.0.0.1.nip.io:38001", prod ".../cm-api".
+    LINTO_STUDIO_BROWSER_API_URL = values.Value(
+        "", environ_name="LINTO_STUDIO_BROWSER_API_URL", environ_prefix=None
+    )
+    # Studio OIDC endpoints (relative to the browser API base) for the silent-SSO
+    # that hands the browser the user's Studio JWT. Empty in dev (no shared IdP)
+    # → the dev-token bridge below is used instead.
+    LINTO_STUDIO_SSO_LOGIN_PATH = values.Value(
+        "/auth/oidc/login", environ_name="LINTO_STUDIO_SSO_LOGIN_PATH", environ_prefix=None
+    )
+    LINTO_STUDIO_SSO_TOKEN_PATH = values.Value(
+        "/auth/oidc/token", environ_name="LINTO_STUDIO_SSO_TOKEN_PATH", environ_prefix=None
+    )
+    LINTO_STUDIO_SSO_ENABLED = values.BooleanValue(
+        False, environ_name="LINTO_STUDIO_SSO_ENABLED", environ_prefix=None
+    )
+    # DEV ONLY: expose GET rooms/{id}/linto/studio-token, which returns a Studio
+    # JWT minted from the service account, so the browser SDK flow is testable
+    # without the shared-IdP SSO. MUST stay False in production.
+    LINTO_STUDIO_DEV_TOKEN_ENABLED = values.BooleanValue(
+        False, environ_name="LINTO_STUDIO_DEV_TOKEN_ENABLED", environ_prefix=None
+    )
     # Default org-member rights on uploaded conversations. 0 = no rights
     # (only MAINTAINER+ and explicitly shared users see it). 1 = READ.
     LINTO_STUDIO_MEMBERS_RIGHT = values.IntegerValue(

@@ -67,10 +67,22 @@ def get_frontend_configuration(request):
             "default_access_level": settings.RESOURCE_DEFAULT_ACCESS_LEVEL,
         },
         "subtitle": {"enabled": settings.ROOM_SUBTITLE_ENABLED},
-        # LinTO live transcription (fork): the in-meeting "LinTO" tool.
+        # LinTO live transcription (fork): the in-meeting "LinTO" tool. Browser-
+        # first — the panel talks to studio-api via the JS SDK as the user, and
+        # only mints the native bot join token + lifecycle hooks via the Meet
+        # backend. `studio_api_url` is the browser-facing studio-api base.
         "linto": {
             "enabled": settings.LINTO_FEATURE_ENABLED,
             "hide_legacy_tools": settings.LINTO_HIDE_LEGACY_TOOLS,
+            "studio_api_url": settings.LINTO_STUDIO_BROWSER_API_URL,
+            "sso_enabled": settings.LINTO_STUDIO_SSO_ENABLED,
+            "sso_login_path": settings.LINTO_STUDIO_SSO_LOGIN_PATH,
+            "sso_token_path": settings.LINTO_STUDIO_SSO_TOKEN_PATH,
+            "dev_token_enabled": settings.LINTO_STUDIO_DEV_TOKEN_ENABLED,
+            "native_livekit_url": settings.LINTO_NATIVE_LIVEKIT_URL,
+            "visio_native_enabled": settings.LINTO_VISIO_NATIVE_ENABLED,
+            "bot_provider": settings.LINTO_BOT_PROVIDER,
+            "default_org_id": settings.LINTO_STUDIO_DEFAULT_ORG_ID,
         },
         "diagnostics": {"connection_test_enabled": settings.CONNECTION_TEST_ENABLED},
         "livekit": {
