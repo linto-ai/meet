@@ -233,9 +233,9 @@ class TestBanner:
         room = RoomFactory()
         user = UserFactory()
         service = BotTranscriptionService()
+        # update_metadata is already @async_to_sync (called synchronously here).
         with mock.patch(
             "core.services.bot_transcription.RoomManagement.update_metadata",
-            new_callable=mock.AsyncMock,
         ) as meta:
             service._set_banner(room, True, user=user)
             service._set_banner(room, False)
@@ -259,7 +259,6 @@ class TestBanner:
         service = BotTranscriptionService()
         with mock.patch(
             "core.services.bot_transcription.RoomManagement.update_metadata",
-            new_callable=mock.AsyncMock,
             side_effect=RuntimeError("livekit down"),
         ):
             service._set_banner(room, True)  # no raise
