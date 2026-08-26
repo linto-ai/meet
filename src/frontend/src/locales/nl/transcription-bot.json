@@ -1,0 +1,56 @@
+{
+  "lintoBot": {
+    "heading": "Live transcriptie van de vergadering",
+    "content": "LinTO-transcriptie",
+    "body": "LinTO transcribeert de vergadering live, met namen van sprekers. Kies hieronder de opties en start vervolgens.",
+    "start": "Starten",
+    "stop": "Stoppen",
+    "notAvailable": "LinTO-transcriptie is niet beschikbaar in deze ruimte.",
+    "options": {
+      "summary": "Een samenvatting genereren",
+      "summaryHelp": "Aan het einde van de vergadering wordt een samenvatting verstuurd.",
+      "record": "De video van de vergadering opnemen"
+    },
+    "errors": {
+      "noProfile": "Er is geen transcriptieprofiel geconfigureerd voor deze organisatie. Vraag een beheerder om er een aan te maken in LinTO Studio.",
+      "generic": "Het starten van de transcriptie is mislukt. Probeer het opnieuw.",
+      "retry": "Opnieuw proberen"
+    },
+    "live": {
+      "heading": "Live transcript",
+      "empty": "Wachten op de eerste woorden…",
+      "displayLanguage": "Weergegeven taal",
+      "original": "Origineel (gesproken taal)"
+    },
+    "settings": {
+      "language": "Taal",
+      "languageAuto": "Automatisch",
+      "asrProfile": "Transcriptieprofiel",
+      "asrProfileAuto": "Automatisch (standaardprofiel)",
+      "asrProfileEmpty": "Geen profiel beschikbaar",
+      "asrProfileAdminNote": "Er is geen transcriptieprofiel geconfigureerd voor deze organisatie. Vraag een beheerder om er een aan te maken in LinTO Studio.",
+      "translations": "Vertaling",
+      "translationsSearch": "Zoek een taal…",
+      "translationsNone": "Geen enkele taal komt overeen.",
+      "translationsCount_one": "{{count}} taal geselecteerd",
+      "translationsCount_other": "{{count}} talen geselecteerd",
+      "translationsRemove": "{{lang}} verwijderen"
+    }
+  },
+  "banner": {
+    "inProgress": "Transcriptie bezig"
+  },
+  "stopToast": {
+    "ownEmail": "De notulen worden naar u verzonden op <recipient>{{email}}</recipient>",
+    "generic": "De notulen worden naar de organisator van de vergadering verzonden."
+  },
+  "tools": {
+    "lintoBot": {
+      "title": "LinTO",
+      "body": "Transcribeer deze vergadering live met LinTO."
+    }
+  },
+  "captions": {
+    "label": "LinTO-ondertitels"
+  }
+}

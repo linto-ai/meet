@@ -7,12 +7,23 @@ import { useAreSubtitlesAvailable } from '@/features/subtitle/hooks/useAreSubtit
 
 export const SubtitlesToggle = () => {
   const { t } = useTranslation('rooms', { keyPrefix: 'controls.subtitles' })
-  const { areSubtitlesOpen, toggleSubtitles, areSubtitlesPending } =
-    useSubtitles()
+  const { t: tLinto } = useTranslation('transcription-bot', {
+    keyPrefix: 'captions',
+  })
+  const {
+    areSubtitlesOpen,
+    toggleSubtitles,
+    areSubtitlesPending,
+    isLintoActive,
+  } = useSubtitles()
   const tooltipLabel = areSubtitlesOpen ? 'open' : 'closed'
   const areSubtitlesAvailable = useAreSubtitlesAvailable()
 
   if (!areSubtitlesAvailable) return null
+
+  // While LinTO transcribes the room, the CC button shows the captions it
+  // publishes — say so (badge + label) instead of the generic wording.
+  const label = isLintoActive ? tLinto('label') : t(tooltipLabel)
 
   return (
     <div
@@ -24,8 +35,8 @@ export const SubtitlesToggle = () => {
       <ToggleButton
         square
         variant="primaryDark"
-        aria-label={t(tooltipLabel)}
-        tooltip={t(tooltipLabel)}
+        aria-label={label}
+        tooltip={label}
         isSelected={areSubtitlesOpen}
         isDisabled={areSubtitlesPending}
         onPress={toggleSubtitles}
@@ -33,6 +44,27 @@ export const SubtitlesToggle = () => {
       >
         <RiClosedCaptioningLine />
       </ToggleButton>
+      {isLintoActive && (
+        <span
+          data-attr="cc-linto-live"
+          aria-hidden="true"
+          className={css({
+            position: 'absolute',
+            top: '-0.35rem',
+            right: '-0.35rem',
+            paddingX: '0.3rem',
+            borderRadius: '999px',
+            fontSize: '0.6rem',
+            lineHeight: '1rem',
+            fontWeight: 'bold',
+            backgroundColor: 'success.700',
+            color: 'white',
+            pointerEvents: 'none',
+          })}
+        >
+          LinTO
+        </span>
+      )}
     </div>
   )
 }

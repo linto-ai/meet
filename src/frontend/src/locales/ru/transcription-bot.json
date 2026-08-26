@@ -1,0 +1,58 @@
+{
+  "lintoBot": {
+    "heading": "Транскрипция встречи в реальном времени",
+    "content": "Транскрипция LinTO",
+    "body": "LinTO транскрибирует встречу в реальном времени, с именами говорящих. Выберите параметры ниже, затем запустите.",
+    "start": "Начать",
+    "stop": "Остановить",
+    "notAvailable": "Транскрипция LinTO недоступна в этой комнате.",
+    "options": {
+      "summary": "Сформировать резюме",
+      "summaryHelp": "Резюме отправляется в конце встречи.",
+      "record": "Записать видео встречи"
+    },
+    "errors": {
+      "noProfile": "Для этой организации не настроен профиль транскрипции. Попросите администратора создать его в LinTO Studio.",
+      "generic": "Не удалось запустить транскрипцию. Пожалуйста, попробуйте снова.",
+      "retry": "Попробовать снова"
+    },
+    "live": {
+      "heading": "Транскрипция в реальном времени",
+      "empty": "Ожидание первых слов…",
+      "displayLanguage": "Отображаемый язык",
+      "original": "Оригинал (язык речи)"
+    },
+    "settings": {
+      "language": "Язык",
+      "languageAuto": "Автоматически",
+      "asrProfile": "Профиль транскрипции",
+      "asrProfileAuto": "Автоматически (профиль по умолчанию)",
+      "asrProfileEmpty": "Нет доступных профилей",
+      "asrProfileAdminNote": "Для этой организации не настроен профиль транскрипции. Попросите администратора создать его в LinTO Studio.",
+      "translations": "Перевод",
+      "translationsSearch": "Поиск языка…",
+      "translationsNone": "Нет подходящего языка.",
+      "translationsCount_one": "Выбран {{count}} язык",
+      "translationsCount_few": "Выбрано {{count}} языка",
+      "translationsCount_many": "Выбрано {{count}} языков",
+      "translationsCount_other": "Выбрано {{count}} языка",
+      "translationsRemove": "Удалить {{lang}}"
+    }
+  },
+  "banner": {
+    "inProgress": "Идёт транскрипция"
+  },
+  "stopToast": {
+    "ownEmail": "Протокол будет отправлен вам на <recipient>{{email}}</recipient>",
+    "generic": "Протокол будет отправлен организатору встречи."
+  },
+  "tools": {
+    "lintoBot": {
+      "title": "LinTO",
+      "body": "Транскрибируйте эту встречу в реальном времени с LinTO."
+    }
+  },
+  "captions": {
+    "label": "Субтитры LinTO"
+  }
+}

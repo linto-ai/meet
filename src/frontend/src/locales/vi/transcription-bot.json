@@ -1,0 +1,56 @@
+{
+  "lintoBot": {
+    "heading": "Phiên âm cuộc họp trực tiếp",
+    "content": "Phiên âm LinTO",
+    "body": "LinTO phiên âm cuộc họp trực tiếp, kèm tên người nói. Chọn các tùy chọn bên dưới rồi bắt đầu.",
+    "start": "Bắt đầu",
+    "stop": "Dừng",
+    "notAvailable": "Phiên âm LinTO không khả dụng trong phòng này.",
+    "options": {
+      "summary": "Tạo bản tóm tắt",
+      "summaryHelp": "Bản tóm tắt được gửi vào cuối cuộc họp.",
+      "record": "Ghi video cuộc họp"
+    },
+    "errors": {
+      "noProfile": "Chưa có hồ sơ phiên âm nào được cấu hình cho tổ chức này. Hãy yêu cầu quản trị viên tạo một hồ sơ trong LinTO Studio.",
+      "generic": "Không thể bắt đầu phiên âm. Vui lòng thử lại.",
+      "retry": "Thử lại"
+    },
+    "live": {
+      "heading": "Bản phiên âm trực tiếp",
+      "empty": "Đang chờ những từ đầu tiên…",
+      "displayLanguage": "Ngôn ngữ hiển thị",
+      "original": "Bản gốc (ngôn ngữ nói)"
+    },
+    "settings": {
+      "language": "Ngôn ngữ",
+      "languageAuto": "Tự động",
+      "asrProfile": "Hồ sơ phiên âm",
+      "asrProfileAuto": "Tự động (hồ sơ mặc định)",
+      "asrProfileEmpty": "Không có hồ sơ khả dụng",
+      "asrProfileAdminNote": "Chưa có hồ sơ phiên âm nào được cấu hình cho tổ chức này. Hãy yêu cầu quản trị viên tạo một hồ sơ trong LinTO Studio.",
+      "translations": "Bản dịch",
+      "translationsSearch": "Tìm một ngôn ngữ…",
+      "translationsNone": "Không có ngôn ngữ nào khớp.",
+      "translationsCount_one": "Đã chọn {{count}} ngôn ngữ",
+      "translationsCount_other": "Đã chọn {{count}} ngôn ngữ",
+      "translationsRemove": "Xóa {{lang}}"
+    }
+  },
+  "banner": {
+    "inProgress": "Đang phiên âm"
+  },
+  "stopToast": {
+    "ownEmail": "Biên bản sẽ được gửi cho bạn tại <recipient>{{email}}</recipient>",
+    "generic": "Biên bản sẽ được gửi cho người tổ chức cuộc họp."
+  },
+  "tools": {
+    "lintoBot": {
+      "title": "LinTO",
+      "body": "Phiên âm cuộc họp này trực tiếp với LinTO."
+    }
+  },
+  "captions": {
+    "label": "Phụ đề LinTO"
+  }
+}

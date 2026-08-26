@@ -1,0 +1,56 @@
+{
+  "lintoBot": {
+    "heading": "Live-Transkription der Besprechung",
+    "content": "LinTO-Transkription",
+    "body": "LinTO transkribiert die Besprechung live, mit den Namen der Sprechenden. Wählen Sie unten die Optionen und starten Sie dann.",
+    "start": "Starten",
+    "stop": "Stoppen",
+    "notAvailable": "Die LinTO-Transkription ist in diesem Raum nicht verfügbar.",
+    "options": {
+      "summary": "Eine Zusammenfassung erstellen",
+      "summaryHelp": "Am Ende der Besprechung wird eine Zusammenfassung gesendet.",
+      "record": "Das Video der Besprechung aufzeichnen"
+    },
+    "errors": {
+      "noProfile": "Für diese Organisation ist kein Transkriptionsprofil konfiguriert. Bitten Sie eine Administratorin oder einen Administrator, in LinTO Studio eines zu erstellen.",
+      "generic": "Die Transkription konnte nicht gestartet werden. Bitte versuchen Sie es erneut.",
+      "retry": "Erneut versuchen"
+    },
+    "live": {
+      "heading": "Live-Transkript",
+      "empty": "Warten auf die ersten Worte…",
+      "displayLanguage": "Angezeigte Sprache",
+      "original": "Original (gesprochene Sprache)"
+    },
+    "settings": {
+      "language": "Sprache",
+      "languageAuto": "Automatisch",
+      "asrProfile": "Transkriptionsprofil",
+      "asrProfileAuto": "Automatisch (Standardprofil)",
+      "asrProfileEmpty": "Kein Profil verfügbar",
+      "asrProfileAdminNote": "Für diese Organisation ist kein Transkriptionsprofil konfiguriert. Bitten Sie eine Administratorin oder einen Administrator, in LinTO Studio eines zu erstellen.",
+      "translations": "Übersetzung",
+      "translationsSearch": "Sprache suchen…",
+      "translationsNone": "Keine Sprache stimmt überein.",
+      "translationsCount_one": "{{count}} Sprache ausgewählt",
+      "translationsCount_other": "{{count}} Sprachen ausgewählt",
+      "translationsRemove": "{{lang}} entfernen"
+    }
+  },
+  "banner": {
+    "inProgress": "Transkription läuft"
+  },
+  "stopToast": {
+    "ownEmail": "Das Protokoll wird Ihnen an <recipient>{{email}}</recipient> gesendet",
+    "generic": "Das Protokoll wird an die organisierende Person der Besprechung gesendet."
+  },
+  "tools": {
+    "lintoBot": {
+      "title": "LinTO",
+      "body": "Transkribieren Sie diese Besprechung live mit LinTO."
+    }
+  },
+  "captions": {
+    "label": "LinTO-Untertitel"
+  }
+}

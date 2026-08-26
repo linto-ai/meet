@@ -20,23 +20,30 @@ class LiveKitTokenAuthentication(authentication.BaseAuthentication):
     """Authenticate using LiveKit token and load the associated Django user."""
 
     def authenticate(self, request):
+        # The room token comes in an "Authorization: X-LiveKit-Token <token>"
+        # header; without any Authorization header, POSTs may instead carry it in
+        # the body, and GET actions (e.g. the LinTO bot-status/bot-profiles) can
+        # only pass it as a `token` query param.
         auth_header = request.headers.get("Authorization")
 
-        if not auth_header:
+        if auth_header:
+            parts = auth_header.split()
+            if not parts or parts[0].lower() != LIVEKIT_AUTH_SCHEME.lower():
+                # Not our scheme (e.g. "Bearer <user access token>"): defer,
+                # another backend may recognize it.
+                return None
+
+            if len(parts) != 2:
+                raise exceptions.AuthenticationFailed(
+                    f"Authorization header must be: {LIVEKIT_AUTH_SCHEME} <token>"
+                )
+
+            token = parts[1]
+        else:
+            token = request.data.get("token") or request.query_params.get("token")
+
+        if not token:
             return None  # No authentication attempted
-
-        parts = auth_header.split()
-        if not parts or parts[0].lower() != LIVEKIT_AUTH_SCHEME.lower():
-            # Not our scheme (e.g. "Bearer <user access token>"): defer, another
-            # backend may recognize it.
-            return None
-
-        if len(parts) != 2:
-            raise exceptions.AuthenticationFailed(
-                f"Authorization header must be: {LIVEKIT_AUTH_SCHEME} <token>"
-            )
-
-        token = parts[1]
 
         try:
             verifier = TokenVerifier(

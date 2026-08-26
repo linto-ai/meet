@@ -1,0 +1,56 @@
+{
+  "lintoBot": {
+    "heading": "Live meeting transcription",
+    "content": "LinTO transcription",
+    "body": "LinTO transcribes the meeting live, with speaker names. Pick the options below, then start.",
+    "start": "Start",
+    "stop": "Stop",
+    "notAvailable": "LinTO transcription is not available in this room.",
+    "options": {
+      "summary": "Generate a summary",
+      "summaryHelp": "A summary is sent at the end of the meeting.",
+      "record": "Record the meeting video"
+    },
+    "errors": {
+      "noProfile": "No transcription profile is configured for this organization. Ask an administrator to create one in LinTO Studio.",
+      "generic": "Failed to start transcription. Please try again.",
+      "retry": "Try again"
+    },
+    "live": {
+      "heading": "Live transcript",
+      "empty": "Waiting for the first words…",
+      "displayLanguage": "Displayed language",
+      "original": "Original (spoken language)"
+    },
+    "settings": {
+      "language": "Language",
+      "languageAuto": "Automatic",
+      "asrProfile": "Transcription profile",
+      "asrProfileAuto": "Automatic (default profile)",
+      "asrProfileEmpty": "No profile available",
+      "asrProfileAdminNote": "No transcription profile is configured for this organization. Ask an administrator to create one in LinTO Studio.",
+      "translations": "Translation",
+      "translationsSearch": "Search a language…",
+      "translationsNone": "No language matches.",
+      "translationsCount_one": "{{count}} language selected",
+      "translationsCount_other": "{{count}} languages selected",
+      "translationsRemove": "Remove {{lang}}"
+    }
+  },
+  "banner": {
+    "inProgress": "Transcription in progress"
+  },
+  "stopToast": {
+    "ownEmail": "The minutes will be sent to you at <recipient>{{email}}</recipient>",
+    "generic": "The minutes will be sent to the meeting organizer."
+  },
+  "tools": {
+    "lintoBot": {
+      "title": "LinTO",
+      "body": "Transcribe this meeting live with LinTO."
+    }
+  },
+  "captions": {
+    "label": "LinTO captions"
+  }
+}

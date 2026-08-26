@@ -1,0 +1,56 @@
+{
+  "lintoBot": {
+    "heading": "Transcription en direct de la réunion",
+    "content": "la transcription LinTO",
+    "body": "LinTO transcrit la réunion en direct, avec le nom des intervenants. Choisissez les options ci-dessous, puis démarrez.",
+    "start": "Démarrer",
+    "stop": "Arrêter",
+    "notAvailable": "La transcription LinTO n'est pas disponible dans ce salon.",
+    "options": {
+      "summary": "Générer un compte rendu",
+      "summaryHelp": "Un compte rendu est envoyé à la fin de la réunion.",
+      "record": "Enregistrer la vidéo de la réunion"
+    },
+    "errors": {
+      "noProfile": "Aucun profil de transcription n'est configuré pour cette organisation. Demandez à un administrateur d'en créer un dans LinTO Studio.",
+      "generic": "Le démarrage de la transcription a échoué. Veuillez réessayer.",
+      "retry": "Réessayer"
+    },
+    "live": {
+      "heading": "Transcription en direct",
+      "empty": "En attente des premiers mots…",
+      "displayLanguage": "Langue affichée",
+      "original": "Original (langue parlée)"
+    },
+    "settings": {
+      "language": "Langue",
+      "languageAuto": "Automatique",
+      "asrProfile": "Profil de transcription",
+      "asrProfileAuto": "Automatique (profil par défaut)",
+      "asrProfileEmpty": "Aucun profil disponible",
+      "asrProfileAdminNote": "Aucun profil de transcription n'est configuré pour cette organisation. Demandez à un administrateur d'en créer un dans LinTO Studio.",
+      "translations": "Traduction",
+      "translationsSearch": "Rechercher une langue…",
+      "translationsNone": "Aucune langue ne correspond.",
+      "translationsCount_one": "{{count}} langue sélectionnée",
+      "translationsCount_other": "{{count}} langues sélectionnées",
+      "translationsRemove": "Retirer {{lang}}"
+    }
+  },
+  "banner": {
+    "inProgress": "Transcription en cours"
+  },
+  "stopToast": {
+    "ownEmail": "Le compte rendu vous sera envoyé à <recipient>{{email}}</recipient>",
+    "generic": "Le compte rendu sera envoyé à l'organisateur de la réunion."
+  },
+  "tools": {
+    "lintoBot": {
+      "title": "LinTO",
+      "body": "Transcrivez cette réunion en direct avec LinTO."
+    }
+  },
+  "captions": {
+    "label": "Sous-titres LinTO"
+  }
+}

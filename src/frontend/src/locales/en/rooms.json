@@ -435,7 +435,8 @@
       "screenRecording": "Record",
       "admin": "Host settings",
       "tools": "More tools",
-      "info": "Meeting information"
+      "info": "Meeting information",
+      "linto": "LinTO"
     },
     "content": {
       "participants": "participants",
@@ -445,7 +446,8 @@
       "screenRecording": "record",
       "admin": "host settings",
       "tools": "more tools",
-      "info": "meeting information"
+      "info": "meeting information",
+      "linto": "the LinTO transcription"
     },
     "closeButton": "Hide {{content}} (Escape)",
     "escapeHint": "Press Escape to close"
