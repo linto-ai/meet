@@ -5,7 +5,11 @@ type LintoState = {
   // for every participant) — see useLintoStatus. Also set optimistically by the
   // local start/stop mutations so the panel reacts before the metadata roundtrip.
   running: boolean
+  // Identifiers of the running Studio session/bot (kept so a later Stop can tear
+  // it down through the SDK). orgId doubles as the SDK organizationId.
   sessionId?: string
+  channelId?: string
+  botId?: string
   orgId?: string
   // Django id of the participant who started the bot (room metadata / bot-status).
   userId?: string
@@ -35,6 +39,8 @@ type LintoState = {
 export const lintoStore = proxy<LintoState>({
   running: false,
   sessionId: undefined,
+  channelId: undefined,
+  botId: undefined,
   orgId: undefined,
   userId: undefined,
   startedByMe: false,
@@ -50,6 +56,8 @@ export const lintoStore = proxy<LintoState>({
 export const resetLintoRun = () => {
   lintoStore.running = false
   lintoStore.sessionId = undefined
+  lintoStore.channelId = undefined
+  lintoStore.botId = undefined
   lintoStore.orgId = undefined
   lintoStore.userId = undefined
   // `startedByMe` is intentionally kept (parity with recordingStore).

@@ -8,16 +8,16 @@ export { LintoProvider } from './components/LintoProvider'
 // hooks
 export { useLintoConfig } from './hooks/useLintoConfig'
 export { useLintoStatus } from './hooks/useLintoStatus'
-export { useLintoBotSync } from './hooks/useLintoBotSync'
 export { useLintoTranscriptFeed } from './hooks/useLintoTranscriptFeed'
 
-// api
+// api — browser-first: the panel drives Studio via the JS SDK; the Meet backend
+// only mints the native token + runs the room-wide lifecycle hooks.
 export {
-  useStartLintoBot,
-  useStopLintoBot,
-  useLintoBotStatus,
   useLintoBotProfiles,
+  useStartLintoLive,
+  useStopLintoLive,
 } from './api/lintoBotApi'
+export { useStudioClient, StudioAuthUnavailable } from './api/studioAuth'
 
 // stores
 export { lintoStore } from './store/lintoStore'
@@ -27,7 +27,6 @@ export { transcriptStore, parseLintoSegmentId } from './store/transcriptStore'
 export type {
   LintoBotConfig,
   LintoCaption,
-  LintoBotStatus,
   LintoBotProfile,
   LintoBotProfilesReason,
   LintoBotProfilesResult,

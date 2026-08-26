@@ -17,6 +17,8 @@ export default tseslint.config(
       'src/styled-system/**',
       // Runtime config template emitted at container startup (uses browser globals)
       'public/config.js',
+      // Vendored LinTO Studio JS SDK (third-party, browser-native) — not our code.
+      'src/features/transcription-bot/vendor/**',
     ],
   },
 
