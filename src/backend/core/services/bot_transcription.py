@@ -20,7 +20,6 @@ from logging import getLogger
 from django.conf import settings
 
 import requests
-from asgiref.sync import async_to_sync
 
 from core import models
 from core.api.permissions import get_recording_permission_level
@@ -363,6 +362,7 @@ class BotTranscriptionService:
         LiveKit replays it to late joiners. Best-effort: a metadata failure must
         never break start/stop.
         """
+        # RoomManagement.update_metadata is already @async_to_sync — call it directly.
         try:
             if active:
                 # Same id as ``configuration["linto"]["user_id"]`` / bot-status so
@@ -372,7 +372,7 @@ class BotTranscriptionService:
                     if (user is not None and getattr(user, "is_authenticated", False))
                     else ""
                 )
-                async_to_sync(RoomManagement().update_metadata)(
+                RoomManagement().update_metadata(
                     str(room.id),
                     {
                         ROOM_METADATA_STATUS_KEY: "active",
@@ -380,7 +380,7 @@ class BotTranscriptionService:
                     },
                 )
             else:
-                async_to_sync(RoomManagement().update_metadata)(
+                RoomManagement().update_metadata(
                     str(room.id),
                     {},
                     [ROOM_METADATA_STATUS_KEY, ROOM_METADATA_STARTER_KEY],

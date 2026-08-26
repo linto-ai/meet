@@ -46,7 +46,7 @@ export const SubtitlesToggle = () => {
       </ToggleButton>
       {isLintoActive && (
         <span
-          data-attr="cc-linto-live"
+          data-testid="cc-linto-live"
           aria-hidden="true"
           className={css({
             position: 'absolute',

@@ -169,6 +169,10 @@ def generate_bot_join_token(room: str, channel_id: str) -> str:
         can_publish=False,
         can_publish_data=True,
         hidden=True,
+        # The bot republishes captions as LiveKit transcription packets, which the
+        # SFU only relays from AGENT-kind participants (same kind as the native
+        # subtitle agent). Still hidden: it never shows up in the participant list.
+        agent=True,
     )
 
     token = (
