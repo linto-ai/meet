@@ -25,11 +25,10 @@ import {
 import { lintoStore, resetLintoRun } from '../store/lintoStore'
 import { clearTranscript } from '../store/transcriptStore'
 import { useLintoConfig } from '../hooks/useLintoConfig'
-import { useLintoBotSync } from '../hooks/useLintoBotSync'
 import {
   useLintoBotProfiles,
-  useStartLintoBot,
-  useStopLintoBot,
+  useStartLintoLive,
+  useStopLintoLive,
 } from '../api/lintoBotApi'
 import { LintoSettings } from './LintoSettings'
 import { LiveTranscript } from './LiveTranscript'
@@ -61,16 +60,14 @@ export const LintoSidePanel = () => {
 
   const apiRoomData = useRoomData()
   const roomId = apiRoomData?.livekit?.room
+  const roomSlug = apiRoomData?.slug
   const token = apiRoomData?.livekit?.token
 
   const { user } = useUser()
   const { data: configData } = useConfig()
+  const lintoConfig = configData?.linto
   const isAdminOrOwner = useIsAdminOrOwner()
   const { notifyParticipants } = useNotifyParticipants()
-
-  // Cross-user hydration: a participant opening the panel while a transcription
-  // runs learns the starter / session and the finalized lines they missed.
-  useLintoBotSync(enabled)
 
   // Permission gating (mirrors the legacy recording machinery).
   const hasTranscriptNoAccess = useHasFeatureWithoutAdminRights(
@@ -98,34 +95,36 @@ export const LintoSidePanel = () => {
     profilesData.profiles.length === 0 &&
     !profilesData.hasDefault
 
-  const { mutateAsync: startLintoBot, isPending: isPendingToStart } =
-    useStartLintoBot({
-      onSuccess: (result) => {
+  const { mutateAsync: startLintoLive, isPending: isPendingToStart } =
+    useStartLintoLive({
+      onSuccess: (run) => {
         lintoStore.running = true
-        lintoStore.sessionId = result.sessionId
-        lintoStore.orgId = result.orgId
-        lintoStore.userId = result.userId
+        lintoStore.sessionId = run.sessionId
+        lintoStore.channelId = run.channelId
+        lintoStore.botId = run.botId ?? undefined
+        lintoStore.orgId = run.organizationId
+        lintoStore.userId = user?.id ? String(user.id) : undefined
         lintoStore.startedByMe = true
         lintoStore.error = undefined
       },
       onError: (err) => {
         const { code, message } = parseApiError(err)
         lintoStore.error =
-          code === 'no_quickmeeting_profile'
-            ? t('errors.noProfile')
+          code === 'permission_denied'
+            ? t('errors.generic')
             : (message ?? t('errors.generic'))
       },
     })
-  const { mutateAsync: stopLintoBot, isPending: isPendingToStop } =
-    useStopLintoBot({
+  const { mutateAsync: stopLintoLive, isPending: isPendingToStop } =
+    useStopLintoLive({
       onSuccess: () => {
         resetLintoRun()
       },
     })
 
   const handleStart = async () => {
-    if (!roomId || !token) {
-      console.warn('LinTO bot: missing room id or token')
+    if (!roomId || !token || !roomSlug || !lintoConfig) {
+      console.warn('LinTO: missing room id, token, slug or config')
       return
     }
     // Debounce an accidental start right after a local action (a stray click can
@@ -137,9 +136,11 @@ export const LintoSidePanel = () => {
     clearTranscript()
     lintoStore.localActionUntil = Date.now() + LOCAL_ACTION_GUARD_MS
     try {
-      await startLintoBot({
+      await startLintoLive({
         roomId,
         token,
+        roomSlug,
+        lintoConfig,
         config: {
           ...(selectedLanguage && { language: selectedLanguage }),
           ...(selectedProfile && { asrProfileId: selectedProfile }),
@@ -151,13 +152,13 @@ export const LintoSidePanel = () => {
     } catch (err) {
       // The error message is surfaced via the store (onError); keep a console
       // trace for debugging.
-      console.error('Failed to start LinTO bot:', err)
+      console.error('Failed to start LinTO transcription:', err)
     }
   }
 
   const handleStop = async () => {
     if (!roomId || !token) {
-      console.warn('LinTO bot: missing room id or token')
+      console.warn('LinTO: missing room id or token')
       return
     }
     // Snapshot the summary intent BEFORE stopping — the toast only fires when a
@@ -166,12 +167,21 @@ export const LintoSidePanel = () => {
     const startedByMe = lintoStore.startedByMe
     lintoStore.localActionUntil = Date.now() + LOCAL_ACTION_GUARD_MS
     try {
-      await stopLintoBot({ roomId, token })
+      await stopLintoLive({
+        roomId,
+        token,
+        run: {
+          sessionId: lintoStore.sessionId,
+          channelId: lintoStore.channelId,
+          botId: lintoStore.botId ?? null,
+          organizationId: lintoStore.orgId,
+        },
+      })
       if (summaryWasOn) {
         notifyLintoSummarySaving(startedByMe, user?.email)
       }
     } catch (err) {
-      console.error('Failed to stop LinTO bot:', err)
+      console.error('Failed to stop LinTO transcription:', err)
     }
   }
 

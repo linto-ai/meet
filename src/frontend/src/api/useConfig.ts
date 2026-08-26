@@ -6,6 +6,29 @@ import type { ApiAccessLevel } from '@/features/rooms/api/ApiRoom'
 import type { Track } from 'livekit-client'
 type Source = Track.Source
 
+// Runtime config for the browser-first LinTO live transcription: the panel talks
+// to studio-api DIRECTLY via the JS SDK (authenticated as the user), and only
+// mints the native bot join token + lifecycle hooks via the Meet backend.
+export interface LintoRuntimeConfig {
+  enabled: boolean
+  hide_legacy_tools: boolean
+  // Browser-facing studio-api base URL the LinTO JS SDK talks to.
+  studio_api_url: string
+  // Silent SSO (shared IdP) that hands the browser the user's Studio JWT.
+  sso_enabled: boolean
+  sso_login_path: string
+  sso_token_path: string
+  // DEV bridge: GET rooms/{id}/linto/studio-token mints a Studio JWT from the
+  // service account (so the flow is testable before the shared-IdP SSO exists).
+  dev_token_enabled: boolean
+  // LiveKit signaling URL injected into the native bot descriptor.
+  native_livekit_url: string
+  visio_native_enabled: boolean
+  bot_provider: string
+  // Optional org pin; '' → resolved dynamically by the SDK.
+  default_org_id: string
+}
+
 export interface ApiConfig {
   analytics?: {
     id: string
@@ -48,10 +71,7 @@ export interface ApiConfig {
     enabled: boolean
   }
   // LinTO live transcription (fork).
-  linto?: {
-    enabled: boolean
-    hide_legacy_tools: boolean
-  }
+  linto?: LintoRuntimeConfig
   diagnostics: {
     connection_test_enabled?: boolean
   }
