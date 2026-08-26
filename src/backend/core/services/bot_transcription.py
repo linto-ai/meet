@@ -395,18 +395,28 @@ class BotTranscriptionService:
         )
         return {"status": "running", **linto}
 
-    def mark_stopped(self, room, data=None, user=None, enforce_permission=True):
+    def mark_stopped(
+        self,
+        room,
+        data=None,
+        user=None,
+        enforce_permission=True,
+        force_studio_delete=False,
+    ):
         """Clear a run: banner off, stop egress, enqueue the summary, drop state.
 
-        The browser has already stopped the bot + quick session via the SDK (it
-        passes the ``conversation_name`` it used on the DELETE so the summary task
-        can resolve the finalized conversation). Who may stop: the STARTER or a
-        room admin/owner. Idempotent (no run → ``{"status": "idle"}``).
+        The STARTER's browser has already stopped the bot + quick session via the
+        SDK (and passes the ``conversation_name`` it used on the DELETE). When the
+        stopper is NOT the starter (an admin stopping someone else's run) or on
+        teardown (``force_studio_delete``), the run holds no browser-side SDK
+        session, so we service-account-delete the Studio bot + quick session here
+        instead. Who may stop: the STARTER or a room admin/owner. Idempotent.
         """
         data = data or {}
         linto = (room.configuration or {}).get("linto")
         if not linto:
             return {"status": "idle"}
+        is_starter = False
         if enforce_permission:
             starter_id = linto.get("user_id")
             is_starter = bool(
@@ -429,7 +439,13 @@ class BotTranscriptionService:
         session_id = linto.get("session_id")
         # The browser passes the unique name it used on the quickMeeting DELETE;
         # fall back to a deterministic one if absent (keeps the task resolvable).
-        conversation_name = data.get("conversation_name") or f"linto-{room.id}"
+        conversation_name = data.get("conversation_name") or (
+            f"linto-{room.id}-{int(time.time())}"
+        )
+        # The starter tore the run down browser-side; anyone else (or teardown)
+        # did not, so stop the Studio bot + session under the service account.
+        if force_studio_delete or not is_starter:
+            self._delete_studio_session(linto, conversation_name)
         summary_payload = None
         if summary and org_id and session_id:
             summary_payload = {
@@ -452,43 +468,49 @@ class BotTranscriptionService:
         logger.info("LinTO run stopped for room %s (summary=%s)", room.id, summary)
         return {"status": "stopped"}
 
-    def teardown(self, room):
-        """Best-effort cleanup when a room ends with a run still active.
+    def _delete_studio_session(self, linto, conversation_name):
+        """SERVICE-ACCOUNT delete of the Studio bot + quick session in ``linto``.
 
-        The browser may have closed without stopping. Using the SERVICE ACCOUNT
-        (org admin), delete the Studio bot + quick session recorded in the state,
-        clear the banner, stop any egress, and enqueue the summary if it was on.
+        Best-effort and idempotent (a 404 from an already-stopped run is fine).
+        Used when the caller cannot stop the run browser-side via the SDK: an
+        admin stopping someone else's run, or the ``room_finished`` teardown.
+        ``conversation_name`` is passed to the quickMeeting DELETE so the summary
+        task can still resolve the finalized conversation.
         """
-        linto = (room.configuration or {}).get("linto")
-        if not linto:
-            return
-        self._set_banner(room, False)
         org_id = linto.get("org_id")
         session_id = linto.get("session_id")
         bot_id = linto.get("bot_id")
-        if org_id and (bot_id or session_id):
-            try:
-                headers = self._headers()
-                if bot_id is not None:
-                    requests.delete(
-                        f"{self.studio_base}/api/organizations/{org_id}/bots/{bot_id}",
-                        headers=headers,
-                        timeout=DEFAULT_TIMEOUT,
-                    )
-                if session_id:
-                    requests.delete(
-                        f"{self.studio_base}/api/organizations/{org_id}/quickMeeting/{session_id}",
-                        headers=headers,
-                        params={
-                            "force": "true",
-                            "name": f"linto-{room.id}-{int(time.time())}",
-                        },
-                        timeout=DEFAULT_TIMEOUT,
-                    )
-            except (requests.RequestException, BotTranscriptionException) as exc:
-                logger.warning("LinTO teardown for room %s: %s", room.id, exc)
-        # Route through mark_stopped's summary/egress/state cleanup (no perm gate).
-        self.mark_stopped(room, {}, enforce_permission=False)
+        if not (org_id and (bot_id or session_id)):
+            return
+        try:
+            headers = self._headers()
+            if bot_id is not None:
+                requests.delete(
+                    f"{self.studio_base}/api/organizations/{org_id}/bots/{bot_id}",
+                    headers=headers,
+                    timeout=DEFAULT_TIMEOUT,
+                )
+            if session_id:
+                requests.delete(
+                    f"{self.studio_base}/api/organizations/{org_id}/quickMeeting/{session_id}",
+                    headers=headers,
+                    params={"force": "true", "name": conversation_name},
+                    timeout=DEFAULT_TIMEOUT,
+                )
+        except (requests.RequestException, BotTranscriptionException) as exc:
+            logger.warning("LinTO service-account session delete: %s", exc)
+
+    def teardown(self, room):
+        """Best-effort cleanup when a room ends with a run still active.
+
+        The browser may have closed without stopping. Delegates to
+        ``mark_stopped`` (no permission gate), which service-account-deletes the
+        Studio bot + quick session, clears the banner/egress and enqueues the
+        summary.
+        """
+        if not (room.configuration or {}).get("linto"):
+            return
+        self.mark_stopped(room, {}, enforce_permission=False, force_studio_delete=True)
 
     def _enqueue_summary(self, room):
         try:

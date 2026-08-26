@@ -185,6 +185,47 @@ class TestMarkStopped:
         assert summary["session_id"] == "sess-1"
         self.enqueue.assert_called_once_with(room)
 
+    def test_admin_stopping_others_run_deletes_studio_session(self, studio_settings):
+        # An admin who did NOT start the run has no browser-side SDK session, so
+        # mark_stopped must service-account-delete the Studio bot + quick session.
+        room = RoomFactory()
+        admin = UserFactory()
+        room.accesses.create(user=admin, role=models.RoleChoices.OWNER)
+        room.configuration = {
+            "linto": {
+                "user_id": "someone-else",
+                "org_id": "org-1",
+                "session_id": "sess-1",
+                "bot_id": "bot-1",
+                "summary": False,
+            }
+        }
+        room.save()
+        with mock.patch.object(
+            BotTranscriptionService, "_delete_studio_session"
+        ) as delete:
+            BotTranscriptionService().mark_stopped(room, {}, user=admin)
+        delete.assert_called_once()
+
+    def test_starter_stop_does_not_service_account_delete(self, studio_settings):
+        room = RoomFactory()
+        starter = UserFactory()
+        room.configuration = {
+            "linto": {
+                "user_id": str(starter.id),
+                "org_id": "org-1",
+                "session_id": "sess-1",
+                "bot_id": "bot-1",
+                "summary": False,
+            }
+        }
+        room.save()
+        with mock.patch.object(
+            BotTranscriptionService, "_delete_studio_session"
+        ) as delete:
+            BotTranscriptionService().mark_stopped(room, {}, user=starter)
+        delete.assert_not_called()
+
 
 class TestTeardown:
     """teardown: service-account DELETEs then the stopped path (no perm gate)."""
