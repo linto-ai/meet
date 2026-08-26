@@ -104,9 +104,23 @@ const startLintoLive = async (
 ): Promise<LintoRun> => {
   const { linto, organizationId } = await getClient(roomId, token)
 
+  // Resolve the ASR profile: the explicit pick, else the first quickMeeting
+  // profile. A quickMeeting WITHOUT a profile is treated by Studio as audio-only
+  // and rejects `keepAudio:false` (400), so a profile is required for live text.
+  let profileId = config.asrProfileId
+  if (!profileId) {
+    const profiles = await linto.listQuickMeetingProfiles({ organizationId })
+    profileId = profiles[0]?.id
+  }
+  if (!profileId) {
+    throw new StudioAuthUnavailable(
+      'no quickMeeting ASR profile available for this organization'
+    )
+  }
+
   const channel = {
     name: 'Main',
-    ...(config.asrProfileId && { transcriberProfileId: config.asrProfileId }),
+    transcriberProfileId: profileId,
     enableLiveTranscripts: true,
     diarization: true,
     // Live transcription is text-only; the summary reads the finalized
