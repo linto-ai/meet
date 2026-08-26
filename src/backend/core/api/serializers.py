@@ -314,29 +314,6 @@ class StartRecordingSerializer(BaseValidationOnlySerializer):
     )
 
 
-class BotConfigSerializer(BaseValidationOnlySerializer):
-    """Validate the LinTO transcription-bot start config from the room panel.
-
-    Clicking the LinTO tool ALWAYS starts the live transcription bot, so there is
-    no transcription mode to choose. Two freely-combinable add-ons ride on top of
-    the always-on live transcription: ``summary`` (default ON — an autonomous
-    Studio conversation + LLM summary is delivered on stop) and ``record``
-    (default OFF — a standalone LiveKit egress). The backend falls back to
-    sensible defaults for the rest (admin org, first quickMeeting ASR profile,
-    diarization on).
-    """
-
-    language = serializers.CharField(required=False, allow_null=True, allow_blank=True)
-    asr_profile_id = serializers.CharField(
-        required=False, allow_null=True, allow_blank=True
-    )
-    diarization = serializers.BooleanField(required=False, default=True)
-    summary = serializers.BooleanField(required=False, default=True)
-    record = serializers.BooleanField(required=False, default=False)
-    translations = serializers.ListField(
-        child=serializers.CharField(), required=False, default=list
-    )
-
 
 class RequestEntrySerializer(BaseValidationOnlySerializer):
     """Validate request entry data."""

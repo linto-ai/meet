@@ -1,0 +1,785 @@
+import {
+  prepareRequest,
+  prepareMultipartFormData,
+  sendRequest,
+} from "../request.js"
+
+import mediaFactory from "../models/media.js"
+import { pickKwarg } from "../tools/pickKwarg.js"
+
+/**
+ * Low-level HTTP client for the LinTO Studio API.
+ *
+ * Used internally by {@link LinTO}; prefer the high-level wrapper unless you
+ * need direct access to an endpoint.
+ */
+export class StudioApiService {
+  constructor({ baseUrl = "https://studio.linto.ai", token = null }) {
+    this.baseApiUrl = baseUrl + "/api"
+    this.baseAuthUrl = baseUrl + "/auth"
+    this.token = token
+    this.organizations = []
+    this.asrServices = []
+  }
+
+  async fetchAsrServices(args) {
+    const services = await this.#withToken(this.#fetchServices)(args)
+    this.asrServices = services
+    return services?.filter((service) => service.scope.indexOf("stt") > -1)
+  }
+
+  async getMediaStatus({ mediaId }) {
+    const conv = await this.#withToken(this.#fetchMedia)({
+      mediaId,
+      key: "job",
+    })
+    return conv
+  }
+
+  async getMedia({ mediaId }) {
+    const conv = await this.#withToken(this.#fetchMedia)({
+      mediaId,
+    })
+    return mediaFactory(conv)
+  }
+
+  async fetchOrganizations(args) {
+    const organizations = await this.#withToken(this.#fetchOrganizations)(args)
+    this.organizations = organizations
+    return organizations
+  }
+
+  async uploadFile(args) {
+    return await this.#withToken(
+      this.#withOrganizationId(this.#withUploadConfig(this.#uploadFile))
+    )(args)
+  }
+
+  // -- LLM / Summary methods --
+
+  async fetchLlmServices(args) {
+    return await this.#withToken(
+      this.#withOrganizationId(this.#fetchLlmServices.bind(this))
+    )(args)
+  }
+
+  async triggerSummary({ conversationId, format, flavor } = {}) {
+    return await this.#withToken(this.#triggerSummary)({
+      conversationId,
+      format,
+      flavor,
+    })
+  }
+
+  async getExportList({ conversationId } = {}) {
+    return await this.#withToken(this.#getExportList)({ conversationId })
+  }
+
+  async getExportContent({ conversationId, jobId } = {}) {
+    return await this.#withToken(this.#getExportContent)({
+      conversationId,
+      jobId,
+    })
+  }
+
+  // -- Download / Publication methods --
+
+  async downloadConversation({ conversationId, format = "docx" } = {}) {
+    return await this.#withToken(this.#downloadConversation)({
+      conversationId,
+      format,
+    })
+  }
+
+  async getPublicationTemplates(args = {}) {
+    return await this.#withToken(
+      this.#withOrganizationId(this.#getPublicationTemplates.bind(this))
+    )(args)
+  }
+
+  async getTemplatePlaceholders({ templateId } = {}) {
+    return await this.#withToken(this.#getTemplatePlaceholders)({
+      templateId,
+    })
+  }
+
+  async exportWithTemplate({
+    jobId,
+    format = "pdf",
+    templateId,
+    versionNumber,
+  } = {}) {
+    return await this.#withToken(this.#exportWithTemplate)({
+      jobId,
+      format,
+      templateId,
+      versionNumber,
+    })
+  }
+
+  // -- Taxonomy methods (categories, tags, folders) --
+
+  async listCategories(args = {}) {
+    return await this.#withToken(
+      this.#withOrganizationId(this.#listCategories.bind(this))
+    )(args)
+  }
+
+  async listTags({ categoryId } = {}) {
+    return await this.#withToken(
+      this.#withOrganizationId(this.#listTags.bind(this))
+    )({ categoryId })
+  }
+
+  async createTag({ categoryId, name, color, emoji, description } = {}) {
+    return await this.#withToken(
+      this.#withOrganizationId(this.#createTag.bind(this))
+    )({ categoryId, name, color, emoji, description })
+  }
+
+  async listFolders({ tree = false, withConversationCount = false } = {}) {
+    return await this.#withToken(
+      this.#withOrganizationId(this.#listFolders.bind(this))
+    )({ tree, withConversationCount })
+  }
+
+  async createFolder({
+    name,
+    parentId,
+    color,
+    emoji,
+    visibility = "public",
+  } = {}) {
+    return await this.#withToken(
+      this.#withOrganizationId(this.#createFolder.bind(this))
+    )({ name, parentId, color, emoji, visibility })
+  }
+
+  async moveConversationToFolder({ folderId, conversationId } = {}) {
+    return await this.#withToken(
+      this.#withOrganizationId(this.#moveConversationToFolder.bind(this))
+    )({ folderId, conversationId })
+  }
+
+  async getConversation({ conversationId } = {}) {
+    return await this.#withToken(this.#getConversation)({ conversationId })
+  }
+
+  async searchUsers({ search } = {}) {
+    return await this.#withToken(this.#searchUsers)({ search })
+  }
+
+  async updateConversation({ conversationId, data } = {}) {
+    return await this.#withToken(this.#updateConversation)({
+      conversationId,
+      data,
+    })
+  }
+
+  async shareConversation({
+    conversationId,
+    email,
+    right = 1,
+    notify = true,
+  } = {}) {
+    return await this.#withToken(this.#shareConversation)({
+      conversationId,
+      email,
+      right,
+      notify,
+    })
+  }
+
+  async login({ email, password }) {
+    const req = prepareRequest(`${this.baseAuthUrl}/login`, "POST", {
+      email,
+      password,
+    })
+
+    const res = await sendRequest(req)
+    this.token = res.auth_token
+    return res
+  }
+
+  // -- Live session / quick-meeting / bot control --
+  //
+  // The methods below drive a LIVE meeting-bot flow (the Visio/Meet integration):
+  // list the org's quickMeeting ASR profiles, create/stop a quick-meeting
+  // session, patch its meta (e.g. inject a native bot join token), and
+  // start/stop a meeting bot. They are thin wrappers over the studio-api proxy
+  // routes `/api/organizations/{org}/...` and are authenticated as the CURRENT
+  // USER (the token passed to the SDK), so a browser can own the whole flow.
+
+  async listTranscriberProfiles(args = {}) {
+    return await this.#withToken(
+      this.#withOrganizationId(this.#listTranscriberProfiles.bind(this))
+    )(args)
+  }
+
+  async createQuickMeeting(args = {}) {
+    return await this.#withToken(
+      this.#withOrganizationId(this.#createQuickMeeting.bind(this))
+    )(args)
+  }
+
+  async stopQuickMeeting(args = {}) {
+    return await this.#withToken(
+      this.#withOrganizationId(this.#stopQuickMeeting.bind(this))
+    )(args)
+  }
+
+  async patchSession(args = {}) {
+    return await this.#withToken(
+      this.#withOrganizationId(this.#patchSession.bind(this))
+    )(args)
+  }
+
+  async startBot(args = {}) {
+    return await this.#withToken(
+      this.#withOrganizationId(this.#startBot.bind(this))
+    )(args)
+  }
+
+  async stopBot(args = {}) {
+    return await this.#withToken(
+      this.#withOrganizationId(this.#stopBot.bind(this))
+    )(args)
+  }
+
+  async listConversations(args = {}) {
+    return await this.#withToken(
+      this.#withOrganizationId(this.#listConversations.bind(this))
+    )(args)
+  }
+
+  // -- Decorators --
+
+  #withOrganizationId(method) {
+    return async (args = {}) => {
+      if (!args?.organizationId) {
+        if (this.organizations.length === 0) {
+          await this.fetchOrganizations()
+        }
+
+        if (this.organizations.length === 0) {
+          throw new Error("User has no organizations")
+        }
+
+        args.organizationId = this.organizations[0]._id
+      }
+
+      return await method(args)
+    }
+  }
+
+  #withToken(method) {
+    return async (args = {}) => {
+      if (!args?.token) {
+        if (!this.token) {
+          throw new Error("No token. You need to pass a token or login first")
+        }
+
+        args.token = this.token
+      }
+      return await method.bind(this)(args)
+    }
+  }
+
+  #withUploadConfig(method) {
+    return async ({ file, lang = "*", ...args } = {}) => {
+      if (this.asrServices.length == 0) {
+        await this.fetchAsrServices()
+      }
+
+      const selectedService = getServiceByQualityAndLang(
+        this.asrServices,
+        1,
+        lang
+      )
+
+      if (!selectedService) {
+        throw new Error(`No ASR services available for lang=${lang}`)
+      }
+
+      // Accept both camelCase (JS convention) and snake_case (Python parity)
+      // so a caller passing enable_diarization is not silently ignored.
+      const serviceConfig = generateServiceConfig(selectedService, {
+        enablePunctuation: pickKwarg(args, "enablePunctuation", "enable_punctuation"),
+        enableDiarization: pickKwarg(args, "enableDiarization", "enable_diarization"),
+        numberOfSpeaker: pickKwarg(args, "numberOfSpeaker", "number_of_speaker"),
+      })
+
+      args["serviceName"] = args["serviceName"] ?? serviceConfig.serviceName
+      args["endpoint"] = args["endpoint"] ?? serviceConfig.endpoint
+      args["transcriptionConfig"] =
+        args["transcriptionConfig"] ?? serviceConfig.config
+      args["lang"] = lang
+      args["file"] = file
+      args["name"] = args["name"] ?? `imported file ${new Date().toISOString()}`
+      args["segmentCharSize"] = args["segmentCharSize"] ?? 2000
+      return await method.bind(this)(args)
+    }
+  }
+
+  // -- API calls --
+  async #fetchMedia({ token, mediaId, ...params }) {
+    const req = prepareRequest(
+      `${this.baseApiUrl}/conversations/${mediaId}`,
+      "GET",
+      { token, ...params }
+    )
+
+    return await sendRequest(req)
+  }
+
+  async #fetchServices({ token }) {
+    const req = prepareRequest(`${this.baseApiUrl}/services`, "GET", {
+      token,
+    })
+
+    return await sendRequest(req)
+  }
+
+  async #fetchOrganizations({ token }) {
+    const req = prepareRequest(`${this.baseApiUrl}/organizations`, "GET", {
+      token,
+    })
+
+    return await sendRequest(req)
+  }
+
+  // -- Live session / quick-meeting / bot control (private API calls) --
+
+  async #listTranscriberProfiles({ token, organizationId, quickMeeting = true }) {
+    const query = buildQuery({ quickMeeting: quickMeeting ? "true" : undefined })
+    const req = prepareRequest(
+      `${this.baseApiUrl}/organizations/${organizationId}/transcriber_profiles${query}`,
+      "GET",
+      { token }
+    )
+    const res = await sendRequest(req)
+    // The proxy may answer a bare list or an envelope — normalize to a list.
+    if (Array.isArray(res)) return res
+    return res?.transcriber_profiles || res?.list || []
+  }
+
+  async #createQuickMeeting({ token, organizationId, channels, meta }) {
+    const req = prepareRequest(
+      `${this.baseApiUrl}/organizations/${organizationId}/quickMeeting/`,
+      "POST",
+      { token, channels, ...(meta !== undefined ? { meta } : {}) }
+    )
+    return await sendRequest(req)
+  }
+
+  async #stopQuickMeeting({
+    token,
+    organizationId,
+    sessionId,
+    name,
+    force = true,
+    trash = false,
+  }) {
+    const query = buildQuery({
+      force: force ? "true" : undefined,
+      trash: trash ? "true" : undefined,
+      name,
+    })
+    const req = prepareRequest(
+      `${this.baseApiUrl}/organizations/${organizationId}/quickMeeting/${sessionId}${query}`,
+      "DELETE",
+      { token }
+    )
+    return await sendRequest(req)
+  }
+
+  async #patchSession({ token, organizationId, sessionId, data }) {
+    const req = prepareRequest(
+      `${this.baseApiUrl}/organizations/${organizationId}/sessions/${sessionId}`,
+      "PATCH",
+      { token, ...(data || {}) }
+    )
+    return await sendRequest(req)
+  }
+
+  async #startBot({
+    token,
+    organizationId,
+    url,
+    channelId,
+    provider = "visio",
+    enableDisplaySub = false,
+    subSource = "original",
+  }) {
+    const req = prepareRequest(
+      `${this.baseApiUrl}/organizations/${organizationId}/bots`,
+      "POST",
+      { token, url, channelId, provider, enableDisplaySub, subSource }
+    )
+    return await sendRequest(req)
+  }
+
+  async #stopBot({ token, organizationId, botId }) {
+    const req = prepareRequest(
+      `${this.baseApiUrl}/organizations/${organizationId}/bots/${botId}`,
+      "DELETE",
+      { token }
+    )
+    return await sendRequest(req)
+  }
+
+  async #listConversations({ token, organizationId, name }) {
+    const query = buildQuery({ name })
+    const req = prepareRequest(
+      `${this.baseApiUrl}/organizations/${organizationId}/conversations${query}`,
+      "GET",
+      { token }
+    )
+    const res = await sendRequest(req)
+    if (Array.isArray(res)) return res
+    return res?.conversations || res?.list || []
+  }
+
+  async #uploadFile({
+    token,
+    organizationId,
+    file,
+    name,
+    transcriptionConfig,
+    serviceName,
+    endpoint,
+    lang,
+    segmentCharSize,
+    membersRight,
+  }) {
+    if (!file) {
+      throw new Error("File is required")
+    }
+
+    let formData = new FormData()
+    formData.append("name", name)
+    formData.append("file", file)
+    formData.append("serviceName", serviceName)
+    formData.append("transcriptionConfig", JSON.stringify(transcriptionConfig))
+    formData.append("segmentCharSize", segmentCharSize)
+    formData.append("lang", lang)
+    formData.append("endpoint", endpoint)
+    if (membersRight != null) {
+      formData.append("membersRight", String(parseInt(membersRight, 10)))
+    }
+    const req = prepareMultipartFormData(
+      `${this.baseApiUrl}/organizations/${organizationId}/conversations/create`,
+      token,
+      formData
+    )
+
+    return await sendRequest(req)
+  }
+
+  // -- LLM / Summary private implementations --
+
+  async #fetchLlmServices({ token, organizationId }) {
+    const req = prepareRequest(
+      `${this.baseApiUrl}/services/${organizationId}/llm`,
+      "GET",
+      { token }
+    )
+
+    return await sendRequest(req)
+  }
+
+  async #triggerSummary({ token, conversationId, format, flavor }) {
+    let url = `${this.baseApiUrl}/conversations/${conversationId}/download?format=${encodeURIComponent(format)}`
+    if (flavor) {
+      url += `&flavor=${encodeURIComponent(flavor)}`
+    }
+    const req = prepareRequest(url, "POST", { token })
+    return await sendRequest(req)
+  }
+
+  async #getExportList({ token, conversationId }) {
+    const req = prepareRequest(
+      `${this.baseApiUrl}/conversations/${conversationId}/export/list`,
+      "GET",
+      { token }
+    )
+    return await sendRequest(req)
+  }
+
+  async #getExportContent({ token, conversationId, jobId }) {
+    const req = prepareRequest(
+      `${this.baseApiUrl}/conversations/${conversationId}/export/${jobId}/content`,
+      "GET",
+      { token }
+    )
+    return await sendRequest(req)
+  }
+
+  // -- Download / Publication private implementations --
+
+  async #downloadConversation({ token, conversationId, format }) {
+    const url = `${this.baseApiUrl}/conversations/${conversationId}/download?format=${encodeURIComponent(format)}`
+    const req = prepareRequest(url, "POST", { token })
+    const isBinary =
+      format === "docx" || format === "odt" || format === "verbatim"
+    return await sendRequest(req, {
+      responseType: isBinary ? "binary" : undefined,
+    })
+  }
+
+  async #getPublicationTemplates({ token, organizationId }) {
+    const url = `${this.baseApiUrl}/publication/templates?organization_id=${encodeURIComponent(organizationId)}`
+    const req = prepareRequest(url, "GET", { token })
+    return await sendRequest(req)
+  }
+
+  async #getTemplatePlaceholders({ token, templateId }) {
+    const url = `${this.baseApiUrl}/publication/templates/${templateId}/placeholders`
+    const req = prepareRequest(url, "GET", { token })
+    return await sendRequest(req)
+  }
+
+  async #exportWithTemplate({
+    token,
+    jobId,
+    format,
+    templateId,
+    versionNumber,
+  }) {
+    let url = `${this.baseApiUrl}/publication/${jobId}/export/${format}`
+    const params = []
+    if (templateId !== undefined && templateId !== null && templateId !== "") {
+      params.push(`templateId=${encodeURIComponent(templateId)}`)
+    }
+    if (versionNumber !== undefined && versionNumber !== null) {
+      params.push(`versionNumber=${encodeURIComponent(versionNumber)}`)
+    }
+    if (params.length > 0) {
+      url += `?${params.join("&")}`
+    }
+    const req = prepareRequest(url, "GET", { token })
+    return await sendRequest(req, { responseType: "binary" })
+  }
+
+  // -- Taxonomy private implementations --
+
+  async #listCategories({ token, organizationId }) {
+    const req = prepareRequest(
+      `${this.baseApiUrl}/organizations/${organizationId}/categories`,
+      "GET",
+      { token }
+    )
+    return await sendRequest(req)
+  }
+
+  async #listTags({ token, organizationId, categoryId }) {
+    const url = `${this.baseApiUrl}/organizations/${organizationId}/tags?categoryId=${encodeURIComponent(categoryId)}`
+    const req = prepareRequest(url, "GET", { token })
+    return await sendRequest(req)
+  }
+
+  async #createTag({
+    token,
+    organizationId,
+    categoryId,
+    name,
+    color,
+    emoji,
+    description,
+  }) {
+    const payload = {
+      organizationId,
+      categoryId,
+      name,
+    }
+    if (color !== undefined && color !== null) payload.color = color
+    if (emoji !== undefined && emoji !== null) payload.emoji = emoji
+    if (description !== undefined && description !== null)
+      payload.description = description
+
+    const req = prepareRequest(
+      `${this.baseApiUrl}/organizations/${organizationId}/tags`,
+      "POST",
+      { token, ...payload }
+    )
+    return await sendRequest(req)
+  }
+
+  async #listFolders({ token, organizationId, tree, withConversationCount }) {
+    const params = []
+    if (tree) params.push("tree=true")
+    if (withConversationCount) params.push("withConversationCount=true")
+    let url = `${this.baseApiUrl}/organizations/${organizationId}/folders`
+    if (params.length > 0) {
+      url += "?" + params.join("&")
+    }
+    const req = prepareRequest(url, "GET", { token })
+    return await sendRequest(req)
+  }
+
+  async #createFolder({
+    token,
+    organizationId,
+    name,
+    parentId,
+    color,
+    emoji,
+    visibility,
+  }) {
+    const payload = { name, visibility }
+    if (parentId !== undefined && parentId !== null) payload.parentId = parentId
+    if (color !== undefined && color !== null) payload.color = color
+    if (emoji !== undefined && emoji !== null) payload.emoji = emoji
+
+    const req = prepareRequest(
+      `${this.baseApiUrl}/organizations/${organizationId}/folders`,
+      "POST",
+      { token, ...payload }
+    )
+    return await sendRequest(req)
+  }
+
+  async #moveConversationToFolder({
+    token,
+    organizationId,
+    folderId,
+    conversationId,
+  }) {
+    const req = prepareRequest(
+      `${this.baseApiUrl}/organizations/${organizationId}/folders/${folderId}/conversations/${conversationId}`,
+      "POST",
+      { token }
+    )
+    return await sendRequest(req)
+  }
+
+  async #getConversation({ token, conversationId }) {
+    const req = prepareRequest(
+      `${this.baseApiUrl}/conversations/${conversationId}`,
+      "GET",
+      { token }
+    )
+    return await sendRequest(req)
+  }
+
+  async #searchUsers({ token, search }) {
+    const url = `${this.baseApiUrl}/users/search?search=${encodeURIComponent(search)}`
+    const req = prepareRequest(url, "GET", { token })
+    return await sendRequest(req)
+  }
+
+  async #updateConversation({ token, conversationId, data }) {
+    const req = prepareRequest(
+      `${this.baseApiUrl}/conversations/${conversationId}`,
+      "PATCH",
+      { token, ...(data ?? {}) }
+    )
+    return await sendRequest(req)
+  }
+
+  async #shareConversation({ token, conversationId, email, right, notify }) {
+    const payload = { email, right }
+    if (notify === false) {
+      payload.notify = false
+    }
+    const req = prepareRequest(
+      `${this.baseApiUrl}/conversations/${conversationId}/invite`,
+      "POST",
+      { token, ...payload }
+    )
+    return await sendRequest(req)
+  }
+}
+
+function getServiceByQualityAndLang(services, quality, lang) {
+  return services.find((service) => {
+    return service.language == "*" || service.language == lang
+  })
+}
+
+export function generateServiceConfig(
+  service,
+  {
+    enablePunctuation = false,
+    enableDiarization = false,
+    numberOfSpeaker = 0,
+    languageValue = service?.language || "*",
+  } = {}
+) {
+  const isWhisper = service?.model_type === "whisper"
+  const subServices = service?.sub_services
+
+  const punctuationServiceList = subServices?.punctuation ?? []
+  const punctuationService =
+    enablePunctuation && !isWhisper && punctuationServiceList.length > 0
+      ? punctuationServiceList[0].service_name
+      : null
+
+  const diarizationServiceList = subServices?.diarization ?? []
+  const diarizationService =
+    enableDiarization && diarizationServiceList.length > 0
+      ? diarizationServiceList[0].service_name
+      : null
+
+  // Diarization is only effectively enabled when a worker is actually
+  // available. When the caller asks for it but the selected ASR service
+  // exposes no diarization sub-service, fall back gracefully instead of
+  // sending enableDiarization=true with serviceName=null, which silently
+  // hangs the transcription on the gateway side.
+  const diarizationEffective = Boolean(enableDiarization && diarizationService)
+
+  // numberOfSpeaker may arrive as a string from env-style configuration.
+  const numberOfSpeakerInt = Number.parseInt(numberOfSpeaker, 10)
+  const numberOfSpeakerSafe = Number.isFinite(numberOfSpeakerInt)
+    ? numberOfSpeakerInt
+    : 0
+
+  return {
+    serviceName: service.serviceName,
+    endpoint: removeLeadingSlash(service.endpoints[0].endpoint),
+    lang: languageValue,
+    config: {
+      language: languageValue,
+      punctuationConfig: {
+        enablePunctuation: enablePunctuation && !isWhisper,
+        serviceName: punctuationService,
+      },
+      diarizationConfig: {
+        enableDiarization: diarizationEffective,
+        numberOfSpeaker:
+          diarizationEffective && numberOfSpeakerSafe > 0
+            ? numberOfSpeakerSafe
+            : null,
+        maxNumberOfSpeaker: diarizationEffective ? 100 : null,
+        serviceName: diarizationService,
+      },
+      enableNormalization: true,
+      modelType: service.model_type,
+      vadConfig: isWhisper
+        ? {
+            enableVAD: true,
+            methodName: "WebRTC",
+            minDuration: 30,
+          }
+        : {
+            enableVAD: true,
+            methodName: "WebRTC",
+            minDuration: 0,
+          },
+    },
+  }
+}
+
+function removeLeadingSlash(str) {
+  return str.replace(/^\/+/, "")
+}
+
+// Build a `?a=1&b=2` query string, skipping null/undefined/empty values.
+export function buildQuery(params) {
+  const usp = new URLSearchParams()
+  for (const [k, v] of Object.entries(params || {})) {
+    if (v !== undefined && v !== null && v !== "") usp.append(k, String(v))
+  }
+  const s = usp.toString()
+  return s ? `?${s}` : ""
+}
