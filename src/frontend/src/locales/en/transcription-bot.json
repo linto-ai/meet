@@ -34,7 +34,8 @@
       "translationsNone": "No language matches.",
       "translationsCount_one": "{{count}} language selected",
       "translationsCount_other": "{{count}} languages selected",
-      "translationsRemove": "Remove {{lang}}"
+      "translationsRemove": "Remove {{lang}}",
+      "translationsHelp": "Optional: add languages to show the live translation."
     }
   },
   "banner": {
