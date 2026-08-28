@@ -34,7 +34,8 @@
       "translationsNone": "Aucune langue ne correspond.",
       "translationsCount_one": "{{count}} langue sélectionnée",
       "translationsCount_other": "{{count}} langues sélectionnées",
-      "translationsRemove": "Retirer {{lang}}"
+      "translationsRemove": "Retirer {{lang}}",
+      "translationsHelp": "Optionnel : ajoutez des langues pour afficher la traduction en direct."
     }
   },
   "banner": {

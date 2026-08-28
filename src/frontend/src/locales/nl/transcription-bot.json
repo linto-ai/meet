@@ -34,7 +34,8 @@
       "translationsNone": "Geen enkele taal komt overeen.",
       "translationsCount_one": "{{count}} taal geselecteerd",
       "translationsCount_other": "{{count}} talen geselecteerd",
-      "translationsRemove": "{{lang}} verwijderen"
+      "translationsRemove": "{{lang}} verwijderen",
+      "translationsHelp": "Optioneel: voeg talen toe om de live vertaling te tonen."
     }
   },
   "banner": {

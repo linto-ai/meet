@@ -36,7 +36,8 @@
       "translationsCount_few": "Выбрано {{count}} языка",
       "translationsCount_many": "Выбрано {{count}} языков",
       "translationsCount_other": "Выбрано {{count}} языка",
-      "translationsRemove": "Удалить {{lang}}"
+      "translationsRemove": "Удалить {{lang}}",
+      "translationsHelp": "Необязательно: добавьте языки для отображения перевода в реальном времени."
     }
   },
   "banner": {

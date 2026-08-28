@@ -34,7 +34,8 @@
       "translationsNone": "Keine Sprache stimmt überein.",
       "translationsCount_one": "{{count}} Sprache ausgewählt",
       "translationsCount_other": "{{count}} Sprachen ausgewählt",
-      "translationsRemove": "{{lang}} entfernen"
+      "translationsRemove": "{{lang}} entfernen",
+      "translationsHelp": "Optional: Sprachen hinzufügen, um die Live-Übersetzung anzuzeigen."
     }
   },
   "banner": {
