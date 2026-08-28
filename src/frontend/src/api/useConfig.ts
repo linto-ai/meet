@@ -27,6 +27,9 @@ export interface LintoRuntimeConfig {
   bot_provider: string
   // Optional org pin; '' → resolved dynamically by the SDK.
   default_org_id: string
+  // Pinned ASR profile id (the panel never lets the user pick one); '' → the
+  // first available profile is used.
+  default_profile_id: string
 }
 
 export interface ApiConfig {

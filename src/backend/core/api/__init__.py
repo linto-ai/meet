@@ -83,6 +83,8 @@ def get_frontend_configuration(request):
             "visio_native_enabled": settings.LINTO_VISIO_NATIVE_ENABLED,
             "bot_provider": settings.LINTO_BOT_PROVIDER,
             "default_org_id": settings.LINTO_STUDIO_DEFAULT_ORG_ID,
+            # Pinned ASR profile — the panel never lets the user pick one.
+            "default_profile_id": settings.LINTO_STUDIO_DEFAULT_PROFILE_ID,
         },
         "diagnostics": {"connection_test_enabled": settings.CONNECTION_TEST_ENABLED},
         "livekit": {

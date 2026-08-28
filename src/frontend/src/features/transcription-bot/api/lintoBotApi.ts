@@ -104,14 +104,16 @@ const startLintoLive = async (
 ): Promise<LintoRun> => {
   const { linto, organizationId } = await getClient(roomId, token)
 
-  // Resolve the ASR profile: the explicit pick, else the first quickMeeting
-  // profile. A quickMeeting WITHOUT a profile is treated by Studio as audio-only
-  // and rejects `keepAudio:false` (400), so a profile is required for live text.
-  let profileId = config.asrProfileId
-  if (!profileId) {
-    const profiles = await linto.listQuickMeetingProfiles({ organizationId })
-    profileId = profiles[0]?.id
-  }
+  // Resolve the ASR profile against what the org ACTUALLY has: use the ops-pinned
+  // profile (config) only when it still exists, else fall back to the first
+  // available one. A quickMeeting WITHOUT a valid profile is treated by Studio as
+  // audio-only and rejects `keepAudio:false` (400), so a real profile is required.
+  const profiles = await linto.listQuickMeetingProfiles({ organizationId })
+  const pinned = lintoConfig.default_profile_id || config.asrProfileId
+  const pinnedProfile = pinned
+    ? profiles.find((p) => String(p.id) === String(pinned))
+    : undefined
+  const profileId = pinnedProfile?.id ?? profiles[0]?.id
   if (!profileId) {
     throw new StudioAuthUnavailable(
       'no quickMeeting ASR profile available for this organization'
