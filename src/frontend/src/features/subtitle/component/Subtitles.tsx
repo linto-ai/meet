@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSubtitles } from '../hooks/useSubtitles'
 import { css, cva } from '@/styled-system/css'
 import { styled } from '@/styled-system/jsx'
@@ -18,6 +18,25 @@ import {
 } from '@/stores/accessibility'
 import { parseLintoSegmentId } from '@/features/transcription-bot/store/transcriptStore'
 import { UNATTRIBUTED_SPEAKER } from '@/features/transcription-bot/hooks/useLintoTranscriptFeed'
+import { lintoStore } from '@/features/transcription-bot/store/lintoStore'
+
+const ORIGINAL = 'original'
+// Collapse region-tagged codes ("en-US") to their base ("en") for matching.
+const baseCode = (code: string): string => code.split('-')[0].toLowerCase()
+// Pick a segment's text in the chosen display language (translation when present
+// for that base code), else the original.
+const textFor = (
+  segment: { text: string; translations?: Record<string, string> },
+  displayLanguage: string
+): string => {
+  if (displayLanguage === ORIGINAL || !segment.translations) return segment.text
+  const direct = segment.translations[displayLanguage]
+  if (direct != null) return direct
+  const hit = Object.entries(segment.translations).find(
+    ([k]) => baseCode(k) === displayLanguage
+  )
+  return hit?.[1] ?? segment.text
+}
 
 const FONT_SIZE_CONFIG: Record<
   CaptionTextSize,
@@ -64,6 +83,9 @@ export interface TranscriptionSpeaker {
 
 export interface TranscriptionSegmentWithSpeaker extends TranscriptionSegment {
   speaker: TranscriptionSpeaker
+  // LinTO live translations keyed by target language code (from the
+  // `linto:<seg>:<lang>` segments the bot publishes alongside the original).
+  translations?: Record<string, string>
 }
 
 export interface TranscriptionRow {
@@ -99,6 +121,9 @@ const useTranscriptionState = () => {
     TranscriptionSegmentWithSpeaker[]
   >([])
 
+  // Translations that arrived before their original segment: baseId → {lang:text}.
+  const pendingTranslations = useRef<Record<string, Record<string, string>>>({})
+
   const updateTranscriptionSegments = useCallback(
     (segments: TranscriptionSegment[], participant?: Participant) => {
       if (segments.length === 0) return
@@ -106,20 +131,55 @@ const useTranscriptionState = () => {
       setTranscriptionSegments((prevSegments) => {
         let next = prevSegments
         for (const segment of segments) {
-          // LinTO translations ride on the same event with a language-suffixed
-          // id; the overlay only shows the spoken language.
-          if (parseLintoSegmentId(segment.id)?.lang) continue
+          const parsed = parseLintoSegmentId(segment.id)
+          // A LinTO translation segment (`linto:<seg>:<lang>`): merge its text onto
+          // the original segment (`linto:<seg>`) under the target language; buffer
+          // it when the original hasn't arrived yet.
+          if (parsed?.lang) {
+            const baseId = parsed.base
+            const idx = next.findIndex((s) => s.id === baseId)
+            if (idx === -1) {
+              const buf = pendingTranslations.current[baseId] ?? {}
+              buf[parsed.lang] = segment.text
+              pendingTranslations.current[baseId] = buf
+            } else {
+              next = next.slice()
+              next[idx] = {
+                ...next[idx],
+                translations: {
+                  ...next[idx].translations,
+                  [parsed.lang]: segment.text,
+                },
+              }
+            }
+            continue
+          }
           const speaker = speakerOf(participant, segment.id)
           const index = next.findIndex((s) => s.id === segment.id)
+          const pending = pendingTranslations.current[segment.id]
           if (index === -1) {
-            next = [...next, { ...segment, speaker }]
+            next = [
+              ...next,
+              {
+                ...segment,
+                speaker,
+                ...(pending && { translations: pending }),
+              },
+            ]
+            if (pending) delete pendingTranslations.current[segment.id]
           } else {
             // Partial → final (or a longer partial) of the SAME utterance:
-            // replace in place instead of ignoring it.
+            // replace in place instead of ignoring it (keep translations).
             const existing = next[index]
             if (existing.final && !segment.final) continue
             next = next.slice()
-            next[index] = { ...existing, ...segment, speaker: existing.speaker }
+            next[index] = {
+              ...existing,
+              ...segment,
+              speaker: existing.speaker,
+              translations: { ...existing.translations, ...pending },
+            }
+            if (pending) delete pendingTranslations.current[segment.id]
           }
         }
         if (next.length > MAX_SEGMENTS) next = next.slice(-MAX_SEGMENTS)
@@ -141,7 +201,13 @@ const useTranscriptionState = () => {
   }
 }
 
-const Transcription = ({ row }: { row: TranscriptionRow }) => {
+const Transcription = ({
+  row,
+  displayLanguage,
+}: {
+  row: TranscriptionRow
+  displayLanguage: string
+}) => {
   const { captionTextSize, captionFontColor, captionBackgroundColor } =
     useSnapshot(accessibilityStore)
   const { fontSize, lineHeight } = CAPTION_FONT_SIZES[captionTextSize]
@@ -151,8 +217,8 @@ const Transcription = ({ row }: { row: TranscriptionRow }) => {
 
   const getDisplayText = (row: TranscriptionRow): string => {
     return row.segments
-      .filter((segment) => segment.text.trim())
-      .map((segment) => segment.text.trim())
+      .map((segment) => textFor(segment, displayLanguage).trim())
+      .filter((text) => text)
       .join(' ')
   }
 
@@ -228,6 +294,9 @@ const SubtitlesWrapper = styled(
 export const Subtitles = () => {
   const { areSubtitlesOpen } = useSubtitles()
   const room = useRoomContext()
+  // Shared with the LinTO panel: switching the "displayed language" there also
+  // switches the overlay (translation shown when available, else the original).
+  const { displayLanguage } = useSnapshot(lintoStore)
 
   const {
     transcriptionSegments,
@@ -299,7 +368,11 @@ export const Subtitles = () => {
           .slice()
           .reverse()
           .map((row) => (
-            <Transcription key={row.id} row={row} />
+            <Transcription
+              key={row.id}
+              row={row}
+              displayLanguage={displayLanguage}
+            />
           ))}
       </div>
     </SubtitlesWrapper>

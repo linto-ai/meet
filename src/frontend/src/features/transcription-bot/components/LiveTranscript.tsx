@@ -1,6 +1,6 @@
 import { css } from '@/styled-system/css'
 import { Text } from '@/primitives'
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSnapshot } from 'valtio'
 import { transcriptStore } from '../store/transcriptStore'
@@ -81,7 +81,7 @@ export const LiveTranscript = () => {
   const { t, i18n } = useTranslation('transcription-bot', {
     keyPrefix: 'lintoBot',
   })
-  const { selectedTranslations } = useSnapshot(lintoStore)
+  const { selectedTranslations, displayLanguage } = useSnapshot(lintoStore)
   const { byId, order } = useSnapshot(transcriptStore)
   const turns = useMemo(
     () =>
@@ -110,11 +110,15 @@ export const LiveTranscript = () => {
     )
   }, [turns, selectedTranslations, i18n.language])
 
-  const [display, setDisplay] = useState<string>(ORIGINAL)
+  // The displayed language is SHARED with the caption overlay (lintoStore), so
+  // changing it here also switches the subtitles.
+  const setDisplay = (value: string) => {
+    lintoStore.displayLanguage = value
+  }
   // If the selected language is no longer offered (run changed), fall back.
   const effectiveDisplay =
-    display === ORIGINAL || availableLangs.includes(display)
-      ? display
+    displayLanguage === ORIGINAL || availableLangs.includes(displayLanguage)
+      ? displayLanguage
       : ORIGINAL
 
   return (
