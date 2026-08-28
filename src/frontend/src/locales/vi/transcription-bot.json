@@ -34,7 +34,8 @@
       "translationsNone": "Không có ngôn ngữ nào khớp.",
       "translationsCount_one": "Đã chọn {{count}} ngôn ngữ",
       "translationsCount_other": "Đã chọn {{count}} ngôn ngữ",
-      "translationsRemove": "Xóa {{lang}}"
+      "translationsRemove": "Xóa {{lang}}",
+      "translationsHelp": "Tùy chọn: thêm ngôn ngữ để hiển thị bản dịch trực tiếp."
     }
   },
   "banner": {
