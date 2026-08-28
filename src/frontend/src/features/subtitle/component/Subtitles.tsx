@@ -91,10 +91,10 @@ export interface TranscriptionSegmentWithSpeaker extends TranscriptionSegment {
 export interface TranscriptionRow {
   id: string
   speaker: TranscriptionSpeaker
-  segments: TranscriptionSegment[]
-  startTime?: number
-  lastUpdateTime: number
-  lastReceivedTime: number
+  // One row = one caption/utterance (finals are never concatenated). The speaker
+  // header is shown only when it changes from the previous row.
+  segment: TranscriptionSegmentWithSpeaker
+  showSpeaker: boolean
 }
 
 const speakerOf = (
@@ -215,14 +215,9 @@ const Transcription = ({
   const backgroundColor =
     CAPTION_BACKGROUND_COLOR_VALUES[captionBackgroundColor]
 
-  const getDisplayText = (row: TranscriptionRow): string => {
-    return row.segments
-      .map((segment) => textFor(segment, displayLanguage).trim())
-      .filter((text) => text)
-      .join(' ')
-  }
-
-  const displayText = getDisplayText(row)
+  // One row = one utterance (never concatenated). The avatar + name are shown
+  // only when the speaker changes; a continuation line aligns under the name.
+  const displayText = textFor(row.segment, displayLanguage).trim()
 
   if (!displayText) return null
 
@@ -240,20 +235,30 @@ const Transcription = ({
           gap: '0.5rem',
         })}
       >
-        <Avatar
-          name={row.speaker.name}
-          bgColor={row.speaker.color}
-          context="subtitles"
-        />
+        {row.showSpeaker ? (
+          <Avatar
+            name={row.speaker.name}
+            bgColor={row.speaker.color}
+            context="subtitles"
+          />
+        ) : (
+          // Keep the text aligned under the name when the header is hidden.
+          <div
+            className={css({ flexShrink: 0, width: '2.5rem' })}
+            aria-hidden
+          />
+        )}
         <div
           className={css({
             width: '100%',
           })}
           style={{ color: fontColor }}
         >
-          <Text variant="h3" margin={false}>
-            {row.speaker.name}
-          </Text>
+          {row.showSpeaker && (
+            <Text variant="h3" margin={false}>
+              {row.speaker.name}
+            </Text>
+          )}
           <p
             className={css({
               fontWeight: '400',
@@ -314,40 +319,19 @@ export const Subtitles = () => {
     }
   }, [room, updateTranscriptionSegments, clearTranscriptionSegments])
 
-  const transcriptionRows = useMemo(() => {
-    if (transcriptionSegments.length === 0) return []
-
-    const rows: TranscriptionRow[] = []
-    let currentRow: TranscriptionRow | null = null
-
-    for (const segment of transcriptionSegments) {
-      const shouldStartNewRow =
-        !currentRow || currentRow.speaker.identity !== segment.speaker.identity
-
-      if (shouldStartNewRow) {
-        currentRow = {
-          id: `${segment.speaker.identity}-${segment.firstReceivedTime}`,
-          speaker: segment.speaker,
-          segments: [segment],
-          startTime: segment.startTime,
-          lastUpdateTime: segment.lastReceivedTime,
-          lastReceivedTime: segment.lastReceivedTime,
-        }
-        rows.push(currentRow)
-      } else if (currentRow) {
-        currentRow.segments.push(segment)
-        currentRow.lastUpdateTime = Math.max(
-          currentRow.lastUpdateTime,
-          segment.lastReceivedTime
-        )
-        currentRow.lastReceivedTime = Math.max(
-          currentRow.lastReceivedTime,
-          segment.lastReceivedTime
-        )
-      }
-    }
-    return rows
-  }, [transcriptionSegments])
+  const transcriptionRows = useMemo(
+    () =>
+      transcriptionSegments.map((segment, index) => ({
+        id: segment.id,
+        speaker: segment.speaker,
+        segment,
+        showSpeaker:
+          index === 0 ||
+          transcriptionSegments[index - 1].speaker.identity !==
+            segment.speaker.identity,
+      })),
+    [transcriptionSegments]
+  )
 
   return (
     <SubtitlesWrapper areOpen={areSubtitlesOpen}>
