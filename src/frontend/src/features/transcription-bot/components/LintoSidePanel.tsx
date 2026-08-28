@@ -55,8 +55,7 @@ export const LintoSidePanel = () => {
   const { t } = useTranslation('transcription-bot', { keyPrefix: 'lintoBot' })
 
   const { enabled } = useLintoConfig()
-  const { running, summary, record, selectedLanguage, selectedProfile, error } =
-    useSnapshot(lintoStore)
+  const { running, summary, record, error } = useSnapshot(lintoStore)
 
   const apiRoomData = useRoomData()
   const roomId = apiRoomData?.livekit?.room
@@ -90,7 +89,10 @@ export const LintoSidePanel = () => {
   // The empty state (no profile AND no default) is the only thing that blocks
   // starting — live transcription is otherwise always possible.
   const { data: profilesData } = useLintoBotProfiles(roomId, token)
+  // An ops-pinned profile (LINTO_STUDIO_DEFAULT_PROFILE_ID) always makes the
+  // feature usable; only an org with genuinely no profile blocks Start.
   const noProfiles =
+    !lintoConfig?.default_profile_id &&
     !!profilesData &&
     profilesData.profiles.length === 0 &&
     !profilesData.hasDefault
@@ -142,8 +144,6 @@ export const LintoSidePanel = () => {
         roomSlug,
         lintoConfig,
         config: {
-          ...(selectedLanguage && { language: selectedLanguage }),
-          ...(selectedProfile && { asrProfileId: selectedProfile }),
           summary,
           record: hasScreenRecordingAccess ? record : false,
           translations: [...lintoStore.selectedTranslations],

@@ -31,6 +31,9 @@ type LintoState = {
   selectedProfile?: string
   // Target translation language codes (0..N).
   selectedTranslations: string[]
+  // Shared 'displayed language' for the live transcript AND the caption overlay:
+  // 'original' = the spoken language, else a translation target (base code).
+  displayLanguage: string
   // Last start-bot error message (machine code mapped to a friendly string in
   // the panel), cleared on the next attempt.
   error?: string
@@ -50,6 +53,7 @@ export const lintoStore = proxy<LintoState>({
   selectedLanguage: undefined,
   selectedProfile: undefined,
   selectedTranslations: [],
+  displayLanguage: 'original',
   error: undefined,
 })
 
