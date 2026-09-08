@@ -6,6 +6,7 @@
     "start": "Bắt đầu",
     "stop": "Dừng",
     "notAvailable": "Phiên âm LinTO không khả dụng trong phòng này.",
+    "noEntitlement": "Tùy chọn phiên âm AI chưa được kích hoạt cho tài khoản của bạn.",
     "options": {
       "summary": "Tạo bản tóm tắt",
       "summaryHelp": "Bản tóm tắt được gửi vào cuối cuộc họp.",

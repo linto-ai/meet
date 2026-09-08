@@ -952,16 +952,6 @@ class Base(Configuration):
     LINTO_NATIVE_TOKEN_TTL = values.IntegerValue(
         43200, environ_name="LINTO_NATIVE_TOKEN_TTL", environ_prefix=None
     )
-    # Session-API base (with /v1), read directly (no auth on the internal net) to
-    # hydrate the finalized captions for participants joining mid-transcription.
-    LINTO_SESSION_API_URL = values.Value(
-        None, environ_name="LINTO_SESSION_API_URL", environ_prefix=None
-    )
-    # Public room URL base recorded on the Studio bot (and used by the web bot
-    # fallback to navigate to the room), e.g. https://visio.example.com.
-    MEET_PUBLIC_URL = values.Value(
-        None, environ_name="MEET_PUBLIC_URL", environ_prefix=None
-    )
     # Service auth to Studio (org-scoped quickMeeting/bots need BOT+MICROPHONE
     # rights). Set LINTO_STUDIO_AUTH_EMAIL/PASSWORD to a dedicated service account,
     # or rely on a static LINTO_STUDIO_API_TOKEN carrying those rights (fallback).
@@ -971,11 +961,13 @@ class Base(Configuration):
     LINTO_STUDIO_AUTH_PASSWORD = values.Value(
         "", environ_name="LINTO_STUDIO_AUTH_PASSWORD", environ_prefix=None
     )
-    # Optional pins; empty → resolved dynamically (a "Visio" org or the first one /
-    # the first quickMeeting ASR profile).
+    # Studio organization the SERVICE ACCOUNT acts in (LINTO_STUDIO_TOKEN_SOURCE=
+    # service_account); empty → the account's first organization. Ignored in
+    # user_key mode, where the organization comes from the user's own key.
     LINTO_STUDIO_DEFAULT_ORG_ID = values.Value(
         "", environ_name="LINTO_STUDIO_DEFAULT_ORG_ID", environ_prefix=None
     )
+    # Pinned quickMeeting ASR profile; empty → the first available profile.
     LINTO_STUDIO_DEFAULT_PROFILE_ID = values.Value(
         "", environ_name="LINTO_STUDIO_DEFAULT_PROFILE_ID", environ_prefix=None
     )
@@ -986,23 +978,19 @@ class Base(Configuration):
     LINTO_STUDIO_BROWSER_API_URL = values.Value(
         "", environ_name="LINTO_STUDIO_BROWSER_API_URL", environ_prefix=None
     )
-    # Studio OIDC endpoints (relative to the browser API base) for the silent-SSO
-    # that hands the browser the user's Studio JWT. Empty in dev (no shared IdP)
-    # → the dev-token bridge below is used instead.
-    LINTO_STUDIO_SSO_LOGIN_PATH = values.Value(
-        "/auth/oidc/login", environ_name="LINTO_STUDIO_SSO_LOGIN_PATH", environ_prefix=None
-    )
-    LINTO_STUDIO_SSO_TOKEN_PATH = values.Value(
-        "/auth/oidc/token", environ_name="LINTO_STUDIO_SSO_TOKEN_PATH", environ_prefix=None
-    )
-    LINTO_STUDIO_SSO_ENABLED = values.BooleanValue(
-        False, environ_name="LINTO_STUDIO_SSO_ENABLED", environ_prefix=None
-    )
-    # DEV ONLY: expose GET rooms/{id}/linto/studio-token, which returns a Studio
-    # JWT minted from the service account, so the browser SDK flow is testable
-    # without the shared-IdP SSO. MUST stay False in production.
-    LINTO_STUDIO_DEV_TOKEN_ENABLED = values.BooleanValue(
-        False, environ_name="LINTO_STUDIO_DEV_TOKEN_ENABLED", environ_prefix=None
+    # Where GET rooms/{id}/linto/studio-token gets the Studio JWT it hands the
+    # browser SDK. The Meet backend is the identity bridge: it knows the
+    # participant from the LiveKit room token and never exposes a long-lived key.
+    #  - "service_account": the shared service account (LINTO_STUDIO_AUTH_EMAIL/
+    #    PASSWORD or LINTO_STUDIO_API_TOKEN) in LINTO_STUDIO_DEFAULT_ORG_ID. ONE
+    #    Studio identity for the whole instance ⇒ ONE live transcription at a
+    #    time (Studio allows a single active quickMeeting per identity).
+    #  - "user_key": exchange the user's identity (sub, email) for a short-lived
+    #    token of the user's OWN LinTO API key (POST /api/auth/external/token on
+    #    studio-api, authenticated with the integration credential). Users
+    #    without a linked key see the option as not active.
+    LINTO_STUDIO_TOKEN_SOURCE = values.Value(
+        "service_account", environ_name="LINTO_STUDIO_TOKEN_SOURCE", environ_prefix=None
     )
     # Default org-member rights on uploaded conversations. 0 = no rights
     # (only MAINTAINER+ and explicitly shared users see it). 1 = READ.

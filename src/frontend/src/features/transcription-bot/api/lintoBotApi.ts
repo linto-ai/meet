@@ -10,6 +10,7 @@ import { LintoBotConfig, LintoBotProfilesResult } from '../types/linto'
 import {
   StudioAuthUnavailable,
   StudioClient,
+  StudioNotEntitled,
   useStudioClient,
 } from './studioAuth'
 
@@ -49,8 +50,9 @@ const nativeMeta = (
 /**
  * quickMeeting ASR profiles for the user's organization, via the SDK. Same
  * `{ profiles, hasDefault, reason }` shape the panel/LintoSettings expect:
- * `reason='unprovisioned'` (org has none), `'ok'`, or `'upstream_error'` when
- * Studio is unreachable / the browser has no Studio auth yet.
+ * `reason='unprovisioned'` (org has none), `'ok'`, `'no_entitlement'` when the
+ * LinTO option is not active for this account, or `'upstream_error'` when
+ * Studio is unreachable / the browser has no Studio auth.
  */
 export function useLintoBotProfiles(
   roomId: string | undefined,
@@ -74,10 +76,11 @@ export function useLintoBotProfiles(
           reason: profiles.length > 0 ? 'ok' : 'unprovisioned',
         }
       } catch (err) {
-        if (err instanceof StudioAuthUnavailable) {
-          return { profiles: [], hasDefault: false, reason: 'upstream_error' }
+        if (err instanceof StudioNotEntitled) {
+          return { profiles: [], hasDefault: false, reason: 'no_entitlement' }
         }
-        // Any other failure (network / Studio down) degrades the same way.
+        // No Studio auth for this participant, or any other failure (network /
+        // Studio down): degrade the same way.
         return { profiles: [], hasDefault: false, reason: 'upstream_error' }
       }
     },

@@ -865,16 +865,29 @@ class RoomViewSet(
     )
     @FeatureFlag.require("linto")
     def linto_studio_token(self, request, pk=None):  # pylint: disable=unused-argument
-        """DEV ONLY: a Studio JWT for the SDK, minted from the service account.
+        """The Studio JWT + context the browser SDK acts with, for the caller.
 
-        Disabled unless ``LINTO_STUDIO_DEV_TOKEN_ENABLED`` — in production the
-        browser gets its Studio token from the shared-IdP SSO, never from here.
+        The Meet backend is the identity bridge: it knows the participant from
+        the LiveKit room token and hands the browser a Studio token from the
+        configured source (``LINTO_STUDIO_TOKEN_SOURCE``: the shared service
+        account, or the user's OWN LinTO key via the studio-api identity
+        exchange), plus the organization to act in. ``{"enabled": false,
+        "reason": ...}`` (200) means the option is not active for this user.
+        Anonymous guests have no identity to bridge → 403 ``anonymous`` (they
+        can still read a running transcript through the public routes).
         """
-        if not settings.LINTO_STUDIO_DEV_TOKEN_ENABLED:
-            raise Http404
         self.get_object()  # room access check
+        user = request.user
+        if user is None or not getattr(user, "is_authenticated", False):
+            return drf_response.Response(
+                {
+                    "code": "anonymous",
+                    "error": "anonymous participants have no LinTO identity",
+                },
+                status=drf_status.HTTP_403_FORBIDDEN,
+            )
         try:
-            result = BotTranscriptionService().dev_studio_token()
+            result = BotTranscriptionService().studio_token_for(user)
         except BotTranscriptionException as exc:
             return drf_response.Response(
                 {"error": str(exc)}, status=drf_status.HTTP_502_BAD_GATEWAY

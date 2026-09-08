@@ -233,8 +233,30 @@ export const LintoSidePanel = () => {
     )
   }
 
+  // The LinTO option is not active for this account (no linked key, or a key
+  // that may not run a quickMeeting): nothing to start. A run started by
+  // someone else is still readable below, exactly like a viewer without rights.
+  const noEntitlement = profilesData?.reason === 'no_entitlement'
+  if (!running && noEntitlement) {
+    return (
+      <Div
+        data-testid="linto-no-entitlement"
+        display="flex"
+        padding="0 1.5rem"
+        flexGrow={1}
+        flexDirection="column"
+        alignItems="center"
+        justifyContent="center"
+      >
+        <Text variant="note" centered>
+          {t('noEntitlement')}
+        </Text>
+      </Div>
+    )
+  }
+
   // Has the right to start/configure the bot (false → read-only viewer).
-  const canControl = !hasTranscriptNoAccess
+  const canControl = !hasTranscriptNoAccess && !noEntitlement
   // Only the starter or a room admin/owner may stop a shared run.
   const canStop = running && (lintoStore.startedByMe || !!isAdminOrOwner)
   const controlsDisabled = isPendingToStart

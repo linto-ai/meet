@@ -75,14 +75,12 @@ def get_frontend_configuration(request):
             "enabled": settings.LINTO_FEATURE_ENABLED,
             "hide_legacy_tools": settings.LINTO_HIDE_LEGACY_TOOLS,
             "studio_api_url": settings.LINTO_STUDIO_BROWSER_API_URL,
-            "sso_enabled": settings.LINTO_STUDIO_SSO_ENABLED,
-            "sso_login_path": settings.LINTO_STUDIO_SSO_LOGIN_PATH,
-            "sso_token_path": settings.LINTO_STUDIO_SSO_TOKEN_PATH,
-            "dev_token_enabled": settings.LINTO_STUDIO_DEV_TOKEN_ENABLED,
+            # Where the browser's Studio JWT comes from (informational: the
+            # panel always asks GET rooms/{id}/linto/studio-token).
+            "token_source": settings.LINTO_STUDIO_TOKEN_SOURCE,
             "native_livekit_url": settings.LINTO_NATIVE_LIVEKIT_URL,
             "visio_native_enabled": settings.LINTO_VISIO_NATIVE_ENABLED,
             "bot_provider": settings.LINTO_BOT_PROVIDER,
-            "default_org_id": settings.LINTO_STUDIO_DEFAULT_ORG_ID,
             # Pinned ASR profile — the panel never lets the user pick one.
             "default_profile_id": settings.LINTO_STUDIO_DEFAULT_PROFILE_ID,
         },

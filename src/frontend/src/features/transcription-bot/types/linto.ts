@@ -65,8 +65,14 @@ export interface LintoBotProfile {
 }
 
 // Why bot-profiles came back the way it did: 'ok' (have profiles or a default),
-// 'unprovisioned' (org has none — admin must create one), 'upstream_error'.
-export type LintoBotProfilesReason = 'ok' | 'unprovisioned' | 'upstream_error'
+// 'unprovisioned' (org has none — admin must create one), 'upstream_error',
+// 'no_entitlement' (the LinTO option is not active for this account: no linked
+// key, or a key that may not run a quickMeeting).
+export type LintoBotProfilesReason =
+  | 'ok'
+  | 'unprovisioned'
+  | 'upstream_error'
+  | 'no_entitlement'
 
 // Full bot-profiles result surfaced to the panel for the empty/error state.
 export interface LintoBotProfilesResult {
