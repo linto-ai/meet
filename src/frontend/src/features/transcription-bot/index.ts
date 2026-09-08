@@ -8,6 +8,7 @@ export { LintoProvider } from './components/LintoProvider'
 // hooks
 export { useLintoConfig } from './hooks/useLintoConfig'
 export { useLintoStatus } from './hooks/useLintoStatus'
+export { useLintoEntitlement } from './hooks/useLintoEntitlement'
 export { useLintoTranscriptFeed } from './hooks/useLintoTranscriptFeed'
 
 // api — browser-first: the panel drives Studio via the JS SDK; the Meet backend

@@ -438,10 +438,121 @@ class TestStudioTokenFor:
         ):
             BotTranscriptionService().studio_token_for(UserFactory())
 
-    def test_user_key_source_is_not_available_yet(self, studio_settings):
-        studio_settings.LINTO_STUDIO_TOKEN_SOURCE = "user_key"
-        with pytest.raises(BotTranscriptionException, match="user_key"):
-            BotTranscriptionService().studio_token_for(UserFactory())
+    def test_integration_token_is_the_preferred_credential(self, studio_settings):
+        studio_settings.LINTO_STUDIO_DEFAULT_ORG_ID = "org-pin"
+        studio_settings.LINTO_STUDIO_INTEGRATION_TOKEN = "integration-key"
+        result = BotTranscriptionService().studio_token_for(UserFactory())
+        assert result["token"] == "integration-key"
+
+
+@pytest.fixture
+def user_key_settings(studio_settings):
+    studio_settings.LINTO_STUDIO_TOKEN_SOURCE = "user_key"
+    studio_settings.LINTO_IDENTITY_PROVIDER = "meet:test"
+    studio_settings.LINTO_STUDIO_INTEGRATION_TOKEN = "integration-key"
+    studio_settings.LINTO_STUDIO_TOKEN_CACHE_TTL = 300
+    studio_settings.CACHES = {
+        "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}
+    }
+    from django.core.cache import cache  # noqa: PLC0415
+
+    cache.clear()
+    return studio_settings
+
+
+EXCHANGE = f"{STUDIO}/api/auth/external/token"
+
+
+class TestUserKeyToken:
+    """user_key mode: the studio-api identity exchange, per user, cached."""
+
+    @responses.activate
+    def test_exchanges_the_identity_for_the_users_key_token(self, user_key_settings):
+        user = UserFactory(sub="lemon-sub-42", email="Alice@Linagora.com")
+        responses.add(
+            responses.POST,
+            EXCHANGE,
+            json={
+                "token": "short-jwt",
+                "expiresIn": 3600,
+                "userId": "key-user",
+                "organizationId": "org-of-the-key",
+                "capabilities": {"quickMeeting": True},
+            },
+        )
+        result = BotTranscriptionService().studio_token_for(user)
+        assert result == {
+            "enabled": True,
+            "token": "short-jwt",
+            "base_url": "http://studio.browser",
+            "organization_id": "org-of-the-key",
+            "expires_in": 3600,
+            "capabilities": {"quickMeeting": True},
+        }
+        call = responses.calls[0].request
+        assert call.headers["Authorization"] == "Bearer integration-key"
+        assert "userScope=backoffice" in call.url
+        assert json.loads(call.body) == {
+            "provider": "meet:test",
+            "subject": "lemon-sub-42",
+            "email": "alice@linagora.com",
+        }
+
+    @responses.activate
+    def test_result_is_cached_per_user(self, user_key_settings):
+        user = UserFactory(sub="s1")
+        other = UserFactory(sub="s2")
+        responses.add(responses.POST, EXCHANGE, json={"token": "t", "expiresIn": 3600})
+        service = BotTranscriptionService()
+        service.studio_token_for(user)
+        service.studio_token_for(user)
+        assert len(responses.calls) == 1
+        service.studio_token_for(other)
+        assert len(responses.calls) == 2
+        service.forget_user_token(user)
+        service.studio_token_for(user)
+        assert len(responses.calls) == 3
+
+    @responses.activate
+    def test_no_linked_key_means_not_entitled_and_is_cached(self, user_key_settings):
+        user = UserFactory(sub="nobody")
+        responses.add(
+            responses.POST, EXCHANGE, status=404, json={"code": "no_linked_key"}
+        )
+        service = BotTranscriptionService()
+        assert service.studio_token_for(user) == {
+            "enabled": False,
+            "reason": "no_linked_key",
+        }
+        assert service.studio_token_for(user)["enabled"] is False
+        assert len(responses.calls) == 1
+
+    @responses.activate
+    @pytest.mark.parametrize("code", ["revoked", "domain_inactive"])
+    def test_revoked_or_inactive_domain_is_not_entitled(self, user_key_settings, code):
+        user = UserFactory(sub="gone")
+        responses.add(responses.POST, EXCHANGE, status=403, json={"code": code})
+        result = BotTranscriptionService().studio_token_for(user)
+        assert result == {"enabled": False, "reason": code}
+
+    @responses.activate
+    def test_other_failures_raise(self, user_key_settings):
+        user = UserFactory(sub="x")
+        responses.add(responses.POST, EXCHANGE, status=401, json={"message": "nope"})
+        with pytest.raises(BotTranscriptionException, match="401"):
+            BotTranscriptionService().studio_token_for(user)
+        responses.replace(responses.POST, EXCHANGE, status=500, body="boom")
+        with pytest.raises(BotTranscriptionException, match="500"):
+            BotTranscriptionService().studio_token_for(user)
+
+    @responses.activate
+    def test_cache_ttl_never_outlives_the_token(self, user_key_settings):
+        user = UserFactory(sub="short")
+        responses.add(responses.POST, EXCHANGE, json={"token": "t", "expiresIn": 90})
+        with mock.patch("core.services.bot_transcription.cache") as fake_cache:
+            fake_cache.get.return_value = None
+            BotTranscriptionService().studio_token_for(user)
+        assert fake_cache.set.call_args.args[2] == 30
 
 
 class TestResolveConversationId:

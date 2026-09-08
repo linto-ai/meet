@@ -12,7 +12,12 @@ import {
   ScreenRecordingSidePanel,
 } from '@/features/recording'
 import { useConfig } from '@/api/useConfig'
-import { LintoSidePanel, useLintoConfig } from '@/features/transcription-bot'
+import {
+  LintoSidePanel,
+  useLintoConfig,
+  useLintoEntitlement,
+  useLintoStatus,
+} from '@/features/transcription-bot'
 
 export interface ToolsButtonProps {
   icon: ReactNode
@@ -112,6 +117,13 @@ export const Tools = () => {
     keyPrefix: 'tools.lintoBot',
   })
   const { enabled: isLintoEnabled, hideLegacyTools } = useLintoConfig()
+  // The LinTO entry is offered to participants whose account has the option
+  // (a linked LinTO key); it stays visible for everyone while a transcription
+  // runs, so the others can read it.
+  const lintoEntitlement = useLintoEntitlement()
+  const { active: isLintoActive } = useLintoStatus()
+  const showLintoTool =
+    isLintoEnabled && (isLintoActive || lintoEntitlement !== 'no_entitlement')
 
   // Restore focus to the element that opened the Tools panel
   // following the same pattern as Chat.
@@ -183,7 +195,7 @@ export const Tools = () => {
           </A>
         )}
       </Text>
-      {isLintoEnabled && (
+      {showLintoTool && (
         <ToolButton
           icon={<Icon name="speech_to_text" />}
           title={tLinto('title')}
