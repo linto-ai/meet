@@ -14,8 +14,11 @@ import pytest
 from livekit.api import AccessToken, VideoGrants
 from rest_framework.test import APIClient
 
-from core.factories import RoomFactory
-from core.services.bot_transcription import PermissionDeniedError
+from core.factories import RoomFactory, UserFactory
+from core.services.bot_transcription import (
+    BotTranscriptionException,
+    PermissionDeniedError,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -125,29 +128,75 @@ class TestStartedStopped:
         stopped.assert_called_once()
 
 
-class TestDevStudioToken:
-    def test_disabled_returns_404(self, linto_settings):
-        linto_settings.LINTO_STUDIO_DEV_TOKEN_ENABLED = False
+class TestStudioToken:
+    """GET linto/studio-token is the identity bridge: the caller's Meet identity
+    → a Studio JWT + organization for the browser SDK, from the configured
+    token source. Anonymous guests (no Meet user behind the LiveKit identity)
+    have nothing to bridge."""
+
+    def test_anonymous_is_forbidden(self, linto_settings):
+        room = RoomFactory()
+        token = _room_token(room)  # identity "user-1" matches no Meet user
+        with mock.patch(
+            "core.api.viewsets.BotTranscriptionService.studio_token_for"
+        ) as service:
+            res = APIClient().get(
+                f"/api/v1.0/rooms/{room.id}/linto/studio-token/?token={token}"
+            )
+        assert res.status_code == 403
+        assert res.json()["code"] == "anonymous"
+        service.assert_not_called()
+
+    def test_authenticated_user_gets_the_token_context(self, linto_settings):
+        user = UserFactory(sub="user-1")
         room = RoomFactory()
         token = _room_token(room)
-        res = APIClient().get(
-            f"/api/v1.0/rooms/{room.id}/linto/studio-token/?token={token}"
-        )
-        assert res.status_code == 404
+        payload = {
+            "enabled": True,
+            "token": "jwt",
+            "base_url": "http://studio",
+            "organization_id": "org1",
+            "expires_in": 3600,
+            "capabilities": {"quickMeeting": True},
+        }
+        with mock.patch(
+            "core.api.viewsets.BotTranscriptionService.studio_token_for",
+            return_value=payload,
+        ) as service:
+            res = APIClient().get(
+                f"/api/v1.0/rooms/{room.id}/linto/studio-token/?token={token}"
+            )
+        assert res.status_code == 200
+        assert res.json() == payload
+        assert service.call_args.args[0] == user
 
-    def test_enabled_returns_token(self, linto_settings):
-        linto_settings.LINTO_STUDIO_DEV_TOKEN_ENABLED = True
+    def test_not_entitled_is_a_200_with_enabled_false(self, linto_settings):
+        UserFactory(sub="user-1")
         room = RoomFactory()
         token = _room_token(room)
         with mock.patch(
-            "core.api.viewsets.BotTranscriptionService.dev_studio_token",
-            return_value={"token": "jwt", "base_url": "http://studio"},
+            "core.api.viewsets.BotTranscriptionService.studio_token_for",
+            return_value={"enabled": False, "reason": "no_entitlement"},
         ):
             res = APIClient().get(
                 f"/api/v1.0/rooms/{room.id}/linto/studio-token/?token={token}"
             )
         assert res.status_code == 200
-        assert res.json() == {"token": "jwt", "base_url": "http://studio"}
+        assert res.json() == {"enabled": False, "reason": "no_entitlement"}
+
+    def test_studio_failure_is_a_502(self, linto_settings):
+        UserFactory(sub="user-1")
+        room = RoomFactory()
+        token = _room_token(room)
+        with mock.patch(
+            "core.api.viewsets.BotTranscriptionService.studio_token_for",
+            side_effect=BotTranscriptionException("no Studio credentials"),
+        ):
+            res = APIClient().get(
+                f"/api/v1.0/rooms/{room.id}/linto/studio-token/?token={token}"
+            )
+        assert res.status_code == 502
+        assert "credentials" in res.json()["error"]
 
 
 class TestAuth:

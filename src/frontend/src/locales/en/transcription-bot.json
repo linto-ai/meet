@@ -6,6 +6,7 @@
     "start": "Start",
     "stop": "Stop",
     "notAvailable": "LinTO transcription is not available in this room.",
+    "noEntitlement": "The AI transcription option is not active for your account.",
     "options": {
       "summary": "Generate a summary",
       "summaryHelp": "A summary is sent at the end of the meeting.",

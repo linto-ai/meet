@@ -6,6 +6,7 @@
     "start": "Starten",
     "stop": "Stoppen",
     "notAvailable": "Die LinTO-Transkription ist in diesem Raum nicht verfügbar.",
+    "noEntitlement": "Die KI-Transkriptionsoption ist für Ihr Konto nicht aktiviert.",
     "options": {
       "summary": "Eine Zusammenfassung erstellen",
       "summaryHelp": "Am Ende der Besprechung wird eine Zusammenfassung gesendet.",

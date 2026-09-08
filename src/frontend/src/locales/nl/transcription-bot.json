@@ -6,6 +6,7 @@
     "start": "Starten",
     "stop": "Stoppen",
     "notAvailable": "LinTO-transcriptie is niet beschikbaar in deze ruimte.",
+    "noEntitlement": "De AI-transcriptieoptie is niet geactiveerd voor uw account.",
     "options": {
       "summary": "Een samenvatting genereren",
       "summaryHelp": "Aan het einde van de vergadering wordt een samenvatting verstuurd.",

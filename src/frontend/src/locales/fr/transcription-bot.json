@@ -6,6 +6,7 @@
     "start": "Démarrer",
     "stop": "Arrêter",
     "notAvailable": "La transcription LinTO n'est pas disponible dans ce salon.",
+    "noEntitlement": "L'option de transcription IA n'est pas activée pour votre compte.",
     "options": {
       "summary": "Générer un compte rendu",
       "summaryHelp": "Un compte rendu est envoyé à la fin de la réunion.",
