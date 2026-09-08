@@ -992,6 +992,26 @@ class Base(Configuration):
     LINTO_STUDIO_TOKEN_SOURCE = values.Value(
         "service_account", environ_name="LINTO_STUDIO_TOKEN_SOURCE", environ_prefix=None
     )
+    # user_key mode — the identity Meet presents to the studio-api exchange:
+    # `provider` labels THIS Meet instance (the same person on two instances is
+    # two identities; keys are linked per provider), `subject` = user.sub,
+    # `email` = user.email (the pivot with Twake / the external domains).
+    LINTO_IDENTITY_PROVIDER = values.Value(
+        "meet", environ_name="LINTO_IDENTITY_PROVIDER", environ_prefix=None
+    )
+    # The ONE credential the backend holds towards Studio: an API key with the
+    # INTEGRATION platform role (identity exchange, admin stop, summary). Empty →
+    # LINTO_STUDIO_AUTH_EMAIL/PASSWORD, then LINTO_STUDIO_API_TOKEN (dev: the
+    # super admin, which the exchange accepts with the backoffice scope).
+    LINTO_STUDIO_INTEGRATION_TOKEN = SecretFileValue(
+        None, environ_name="LINTO_STUDIO_INTEGRATION_TOKEN", environ_prefix=None
+    )
+    # Seconds a user's exchange result (short token, or "option not active") is
+    # cached per user — one Studio round-trip per participant per 5 min, not
+    # per panel opening. Never longer than the token itself.
+    LINTO_STUDIO_TOKEN_CACHE_TTL = values.IntegerValue(
+        300, environ_name="LINTO_STUDIO_TOKEN_CACHE_TTL", environ_prefix=None
+    )
     # Default org-member rights on uploaded conversations. 0 = no rights
     # (only MAINTAINER+ and explicitly shared users see it). 1 = READ.
     LINTO_STUDIO_MEMBERS_RIGHT = values.IntegerValue(

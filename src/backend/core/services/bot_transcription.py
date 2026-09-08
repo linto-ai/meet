@@ -28,6 +28,7 @@ from datetime import datetime, timezone
 from logging import getLogger
 
 from django.conf import settings
+from django.core.cache import cache
 
 import requests
 
@@ -105,8 +106,12 @@ class BotTranscriptionService:
 
     # ── auth ─────────────────────────────────────────────────────────────
     def _login(self):
-        """Service auth to Studio. Prefers a login (BOT+MICROPHONE rights via the
-        account's org), falls back to a static LINTO_STUDIO_API_TOKEN."""
+        """The backend's credential towards Studio: the INTEGRATION key when
+        configured (identity exchange, admin stop, summary), else a login
+        (BOT+MICROPHONE rights via the account's org), else the static
+        LINTO_STUDIO_API_TOKEN."""
+        if settings.LINTO_STUDIO_INTEGRATION_TOKEN:
+            return settings.LINTO_STUDIO_INTEGRATION_TOKEN
         email = settings.LINTO_STUDIO_AUTH_EMAIL
         password = settings.LINTO_STUDIO_AUTH_PASSWORD
         if email and password:
@@ -564,7 +569,8 @@ class BotTranscriptionService:
           ``LINTO_STUDIO_DEFAULT_ORG_ID`` (or its first organization). One Studio
           identity for the whole instance ⇒ one live transcription at a time.
         - ``user_key`` — the user's OWN LinTO API key, through the studio-api
-          identity exchange (``POST /api/auth/external/token``).
+          identity exchange (``POST /api/auth/external/token``); the
+          organization is the key's. No per-instance limit.
 
         Returns ``{"enabled": True, "token", "base_url", "organization_id",
         "expires_in", "capabilities"}``, or ``{"enabled": False, "reason"}`` when
@@ -622,12 +628,89 @@ class BotTranscriptionService:
             )
         return orgs[0].get("_id") or orgs[0].get("id")
 
+    # Exchange answers that mean "not for this user" rather than "broken".
+    NOT_ENTITLED_CODES = {"no_linked_key", "revoked", "domain_inactive"}
+
     def _user_key_token(self, user):
-        """Exchange the user's identity for a short token of their own key."""
+        """Exchange the user's identity for a short token of their OWN key.
+
+        ``POST {studio}/api/auth/external/token {provider, subject, email}``
+        with the integration credential: studio-api resolves the LinTO API key
+        linked to that person (or creates one just-in-time when the email's
+        domain is active) and mints a token that expires within the hour. A
+        ``404 no_linked_key`` / ``403 revoked|domain_inactive`` is a normal
+        answer — the option is not active for this user — not an error. Both
+        outcomes are cached per user for ``LINTO_STUDIO_TOKEN_CACHE_TTL``
+        seconds (never beyond the token's own life).
+        """
+        cache_key = self._user_token_cache_key(user)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        subject = user.sub or str(user.id)
+        email = (user.email or "").strip().lower()
+        payload = {"provider": settings.LINTO_IDENTITY_PROVIDER, "subject": subject}
+        if email:
+            payload["email"] = email
+        try:
+            r = requests.post(
+                f"{self.studio_base}/api/auth/external/token",
+                # Harmless for an INTEGRATION key; required when the credential
+                # is a system administrator (dev / transition).
+                params={"userScope": "backoffice"},
+                json=payload,
+                headers=self._headers(),
+                timeout=DEFAULT_TIMEOUT,
+            )
+        except requests.RequestException as exc:
+            raise BotTranscriptionException(
+                f"Studio identity exchange error: {exc}"
+            ) from exc
+
+        ttl = max(1, int(settings.LINTO_STUDIO_TOKEN_CACHE_TTL))
+        if r.status_code == 200:
+            data = r.json() or {}
+            if not data.get("token"):
+                raise BotTranscriptionException(
+                    "Studio identity exchange returned no token"
+                )
+            expires_in = data.get("expiresIn")
+            result = {
+                "enabled": True,
+                "token": data["token"],
+                "base_url": self._browser_base(),
+                "organization_id": data.get("organizationId"),
+                "expires_in": expires_in,
+                "capabilities": data.get("capabilities") or {"quickMeeting": True},
+            }
+            if isinstance(expires_in, (int, float)) and expires_in > 0:
+                # Keep a margin so a cached token is never handed out expired.
+                ttl = max(1, min(ttl, int(expires_in) - 60))
+            cache.set(cache_key, result, ttl)
+            return result
+
+        code = None
+        try:
+            code = (r.json() or {}).get("code")
+        except ValueError:
+            pass
+        if r.status_code in (403, 404) and code in self.NOT_ENTITLED_CODES:
+            result = {"enabled": False, "reason": code}
+            cache.set(cache_key, result, ttl)
+            logger.info("LinTO: option not active for user %s (%s)", subject, code)
+            return result
         raise BotTranscriptionException(
-            "LINTO_STUDIO_TOKEN_SOURCE=user_key is not available yet "
-            "(studio-api identity exchange pending)"
+            f"Studio identity exchange failed: {r.status_code} {r.text[:200]}"
         )
+
+    @staticmethod
+    def _user_token_cache_key(user):
+        return f"linto:studio-token:{settings.LINTO_IDENTITY_PROVIDER}:{user.id}"
+
+    def forget_user_token(self, user):
+        """Drop a user's cached exchange result (e.g. after a revocation)."""
+        cache.delete(self._user_token_cache_key(user))
 
 
 def jwt_seconds_left(token):
