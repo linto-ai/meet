@@ -10,6 +10,7 @@ egress) are patched.
 
 # pylint: disable=redefined-outer-name,protected-access
 
+from datetime import datetime, timezone
 from unittest import mock
 
 import pytest
@@ -18,6 +19,15 @@ import responses
 from core import models
 from core.factories import RoomFactory, UserFactory
 from core.services.bot_transcription import (
+    LINTO_CHANNEL_INDEX,
+    ROOM_METADATA_CHANNEL_ID_KEY,
+    ROOM_METADATA_CHANNEL_INDEX_KEY,
+    ROOM_METADATA_KEYS,
+    ROOM_METADATA_ORG_ID_KEY,
+    ROOM_METADATA_SESSION_ID_KEY,
+    ROOM_METADATA_STARTED_AT_KEY,
+    ROOM_METADATA_STARTER_KEY,
+    ROOM_METADATA_STATUS_KEY,
     BotTranscriptionException,
     BotTranscriptionService,
     PermissionDeniedError,
@@ -122,7 +132,9 @@ class TestMarkStarted:
         assert linto["org_id"] == "org-1"
         assert linto["user_id"] == str(owner.id)
         assert "recording_id" not in linto  # record was False → no egress
-        self.banner.assert_called_once_with(room, True, user=owner)
+        # The banner call carries the run state, so the metadata can advertise
+        # the Studio ids a late joiner needs to catch up.
+        self.banner.assert_called_once_with(room, True, user=owner, linto=linto)
         self.rec.assert_not_called()
 
     def test_record_add_on_dropped_without_screen_permission(self, studio_settings):
@@ -134,6 +146,83 @@ class TestMarkStarted:
         )
         assert result["record"] is False
         self.rec.assert_not_called()
+
+
+class TestBannerMetadata:
+    """_set_banner: the room-metadata contract read by EVERY participant.
+
+    Beyond the status/starter pair, an active run advertises the Studio session
+    identity (+ start timestamp) so a LATE JOINER's browser can fetch the
+    transcript so far and the "before you arrived" summary. Everything is
+    cleared as one block at stop/teardown.
+    """
+
+    def test_active_publishes_the_session_identity(self, studio_settings):
+        room, owner = _owner_room()
+        data = {
+            "session_id": "sess-1",
+            "channel_id": "chan-1",
+            "org_id": "org-1",
+            "bot_id": "bot-1",
+            "record": False,
+        }
+        with (
+            mock.patch(
+                "core.services.bot_transcription.RoomManagement"
+            ) as room_management,
+            mock.patch.object(BotTranscriptionService, "_start_recording"),
+        ):
+            BotTranscriptionService().mark_started(room, data, user=owner)
+        room_management.return_value.update_metadata.assert_called_once()
+        args = room_management.return_value.update_metadata.call_args[0]
+        assert args[0] == str(room.id)
+        metadata = args[1]
+        assert metadata[ROOM_METADATA_STATUS_KEY] == "active"
+        assert metadata[ROOM_METADATA_STARTER_KEY] == str(owner.id)
+        assert metadata[ROOM_METADATA_SESSION_ID_KEY] == "sess-1"
+        assert metadata[ROOM_METADATA_CHANNEL_ID_KEY] == "chan-1"
+        assert metadata[ROOM_METADATA_CHANNEL_INDEX_KEY] == LINTO_CHANNEL_INDEX
+        assert metadata[ROOM_METADATA_ORG_ID_KEY] == "org-1"
+        started_at = metadata[ROOM_METADATA_STARTED_AT_KEY]
+        # ISO 8601 UTC, parseable by the browser's Date.parse.
+        assert started_at.endswith("Z")
+        parsed = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+        assert parsed.tzinfo is not None
+        assert abs((datetime.now(timezone.utc) - parsed).total_seconds()) < 60
+
+    def test_active_without_ids_only_publishes_the_status(self, studio_settings):
+        # A half-written key set would send the catch-up hook after a session
+        # that does not exist: publish the ids only when we have them.
+        room, owner = _owner_room()
+        with mock.patch(
+            "core.services.bot_transcription.RoomManagement"
+        ) as room_management:
+            BotTranscriptionService()._set_banner(room, True, user=owner, linto={})
+        metadata = room_management.return_value.update_metadata.call_args[0][1]
+        assert set(metadata) == {ROOM_METADATA_STATUS_KEY, ROOM_METADATA_STARTER_KEY}
+
+    def test_inactive_removes_every_linto_key(self, studio_settings):
+        room = RoomFactory()
+        with mock.patch(
+            "core.services.bot_transcription.RoomManagement"
+        ) as room_management:
+            BotTranscriptionService()._set_banner(room, False)
+        args = room_management.return_value.update_metadata.call_args[0]
+        assert args[1] == {}
+        assert sorted(args[2]) == sorted(ROOM_METADATA_KEYS)
+        assert ROOM_METADATA_SESSION_ID_KEY in args[2]
+
+    def test_metadata_failure_never_breaks_the_run(self, studio_settings):
+        room, owner = _owner_room()
+        with mock.patch(
+            "core.services.bot_transcription.RoomManagement"
+        ) as room_management:
+            room_management.return_value.update_metadata.side_effect = RuntimeError(
+                "livekit down"
+            )
+            BotTranscriptionService()._set_banner(
+                room, True, user=owner, linto={"session_id": "sess-1"}
+            )
 
 
 class TestMarkStopped:
@@ -259,6 +348,28 @@ class TestTeardown:
         assert del_qm.call_count == 1
         room.refresh_from_db()
         assert "linto" not in room.configuration
+
+    @responses.activate
+    def test_clears_the_room_metadata(self, studio_settings):
+        # A room ending with a run still active must leave no stale session id
+        # behind, or a later joiner would try to catch up on a dead session.
+        room = RoomFactory()
+        room.configuration = {
+            "linto": {"org_id": "org-1", "session_id": "sess-1", "summary": False}
+        }
+        room.save()
+        responses.delete(
+            f"{STUDIO}/api/organizations/org-1/quickMeeting/sess-1",
+            json={"success": True},
+            status=200,
+        )
+        with mock.patch(
+            "core.services.bot_transcription.RoomManagement"
+        ) as room_management:
+            BotTranscriptionService().teardown(room)
+        args = room_management.return_value.update_metadata.call_args[0]
+        assert args[1] == {}
+        assert sorted(args[2]) == sorted(ROOM_METADATA_KEYS)
 
 
 class TestDevStudioToken:

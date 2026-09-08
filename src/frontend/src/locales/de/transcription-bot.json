@@ -22,6 +22,14 @@
       "displayLanguage": "Angezeigte Sprache",
       "original": "Original (gesprochene Sprache)"
     },
+    "catchup": {
+      "heading": "Vor Ihrer Ankunft",
+      "loading": "Zusammenfassung wird erstellt…",
+      "error": "Die Zusammenfassung konnte nicht erstellt werden.",
+      "tooShort": "Vor Ihrer Ankunft wurde zu wenig gesagt.",
+      "refresh": "Aktualisieren",
+      "joined": "Sie sind um {{time}} beigetreten"
+    },
     "settings": {
       "language": "Sprache",
       "languageAuto": "Automatisch",

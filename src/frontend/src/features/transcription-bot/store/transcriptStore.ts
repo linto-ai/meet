@@ -18,19 +18,32 @@ export const transcriptStore = proxy<TranscriptState>({
 
 /**
  * Split a LinTO segment id into its base id and optional translation target.
- * `linto:12` → { base: 'linto:12' }, `linto:12:en` → { base: 'linto:12', lang: 'en' }.
+ *
+ * The bot namespaces its ids as `linto:[<channelKey>:]<segmentId>[:<lang>]`,
+ * where `channelKey` is the `<sessionId>,<channelIndex>` tail of its Transcriber
+ * stream (present since the per-channel namespacing; absent on older bots) and
+ * `segmentId` is the Transcriber's integer counter. Only the TRAILING part can be
+ * a language code, and it is never numeric, which is what tells
+ * `linto:abc,0:12:en` (translation of `linto:abc,0:12`) apart from
+ * `linto:abc,0:12` (an original line).
+ *   `linto:12`          → { base: 'linto:12' }
+ *   `linto:12:en`       → { base: 'linto:12', lang: 'en' }
+ *   `linto:s1,0:12`     → { base: 'linto:s1,0:12' }
+ *   `linto:s1,0:12:en`  → { base: 'linto:s1,0:12', lang: 'en' }
  * Returns undefined for ids that are not LinTO segments.
  */
 export const parseLintoSegmentId = (
   id: string
 ): { base: string; lang?: string } | undefined => {
   if (!id.startsWith(LINTO_SEGMENT_PREFIX)) return undefined
-  const rest = id.slice(LINTO_SEGMENT_PREFIX.length)
-  const sep = rest.indexOf(':')
-  if (sep === -1) return { base: id }
+  const parts = id.slice(LINTO_SEGMENT_PREFIX.length).split(':')
+  const last = parts[parts.length - 1]
+  if (parts.length < 2 || last === '' || /^\d+$/.test(last)) {
+    return { base: id }
+  }
   return {
-    base: `${LINTO_SEGMENT_PREFIX}${rest.slice(0, sep)}`,
-    lang: rest.slice(sep + 1) || undefined,
+    base: `${LINTO_SEGMENT_PREFIX}${parts.slice(0, -1).join(':')}`,
+    lang: last,
   }
 }
 

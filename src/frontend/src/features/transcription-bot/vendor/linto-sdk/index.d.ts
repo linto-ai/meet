@@ -35,6 +35,59 @@ export interface Organization {
   name?: string
 }
 
+// One finalized caption as Session-API persists it (catch-up history).
+export interface PublicSessionCaption {
+  segmentId?: string | number
+  start?: number
+  end?: number
+  text?: string
+  // Absolute wall-clock start of the AUDIO the segment belongs to (ISO 8601);
+  // `astart + start` is the real time the sentence was spoken.
+  astart?: string
+  aend?: string
+  lang?: string
+  locutor?: string
+}
+
+export interface PublicSessionTranslation {
+  segmentId?: string | number
+  targetLang?: string
+  lang?: string
+  text?: string
+}
+
+export interface PublicSessionChannel {
+  index?: number
+  id?: string
+  closedCaptions?: PublicSessionCaption[]
+  translatedCaptions?: Record<string, PublicSessionTranslation[]>
+}
+
+export interface PublicSession {
+  id?: string
+  name?: string
+  visibility?: string
+  channels?: PublicSessionChannel[]
+  // Bearer token authorizing the catch-up routes for an anonymous guest.
+  publicSessionToken?: string
+}
+
+export interface CatchUpResult {
+  text: string
+  cached: boolean
+}
+
+// Machine-readable reason carried by a rejected catch-up call.
+export type CatchUpErrorCode =
+  | 'catchup_unavailable'
+  | 'catchup_rate_limited'
+  | 'catchup_too_short'
+  | 'catchup_forbidden'
+
+export interface CatchUpError extends Error {
+  code?: CatchUpErrorCode | string
+}
+
 export default class LinTO {
   constructor(options?: LintoOptions)
   apiService: {
@@ -42,6 +95,39 @@ export default class LinTO {
     organizations: Organization[]
     fetchOrganizations(args?: { token?: string }): Promise<Organization[]>
   }
+
+  /** LLM services available for summarization (empty = no LLM configured). */
+  listLlmServices(): Promise<Array<Record<string, unknown>>>
+
+  summarize(
+    conversationId: string,
+    serviceRoute: string,
+    options?: { flavor?: string }
+  ): Promise<unknown>
+
+  // --- Catch-up (late joiner) ---
+
+  getPublicSession(
+    sessionId: string,
+    options?: { token?: string }
+  ): Promise<PublicSession>
+
+  catchUpStatus(
+    sessionId: string,
+    options?: { token?: string }
+  ): Promise<{ enabled: boolean }>
+
+  catchUp(
+    sessionId: string,
+    options?: {
+      token?: string
+      before?: string
+      channelIndex?: number
+      maxChars?: number
+      onToken?: (chunk: string, fullText: string) => void
+      signal?: AbortSignal
+    }
+  ): Promise<CatchUpResult>
 
   listQuickMeetingProfiles(args?: {
     organizationId?: string
@@ -89,6 +175,9 @@ export default class LinTO {
     botUrl: string
     provider?: string
     makePublic?: boolean
+    /** Have the bot show the captions in the meeting (native visio bot: republish
+     *  them into the LiveKit room, which feeds the overlay + panel). Default true. */
+    enableDisplaySub?: boolean
     metaWithToken?: (
       sessionId: string,
       channelId: string

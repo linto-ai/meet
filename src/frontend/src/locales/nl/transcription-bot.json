@@ -22,6 +22,14 @@
       "displayLanguage": "Weergegeven taal",
       "original": "Origineel (gesproken taal)"
     },
+    "catchup": {
+      "heading": "Voordat u erbij kwam",
+      "loading": "Samenvatting wordt gegenereerd…",
+      "error": "De samenvatting kon niet worden gegenereerd.",
+      "tooShort": "Er is te weinig gezegd voordat u erbij kwam.",
+      "refresh": "Vernieuwen",
+      "joined": "U bent om {{time}} toegetreden"
+    },
     "settings": {
       "language": "Taal",
       "languageAuto": "Automatisch",

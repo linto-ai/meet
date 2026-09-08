@@ -21,6 +21,7 @@ the summary Celery task and the teardown, which run under the service account.
 """
 
 import time
+from datetime import datetime, timezone
 from logging import getLogger
 
 from django.conf import settings
@@ -44,6 +45,34 @@ DEFAULT_TIMEOUT = 15
 # source of truth, replayed to late joiners by LiveKit itself.
 ROOM_METADATA_STATUS_KEY = "linto_transcription_status"
 ROOM_METADATA_STARTER_KEY = "linto_transcription_started_by"
+
+# Studio identity of the RUNNING session, broadcast the same way so a LATE
+# JOINER can fetch the transcript so far (catch-up) without ever having seen the
+# start: the browser reads these keys, calls studio-api for the finalized
+# captions and the "before you arrived" summary. They expose nothing that
+# ``GET /rooms/{id}/`` does not already return in ``configuration["linto"]``.
+ROOM_METADATA_SESSION_ID_KEY = "linto_transcription_session_id"
+ROOM_METADATA_CHANNEL_ID_KEY = "linto_transcription_channel_id"
+ROOM_METADATA_CHANNEL_INDEX_KEY = "linto_transcription_channel_index"
+ROOM_METADATA_ORG_ID_KEY = "linto_transcription_org_id"
+ROOM_METADATA_STARTED_AT_KEY = "linto_transcription_started_at"
+
+# A Meet room drives ONE quickMeeting channel, always at index 0 — the index (not
+# the channel id) is what namespaces the bot's segment ids
+# (``linto:<sessionId>,<channelIndex>:<segmentId>``), so the catch-up history can
+# be keyed exactly like the live feed.
+LINTO_CHANNEL_INDEX = 0
+
+# Every LinTO room-metadata key, cleared as one block at stop/teardown.
+ROOM_METADATA_KEYS = [
+    ROOM_METADATA_STATUS_KEY,
+    ROOM_METADATA_STARTER_KEY,
+    ROOM_METADATA_SESSION_ID_KEY,
+    ROOM_METADATA_CHANNEL_ID_KEY,
+    ROOM_METADATA_CHANNEL_INDEX_KEY,
+    ROOM_METADATA_ORG_ID_KEY,
+    ROOM_METADATA_STARTED_AT_KEY,
+]
 
 
 class BotTranscriptionException(Exception):
@@ -241,14 +270,17 @@ class BotTranscriptionService:
             return bool(user is not None and getattr(user, "is_authenticated", False))
         return room.is_administrator_or_owner(user)
 
-    def _set_banner(self, room, active, user=None):
+    def _set_banner(self, room, active, user=None, linto=None):
         """Light/clear the room-wide "transcription in progress" state.
 
-        Writes a DEDICATED LiveKit room-metadata key (independent of the egress
+        Writes DEDICATED LiveKit room-metadata keys (independent of the egress
         ``recording_mode``/``recording_status`` machinery, so both can coexist).
-        Every participant's frontend reads it (banner, CC badge, panel state) and
-        LiveKit replays it to late joiners. Best-effort: a metadata failure must
-        never break start/stop.
+        Every participant's frontend reads them (banner, CC badge, panel state,
+        catch-up) and LiveKit replays them to late joiners. When ``linto`` (the
+        run state persisted by :meth:`mark_started`) is given, the Studio ids and
+        the start timestamp ride along so a LATE JOINER can hydrate the
+        transcript so far. Best-effort: a metadata failure must never break
+        start/stop.
         """
         # RoomManagement.update_metadata is already @async_to_sync — call it directly.
         try:
@@ -260,18 +292,31 @@ class BotTranscriptionService:
                     if (user is not None and getattr(user, "is_authenticated", False))
                     else ""
                 )
-                RoomManagement().update_metadata(
-                    str(room.id),
-                    {
-                        ROOM_METADATA_STATUS_KEY: "active",
-                        ROOM_METADATA_STARTER_KEY: starter,
-                    },
-                )
+                metadata = {
+                    ROOM_METADATA_STATUS_KEY: "active",
+                    ROOM_METADATA_STARTER_KEY: starter,
+                }
+                run = linto or {}
+                # Only advertise ids we actually have: a half-written key set
+                # would make the catch-up hook fetch a session that does not exist.
+                if run.get("session_id"):
+                    metadata[ROOM_METADATA_SESSION_ID_KEY] = str(run["session_id"])
+                    metadata[ROOM_METADATA_CHANNEL_INDEX_KEY] = LINTO_CHANNEL_INDEX
+                    metadata[ROOM_METADATA_STARTED_AT_KEY] = (
+                        datetime.now(timezone.utc)
+                        .isoformat(timespec="seconds")
+                        .replace("+00:00", "Z")
+                    )
+                if run.get("channel_id"):
+                    metadata[ROOM_METADATA_CHANNEL_ID_KEY] = str(run["channel_id"])
+                if run.get("org_id"):
+                    metadata[ROOM_METADATA_ORG_ID_KEY] = str(run["org_id"])
+                RoomManagement().update_metadata(str(room.id), metadata)
             else:
                 RoomManagement().update_metadata(
                     str(room.id),
                     {},
-                    [ROOM_METADATA_STATUS_KEY, ROOM_METADATA_STARTER_KEY],
+                    list(ROOM_METADATA_KEYS),
                 )
         except Exception as exc:  # noqa: BLE001
             logger.warning(
@@ -384,7 +429,7 @@ class BotTranscriptionService:
 
         room.configuration = {**(room.configuration or {}), "linto": linto}
         room.save(update_fields=["configuration"])
-        self._set_banner(room, True, user=user)
+        self._set_banner(room, True, user=user, linto=linto)
         logger.info(
             "LinTO run started for room %s (session=%s bot=%s summary=%s record=%s)",
             room.id,
