@@ -6,12 +6,24 @@ Reference: /home/realitix/git/linagora/meet2twake/main.go
 
 import json
 import logging
+from urllib.parse import quote
 
 import aiohttp
 
 logger = logging.getLogger(__name__)
 
-MEETINGS_DIR_NAME = "_Reunions"
+ROOT_DIR_ID = "io.cozy.files.root-dir"
+TRASH_PATH_PREFIX = "/.cozy_trash"
+
+MEETINGS_DIR_NAME = "_Meetings"
+
+# "Magic folder" reference, following the cozy-client convention
+# (`io.cozy.apps/administrative`, `io.cozy.apps/notes`, ...). The referenced
+# `io.cozy.apps` document does not exist: the stack only stores the pair
+# (type, id) in the folder's `referenced_by` array. Looking the folder up by
+# this reference instead of by path keeps working after the user renames or
+# moves it.
+MEETINGS_DIR_REFERENCE = {"type": "io.cozy.apps", "id": "io.cozy.apps/meet"}
 
 
 async def get_drive_token(cloudery_url, cloudery_token, instance):
@@ -128,23 +140,113 @@ async def ensure_directory(instance, token, path, parent_id, favorite=False):
     return dir_id
 
 
+def _references_url(instance, reference):
+    """Build the stack URL for the references of a document.
+
+    The document id may contain a `/` (e.g. `io.cozy.apps/meet`), so it has to
+    be percent-encoded as a single path segment; the stack unescapes it.
+    """
+    doc_id = quote(reference["id"], safe="")
+    return (
+        f"https://{instance}/data/{reference['type']}/{doc_id}/relationships/references"
+    )
+
+
+def pick_live_directory(included):
+    """Return the most recently created non-trashed directory, or None.
+
+    Port of cozy-client `getReferencedFolder`: the stack view does not filter
+    out trashed files, so this is done here.
+    """
+    directories = [
+        doc
+        for doc in included
+        if doc.get("type") == "io.cozy.files"
+        and doc.get("attributes", {}).get("type") == "directory"
+        and not doc["attributes"].get("path", "").startswith(TRASH_PATH_PREFIX)
+    ]
+    if not directories:
+        return None
+    return max(directories, key=lambda doc: doc["attributes"].get("created_at", ""))
+
+
+async def get_referenced_directory(instance, token, reference):
+    """Return {"id", "path"} of the directory referenced by `reference`, or None.
+
+    Port of cozy-client `getReferencedFolder`.
+    GET https://{instance}/data/{type}/{id}/relationships/references?include=files
+    """
+    url = f"{_references_url(instance, reference)}?include=files"
+    headers = {"Authorization": f"Bearer {token}"}
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, headers=headers) as resp:
+            if resp.status != 200:
+                body = await resp.text()
+                raise RuntimeError(
+                    f"Cozy get_referenced_directory failed for {reference['id']}: "
+                    f"{resp.status} {body[:500]}"
+                )
+            data = await resp.json()
+
+    directory = pick_live_directory(data.get("included", []))
+    if directory is None:
+        return None
+    return {"id": directory["id"], "path": directory["attributes"]["path"]}
+
+
+async def add_reference(instance, token, reference, dir_id):
+    """Add `reference` to the `referenced_by` of the given directory.
+
+    Port of cozy-stack-client `addReferencesTo`.
+    POST https://{instance}/data/{type}/{id}/relationships/references
+    """
+    url = _references_url(instance, reference)
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/vnd.api+json",
+    }
+    payload = {"data": [{"type": "io.cozy.files", "id": dir_id}]}
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, headers=headers, data=json.dumps(payload)) as resp:
+            if resp.status != 204:
+                body = await resp.text()
+                raise RuntimeError(
+                    f"Cozy add_reference failed for {dir_id}: "
+                    f"{resp.status} {body[:500]}"
+                )
+
+
+async def ensure_meetings_directory(instance, token):
+    """Return {"id", "path"} of the meetings "magic folder", creating it if needed.
+
+    Port of cozy-client `ensureMagicFolder`: look the folder up by reference
+    first, so a renamed or moved folder is still found. Fall back to the
+    default path (which also adopts a pre-existing, unreferenced `_Meetings`
+    folder), and tag it with the reference.
+    """
+    directory = await get_referenced_directory(instance, token, MEETINGS_DIR_REFERENCE)
+    if directory:
+        return directory
+
+    path = f"/{MEETINGS_DIR_NAME}"
+    dir_id = await ensure_directory(instance, token, path, ROOT_DIR_ID, favorite=True)
+    await add_reference(instance, token, MEETINGS_DIR_REFERENCE, dir_id)
+    return {"id": dir_id, "path": path}
+
+
 async def ensure_meeting_directory(instance, token, dirname):
-    """Create _Reunions/{dirname} directory structure.
+    """Create {meetings folder}/{dirname} directory structure.
 
     Ref: meet2twake ensureMeetingDirectory (lines 503-509)
     """
-    meetings_dir_id = await ensure_directory(
-        instance,
-        token,
-        f"/{MEETINGS_DIR_NAME}",
-        "io.cozy.files.root-dir",
-        favorite=True,
-    )
+    meetings_dir = await ensure_meetings_directory(instance, token)
     return await ensure_directory(
         instance,
         token,
-        f"/{MEETINGS_DIR_NAME}/{dirname}",
-        meetings_dir_id,
+        f"{meetings_dir['path']}/{dirname}",
+        meetings_dir["id"],
     )
 
 
