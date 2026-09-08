@@ -1,5 +1,25 @@
 import { proxy } from 'valtio'
 
+// Lifecycle of the "before you arrived" summary: 'unavailable' = the deployment
+// has no LLM (block hidden), 'too_short' = nothing worth summarizing was said
+// before I joined.
+export type LintoCatchUpStatus =
+  | 'idle'
+  | 'loading'
+  | 'streaming'
+  | 'done'
+  | 'error'
+  | 'unavailable'
+  | 'too_short'
+
+export type LintoCatchUpState = {
+  status: LintoCatchUpStatus
+  // Markdown produced by the LLM, growing while it streams.
+  text: string
+  updatedAt: number | null
+  error?: string
+}
+
 type LintoState = {
   // Mirrors the room-metadata "transcription in progress" flag (shared truth
   // for every participant) — see useLintoStatus. Also set optimistically by the
@@ -37,6 +57,19 @@ type LintoState = {
   // Last start-bot error message (machine code mapped to a friendly string in
   // the panel), cleared on the next attempt.
   error?: string
+  // Epoch ms at which I joined THIS room while the run was already going. Splits
+  // the journal into catch-up history and live lines; null for the starter and
+  // for anyone who was there before the transcription started.
+  joinedAt: number | null
+  // "Before you arrived" LLM summary of the pre-join transcript.
+  catchUp: LintoCatchUpState
+}
+
+export const IDLE_CATCH_UP: LintoCatchUpState = {
+  status: 'idle',
+  text: '',
+  updatedAt: null,
+  error: undefined,
 }
 
 export const lintoStore = proxy<LintoState>({
@@ -55,6 +88,8 @@ export const lintoStore = proxy<LintoState>({
   selectedTranslations: [],
   displayLanguage: 'original',
   error: undefined,
+  joinedAt: null,
+  catchUp: { ...IDLE_CATCH_UP },
 })
 
 export const resetLintoRun = () => {
@@ -64,5 +99,9 @@ export const resetLintoRun = () => {
   lintoStore.botId = undefined
   lintoStore.orgId = undefined
   lintoStore.userId = undefined
+  // The catch-up belongs to the run that just ended: a next run starts from a
+  // blank journal (clearTranscript) and must not show the previous summary.
+  lintoStore.joinedAt = null
+  lintoStore.catchUp = { ...IDLE_CATCH_UP }
   // `startedByMe` is intentionally kept (parity with recordingStore).
 }

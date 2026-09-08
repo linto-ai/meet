@@ -36,8 +36,12 @@ export interface LintoCaption {
   translations?: Record<string, string>
   // True while a turn is still in-flight (live partial); false once final.
   partial: boolean
-  // Local receive time (ms epoch) — insertion order of live lines.
+  // Local receive time (ms epoch) — insertion order of live lines. Hydrated
+  // history lines carry the time they were actually SPOKEN (astart + start).
   receivedAt: number
+  // True for a line hydrated from Studio because it was said BEFORE I joined
+  // (catch-up history): rendered dimmed, above the "you joined at" divider.
+  catchup?: boolean
 }
 
 export interface LintoBotStatus {
@@ -75,6 +79,16 @@ export interface LintoBotProfilesResult {
 // room (the shared source of truth for every participant).
 export const LINTO_METADATA_STATUS_KEY = 'linto_transcription_status'
 export const LINTO_METADATA_STARTER_KEY = 'linto_transcription_started_by'
+
+// Studio identity of the RUNNING session, published the same way so a LATE
+// JOINER — who never saw the start and has no local session id — can fetch the
+// transcript so far and the "before you arrived" summary (catch-up).
+export const LINTO_METADATA_SESSION_ID_KEY = 'linto_transcription_session_id'
+export const LINTO_METADATA_CHANNEL_ID_KEY = 'linto_transcription_channel_id'
+export const LINTO_METADATA_CHANNEL_INDEX_KEY =
+  'linto_transcription_channel_index'
+export const LINTO_METADATA_ORG_ID_KEY = 'linto_transcription_org_id'
+export const LINTO_METADATA_STARTED_AT_KEY = 'linto_transcription_started_at'
 
 // Segment-id namespace used by the LinTO bot for the transcription segments it
 // publishes into the LiveKit room.
