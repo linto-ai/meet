@@ -11,8 +11,9 @@ and starts/stops the bot. This service only does what the browser cannot:
   video egress and the autonomous post-meeting summary, and persist the run state
   in ``room.configuration["linto"]``;
 - ``teardown`` — service-account cleanup when a room ends with a run still active;
-- ``dev_studio_token`` — DEV ONLY bridge (service-account JWT) so the browser
-  flow is testable without the shared-IdP SSO.
+- ``studio_token_for`` — the identity bridge: the Studio JWT (+ organization)
+  the browser SDK acts with, from the configured source (shared service account
+  today, the user's own LinTO key through the studio-api identity exchange).
 
 The native bot republishes the live captions INTO the LiveKit room as
 transcription segments, so every participant sees them via the native overlay —
@@ -20,6 +21,8 @@ no per-viewer Studio socket. ``_login`` / ``resolve_conversation_id`` stay for
 the summary Celery task and the teardown, which run under the service account.
 """
 
+import base64
+import json
 import time
 from datetime import datetime, timezone
 from logging import getLogger
@@ -39,6 +42,10 @@ from core.utils import generate_bot_join_token
 logger = getLogger(__name__)
 
 DEFAULT_TIMEOUT = 15
+
+# ``LINTO_STUDIO_TOKEN_SOURCE`` values — where the browser's Studio JWT comes from.
+TOKEN_SOURCE_SERVICE_ACCOUNT = "service_account"  # noqa: S105
+TOKEN_SOURCE_USER_KEY = "user_key"  # noqa: S105
 
 # LiveKit room-metadata key lit while a LinTO bot transcribes the room. Read by
 # EVERY participant's frontend (banner, CC badge, panel state) — the shared
@@ -94,7 +101,6 @@ class BotTranscriptionService:
 
     def __init__(self):
         self.studio_base = (settings.LINTO_STUDIO_BASE_URL or "").rstrip("/")
-        self.session_api = (settings.LINTO_SESSION_API_URL or "").rstrip("/")
         self._token = None
 
     # ── auth ─────────────────────────────────────────────────────────────
@@ -129,26 +135,7 @@ class BotTranscriptionService:
             self._token = self._login()
         return {"Authorization": f"Bearer {self._token}"}
 
-    # ── resolution (dynamic, no hard-coded org/profile) ──────────────────
-    def _resolve_org(self, headers):
-        if settings.LINTO_STUDIO_DEFAULT_ORG_ID:
-            return settings.LINTO_STUDIO_DEFAULT_ORG_ID
-        r = requests.get(
-            f"{self.studio_base}/api/organizations/",
-            headers=headers,
-            timeout=DEFAULT_TIMEOUT,
-        )
-        data = r.json() if r.status_code == 200 else []
-        orgs = data if isinstance(data, list) else data.get("organizations", [])
-        if not orgs:
-            raise BotTranscriptionException(
-                "no Studio organization available for the bot"
-            )
-        # Prefer a "Visio" org if present, else the first one.
-        visio = [o for o in orgs if "visio" in (o.get("name", "") or "").lower()]
-        chosen = visio[0] if visio else orgs[0]
-        return chosen.get("_id") or chosen.get("id")
-
+    # ── resolution ───────────────────────────────────────────────────────
     def resolve_conversation_id(self, org_id, session_id, name):
         """Find the Studio conversation finalized for a stopped quick session.
 
@@ -252,12 +239,6 @@ class BotTranscriptionService:
             logger.warning(
                 "LinTO bot: video egress failed to stop (%s): %s", recording_id, exc
             )
-
-    # ── lifecycle ────────────────────────────────────────────────────────
-    def _room_url(self, room):
-        base = (settings.MEET_PUBLIC_URL or "").rstrip("/")
-        slug = getattr(room, "slug", None) or str(room.id)
-        return f"{base}/{slug}"
 
     # ── organizer recording permissions + "in progress" banner ───────────
     def _has_recording_permission(self, room, user, mode):
@@ -571,13 +552,97 @@ class BotTranscriptionService:
                 exc,
             )
 
-    def dev_studio_token(self):
-        """DEV ONLY: a Studio JWT + browser API base for the SDK, minted from the
-        service account. Lets the browser-first flow be tested without the
-        shared-IdP SSO. Gated by ``LINTO_STUDIO_DEV_TOKEN_ENABLED`` in the view.
+    # ── Studio token for the browser SDK (identity bridge) ───────────────
+    def studio_token_for(self, user):
+        """The Studio JWT + context the browser SDK acts with, for ``user``.
+
+        The Meet backend is the identity bridge between the meeting and LinTO:
+        it knows the participant (``sub``/``email`` from the LiveKit room token)
+        and hands the browser a Studio token from ``LINTO_STUDIO_TOKEN_SOURCE``:
+
+        - ``service_account`` — the shared service account, acting in
+          ``LINTO_STUDIO_DEFAULT_ORG_ID`` (or its first organization). One Studio
+          identity for the whole instance ⇒ one live transcription at a time.
+        - ``user_key`` — the user's OWN LinTO API key, through the studio-api
+          identity exchange (``POST /api/auth/external/token``).
+
+        Returns ``{"enabled": True, "token", "base_url", "organization_id",
+        "expires_in", "capabilities"}``, or ``{"enabled": False, "reason"}`` when
+        the option is not active for this user. Raises
+        :class:`BotTranscriptionException` on misconfiguration / Studio failure.
+        The browser never receives a long-lived key: ``expires_in`` (seconds,
+        ``None`` = unknown) lets it refresh before expiry.
         """
+        source = settings.LINTO_STUDIO_TOKEN_SOURCE
+        if source == TOKEN_SOURCE_SERVICE_ACCOUNT:
+            return self._service_account_token()
+        if source == TOKEN_SOURCE_USER_KEY:
+            return self._user_key_token(user)
+        raise BotTranscriptionException(
+            f"unknown LINTO_STUDIO_TOKEN_SOURCE {source!r} "
+            f"(expected {TOKEN_SOURCE_SERVICE_ACCOUNT!r} or {TOKEN_SOURCE_USER_KEY!r})"
+        )
+
+    def _browser_base(self):
+        return settings.LINTO_STUDIO_BROWSER_API_URL or settings.LINTO_STUDIO_BASE_URL
+
+    def _service_account_token(self):
+        token = self._login()
+        headers = {"Authorization": f"Bearer {token}"}
         return {
-            "token": self._login(),
-            "base_url": settings.LINTO_STUDIO_BROWSER_API_URL
-            or settings.LINTO_STUDIO_BASE_URL,
+            "enabled": True,
+            "token": token,
+            "base_url": self._browser_base(),
+            "organization_id": self._service_account_org(headers),
+            "expires_in": jwt_seconds_left(token),
+            "capabilities": {"quickMeeting": True},
         }
+
+    def _service_account_org(self, headers):
+        """The organization the service account acts in: the configured pin,
+        else the account's first organization (no name heuristic)."""
+        if settings.LINTO_STUDIO_DEFAULT_ORG_ID:
+            return settings.LINTO_STUDIO_DEFAULT_ORG_ID
+        try:
+            r = requests.get(
+                f"{self.studio_base}/api/organizations/",
+                headers=headers,
+                timeout=DEFAULT_TIMEOUT,
+            )
+        except requests.RequestException as exc:
+            raise BotTranscriptionException(
+                f"Studio organizations lookup error: {exc}"
+            ) from exc
+        data = r.json() if r.status_code == 200 else []
+        orgs = data if isinstance(data, list) else data.get("organizations", [])
+        if not orgs:
+            raise BotTranscriptionException(
+                "the Studio service account has no organization "
+                "(set LINTO_STUDIO_DEFAULT_ORG_ID)"
+            )
+        return orgs[0].get("_id") or orgs[0].get("id")
+
+    def _user_key_token(self, user):
+        """Exchange the user's identity for a short token of their own key."""
+        raise BotTranscriptionException(
+            "LINTO_STUDIO_TOKEN_SOURCE=user_key is not available yet "
+            "(studio-api identity exchange pending)"
+        )
+
+
+def jwt_seconds_left(token):
+    """Seconds until ``token`` (a JWT) expires, ``None`` if unknown.
+
+    Reads the unverified payload only — the token was minted by Studio and is
+    handed back to the browser as-is; this is purely a refresh hint.
+    """
+    try:
+        payload_b64 = token.split(".")[1]
+        payload_b64 += "=" * (-len(payload_b64) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(payload_b64))
+        exp = payload.get("exp")
+    except (AttributeError, IndexError, ValueError, TypeError):
+        return None
+    if not isinstance(exp, (int, float)):
+        return None
+    return max(0, int(exp - time.time()))

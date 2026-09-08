@@ -10,6 +10,8 @@ egress) are patched.
 
 # pylint: disable=redefined-outer-name,protected-access
 
+import base64
+import json
 from datetime import datetime, timezone
 from unittest import mock
 
@@ -372,15 +374,74 @@ class TestTeardown:
         assert sorted(args[2]) == sorted(ROOM_METADATA_KEYS)
 
 
-class TestDevStudioToken:
-    def test_returns_service_token_and_browser_base(self, studio_settings):
-        result = BotTranscriptionService().dev_studio_token()
-        assert result == {"token": "static-token", "base_url": "http://studio.browser"}
+def _jwt_with_exp(exp):
+    """An unsigned JWT-shaped string whose payload carries ``exp``."""
+
+    def b64(data):
+        return base64.urlsafe_b64encode(json.dumps(data).encode()).rstrip(b"=")
+
+    return f"{b64({'alg': 'HS256'}).decode()}.{b64({'exp': exp}).decode()}.sig"
+
+
+class TestStudioTokenFor:
+    """The identity bridge for the browser SDK (LINTO_STUDIO_TOKEN_SOURCE)."""
+
+    def test_service_account_with_pinned_org(self, studio_settings):
+        studio_settings.LINTO_STUDIO_TOKEN_SOURCE = "service_account"
+        studio_settings.LINTO_STUDIO_DEFAULT_ORG_ID = "org-pin"
+        result = BotTranscriptionService().studio_token_for(UserFactory())
+        assert result == {
+            "enabled": True,
+            "token": "static-token",
+            "base_url": "http://studio.browser",
+            "organization_id": "org-pin",
+            # A static (non-JWT) token has no readable expiry.
+            "expires_in": None,
+            "capabilities": {"quickMeeting": True},
+        }
+
+    @responses.activate
+    def test_service_account_falls_back_to_the_first_org(self, studio_settings):
+        studio_settings.LINTO_STUDIO_DEFAULT_ORG_ID = ""
+        responses.add(
+            responses.GET,
+            f"{STUDIO}/api/organizations/",
+            json=[{"_id": "first", "name": "Whatever"}, {"_id": "second"}],
+        )
+        result = BotTranscriptionService().studio_token_for(UserFactory())
+        assert result["organization_id"] == "first"
+
+    @responses.activate
+    def test_service_account_without_any_org_raises(self, studio_settings):
+        studio_settings.LINTO_STUDIO_DEFAULT_ORG_ID = ""
+        responses.add(responses.GET, f"{STUDIO}/api/organizations/", json=[])
+        with pytest.raises(BotTranscriptionException):
+            BotTranscriptionService().studio_token_for(UserFactory())
+
+    def test_expires_in_is_read_from_the_jwt(self, studio_settings):
+        studio_settings.LINTO_STUDIO_DEFAULT_ORG_ID = "org-pin"
+        studio_settings.LINTO_STUDIO_API_TOKEN = _jwt_with_exp(
+            int(datetime.now(timezone.utc).timestamp()) + 3600
+        )
+        result = BotTranscriptionService().studio_token_for(UserFactory())
+        assert 3500 < result["expires_in"] <= 3600
 
     def test_raises_without_credentials(self, studio_settings):
         studio_settings.LINTO_STUDIO_API_TOKEN = None
         with pytest.raises(BotTranscriptionException):
-            BotTranscriptionService().dev_studio_token()
+            BotTranscriptionService().studio_token_for(UserFactory())
+
+    def test_unknown_source_raises(self, studio_settings):
+        studio_settings.LINTO_STUDIO_TOKEN_SOURCE = "keycloak"
+        with pytest.raises(
+            BotTranscriptionException, match="LINTO_STUDIO_TOKEN_SOURCE"
+        ):
+            BotTranscriptionService().studio_token_for(UserFactory())
+
+    def test_user_key_source_is_not_available_yet(self, studio_settings):
+        studio_settings.LINTO_STUDIO_TOKEN_SOURCE = "user_key"
+        with pytest.raises(BotTranscriptionException, match="user_key"):
+            BotTranscriptionService().studio_token_for(UserFactory())
 
 
 class TestResolveConversationId:
