@@ -22,6 +22,14 @@
       "displayLanguage": "Displayed language",
       "original": "Original (spoken language)"
     },
+    "catchup": {
+      "heading": "Before you arrived",
+      "loading": "Generating the summary…",
+      "error": "The summary could not be generated.",
+      "tooShort": "Too little was said before you arrived.",
+      "refresh": "Refresh",
+      "joined": "You joined at {{time}}"
+    },
     "settings": {
       "language": "Language",
       "languageAuto": "Automatic",

@@ -146,6 +146,10 @@ const startLintoLive = async (
     botUrl,
     provider: lintoConfig.bot_provider || 'visio',
     makePublic: true,
+    // The native bot republishes the captions into the LiveKit room only when
+    // asked to (an explicit `false` — the SDK's startBot default — opts it out);
+    // the overlay and the panel are fed by exactly that republish.
+    enableDisplaySub: true,
     metaWithToken: native
       ? async (_sessionId: string, channelId: string) => {
           // Mint the native bot join token via the Meet backend (needs Meet's

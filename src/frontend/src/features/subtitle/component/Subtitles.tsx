@@ -132,8 +132,8 @@ const useTranscriptionState = () => {
         let next = prevSegments
         for (const segment of segments) {
           const parsed = parseLintoSegmentId(segment.id)
-          // A LinTO translation segment (`linto:<seg>:<lang>`): merge its text onto
-          // the original segment (`linto:<seg>`) under the target language; buffer
+          // A LinTO translation segment (`linto:[<channel>:]<seg>:<lang>`): merge its text onto
+          // the original segment (`linto:[<channel>:]<seg>`) under the target language; buffer
           // it when the original hasn't arrived yet.
           if (parsed?.lang) {
             const baseId = parsed.base

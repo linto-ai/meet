@@ -1,12 +1,14 @@
 import { css } from '@/styled-system/css'
-import { Text } from '@/primitives'
-import { useMemo } from 'react'
+import { Button, Text } from '@/primitives'
+import { Fragment, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSnapshot } from 'valtio'
 import { transcriptStore } from '../store/transcriptStore'
 import { lintoStore } from '../store/lintoStore'
+import { refreshLintoCatchUp } from '../hooks/useLintoCatchUp'
 import { LintoCaption } from '../types/linto'
 import { languageName } from '../utils/languageLabel'
+import { SimpleMarkdown } from './SimpleMarkdown'
 
 const ORIGINAL = 'original'
 
@@ -59,7 +61,13 @@ export const LiveTranscript = () => {
   const { t, i18n } = useTranslation('transcription-bot', {
     keyPrefix: 'lintoBot',
   })
-  const { selectedTranslations, displayLanguage } = useSnapshot(lintoStore)
+  const {
+    selectedTranslations,
+    displayLanguage,
+    startedByMe,
+    joinedAt,
+    catchUp,
+  } = useSnapshot(lintoStore)
   const { byId, order } = useSnapshot(transcriptStore)
 
   // One entry per caption, in arrival order (partials refresh their own id).
@@ -87,6 +95,54 @@ export const LiveTranscript = () => {
       )
     )
   }, [entries, selectedTranslations, i18n.language])
+
+  // Catch-up: everything said BEFORE I joined is history, shown dimmed above a
+  // "you joined at HH:MM" divider. The starter saw it all and gets neither.
+  // `unavailable` (no LLM in this deployment) hides the summary block entirely.
+  const showCatchUp =
+    !startedByMe &&
+    joinedAt !== null &&
+    catchUp.status !== 'idle' &&
+    catchUp.status !== 'unavailable'
+  // The divider sits right before the first line received live (or at the tail
+  // when the whole journal is still history).
+  const markerIndex = useMemo(() => {
+    if (startedByMe || joinedAt === null) return -1
+    if (!entries.some((entry) => entry.catchup)) return -1
+    const firstLive = entries.findIndex((entry) => !entry.catchup)
+    return firstLive === -1 ? entries.length : firstLive
+  }, [entries, startedByMe, joinedAt])
+
+  const joinedMarker =
+    markerIndex === -1 ? null : (
+      <div
+        key="linto-joined-marker"
+        data-testid="linto-joined-marker"
+        className={css({
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          marginTop: '0.75rem',
+          marginBottom: '0.25rem',
+          '&::before, &::after': {
+            content: '""',
+            flex: 1,
+            height: '1px',
+            backgroundColor: 'greyscale.200',
+          },
+        })}
+      >
+        <Text
+          variant="smNote"
+          as="span"
+          className={css({ flexShrink: 0, textStyle: 'sm' })}
+        >
+          {t('catchup.joined', {
+            time: formatTime(joinedAt ?? 0, i18n.language),
+          })}
+        </Text>
+      </div>
+    )
 
   // The displayed language is SHARED with the caption overlay (lintoStore).
   const setDisplay = (value: string) => {
@@ -131,6 +187,62 @@ export const LiveTranscript = () => {
         </label>
       )}
 
+      {showCatchUp && (
+        <div
+          data-testid="linto-catchup"
+          data-status={catchUp.status}
+          className={css({
+            width: '100%',
+            padding: '0.625rem 0.75rem',
+            borderRadius: '4px',
+            border: '1px solid',
+            borderColor: 'control.border',
+            backgroundColor: 'greyscale.50',
+          })}
+        >
+          <div
+            className={css({
+              display: 'flex',
+              alignItems: 'baseline',
+              justifyContent: 'space-between',
+              gap: '0.5rem',
+            })}
+          >
+            <Text
+              variant="sm"
+              as="p"
+              className={css({ fontWeight: 'semibold', color: 'primary.700' })}
+            >
+              {t('catchup.heading')}
+            </Text>
+            <Button
+              variant="text"
+              size="sm"
+              data-testid="linto-catchup-refresh"
+              onPress={() => refreshLintoCatchUp()}
+              isDisabled={
+                catchUp.status === 'loading' || catchUp.status === 'streaming'
+              }
+            >
+              {t('catchup.refresh')}
+            </Button>
+          </div>
+          <div data-testid="linto-catchup-summary">
+            {catchUp.text ? (
+              <SimpleMarkdown text={catchUp.text} />
+            ) : (
+              <Text variant="smNote">
+                {catchUp.status === 'error'
+                  ? t('catchup.error')
+                  : catchUp.status === 'too_short'
+                    ? t('catchup.tooShort')
+                    : t('catchup.loading')}
+              </Text>
+            )}
+          </div>
+        </div>
+      )}
+
       {entries.length === 0 ? (
         <Text variant="smNote">{t('live.empty')}</Text>
       ) : (
@@ -157,64 +269,69 @@ export const LiveTranscript = () => {
             const isTranslated = showTranslated && translated != null
             const time = formatTime(entry.receivedAt, i18n.language)
             return (
-              <div
-                key={entry.id}
-                data-testid="linto-turn"
-                data-speaker={entry.locutor}
-                data-partial={entry.partial ? 'true' : 'false'}
-                className={css({
-                  width: '100%',
-                  marginTop: showSpeaker ? '0.5rem' : 0,
-                })}
-              >
-                {showSpeaker && (
-                  <Text
-                    variant="sm"
-                    className={css({
-                      fontWeight: 'semibold',
-                      color: 'primary.700',
-                    })}
-                  >
-                    {entry.locutor}
-                  </Text>
-                )}
+              <Fragment key={entry.id}>
+                {index === markerIndex && joinedMarker}
                 <div
+                  data-testid="linto-turn"
+                  data-speaker={entry.locutor}
+                  data-partial={entry.partial ? 'true' : 'false'}
+                  {...(entry.catchup ? { 'data-catchup': 'true' } : {})}
                   className={css({
-                    display: 'flex',
-                    gap: '0.5rem',
-                    alignItems: 'baseline',
-                    opacity: entry.partial ? 0.6 : 1,
-                    fontStyle: entry.partial ? 'italic' : 'normal',
+                    width: '100%',
+                    marginTop: showSpeaker ? '0.5rem' : 0,
+                    opacity: entry.catchup ? 0.75 : 1,
                   })}
                 >
-                  {time && (
-                    <span
-                      data-testid="linto-turn-time"
+                  {showSpeaker && (
+                    <Text
+                      variant="sm"
                       className={css({
-                        flexShrink: 0,
-                        fontVariantNumeric: 'tabular-nums',
-                        fontSize: '0.6875rem',
-                        color: 'greyscale.500',
-                        paddingTop: '0.15rem',
+                        fontWeight: 'semibold',
+                        color: 'primary.700',
                       })}
                     >
-                      {time}
-                    </span>
+                      {entry.locutor}
+                    </Text>
                   )}
-                  {isTranslated ? (
-                    <div
-                      data-testid="linto-translation"
-                      data-lang={effectiveDisplay}
-                    >
+                  <div
+                    className={css({
+                      display: 'flex',
+                      gap: '0.5rem',
+                      alignItems: 'baseline',
+                      opacity: entry.partial ? 0.6 : 1,
+                      fontStyle: entry.partial ? 'italic' : 'normal',
+                    })}
+                  >
+                    {time && (
+                      <span
+                        data-testid="linto-turn-time"
+                        className={css({
+                          flexShrink: 0,
+                          fontVariantNumeric: 'tabular-nums',
+                          fontSize: '0.6875rem',
+                          color: 'greyscale.500',
+                          paddingTop: '0.15rem',
+                        })}
+                      >
+                        {time}
+                      </span>
+                    )}
+                    {isTranslated ? (
+                      <div
+                        data-testid="linto-translation"
+                        data-lang={effectiveDisplay}
+                      >
+                        <Text variant="sm">{body}</Text>
+                      </div>
+                    ) : (
                       <Text variant="sm">{body}</Text>
-                    </div>
-                  ) : (
-                    <Text variant="sm">{body}</Text>
-                  )}
+                    )}
+                  </div>
                 </div>
-              </div>
+              </Fragment>
             )
           })}
+          {markerIndex === entries.length && joinedMarker}
         </div>
       )}
     </div>

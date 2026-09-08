@@ -1,4 +1,5 @@
 import { useLintoConfig } from '../hooks/useLintoConfig'
+import { useLintoCatchUp } from '../hooks/useLintoCatchUp'
 import { useLintoTranscriptFeed } from '../hooks/useLintoTranscriptFeed'
 import { useSyncLintoStatus } from '../hooks/useLintoStatus'
 import { LintoBanner } from './LintoBanner'
@@ -8,6 +9,9 @@ const LintoRuntime = () => {
   // transcript store. Both mounted once per room, for EVERY participant.
   useSyncLintoStatus()
   useLintoTranscriptFeed()
+  // Late joiner only: hydrate the transcript so far + stream the "before you
+  // arrived" summary. A no-op for the starter and outside a running session.
+  useLintoCatchUp()
   return <LintoBanner />
 }
 

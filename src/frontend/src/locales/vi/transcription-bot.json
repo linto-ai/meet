@@ -22,6 +22,14 @@
       "displayLanguage": "Ngôn ngữ hiển thị",
       "original": "Bản gốc (ngôn ngữ nói)"
     },
+    "catchup": {
+      "heading": "Trước khi bạn tham gia",
+      "loading": "Đang tạo bản tóm tắt…",
+      "error": "Không thể tạo bản tóm tắt.",
+      "tooShort": "Có quá ít nội dung được nói trước khi bạn tham gia.",
+      "refresh": "Làm mới",
+      "joined": "Bạn đã tham gia lúc {{time}}"
+    },
     "settings": {
       "language": "Ngôn ngữ",
       "languageAuto": "Tự động",

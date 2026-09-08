@@ -22,6 +22,14 @@
       "displayLanguage": "Langue affichée",
       "original": "Original (langue parlée)"
     },
+    "catchup": {
+      "heading": "Avant votre arrivée",
+      "loading": "Résumé en cours de génération…",
+      "error": "Le résumé n'a pas pu être généré.",
+      "tooShort": "Trop peu de choses ont été dites avant votre arrivée.",
+      "refresh": "Actualiser",
+      "joined": "Vous avez rejoint à {{time}}"
+    },
     "settings": {
       "language": "Langue",
       "languageAuto": "Automatique",
