@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 async def upload_recording_files(recording, owner_access, files):
-    """Upload multiple files to Twake Drive under a single Reunion_{date} folder.
+    """Upload multiple files to Twake Drive under a single meeting folder.
 
     Each file in `files` is a dict with keys: "filename", "content", "content_type".
     Returns the Twake Drive link if at least one file was uploaded successfully,
@@ -40,9 +40,9 @@ async def upload_recording_files(recording, owner_access, files):
 
     drive_token = await get_drive_token(cloudery_url, cloudery_token, instance)
 
-    meeting_time = recording.created_at.strftime("%d-%m-%Y_%H-%M")
-    dirname = f"Reunion_{meeting_time}"
-    dir_id = await ensure_meeting_directory(instance, drive_token, dirname)
+    dir_id = await ensure_meeting_directory(
+        instance, drive_token, recording, language=user.language
+    )
 
     uploaded = []
     for f in files:

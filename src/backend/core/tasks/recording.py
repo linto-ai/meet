@@ -13,6 +13,7 @@ from django.utils.translation import gettext_lazy as _
 from asgiref.sync import async_to_sync, sync_to_async
 
 from core import models
+from core.services.twake_drive import build_recording_filename
 from core.services.twake_recording import upload_recording_files
 from core.tasks._base import NotificationTask
 from core.tasks._errors import TransientError, classify_external
@@ -35,7 +36,7 @@ def process_screen_recording_to_twake(self, recording_id):
     """Upload a screen recording (MP4) to Twake Drive and notify owners.
 
     Downloads the MP4 from S3 storage, uploads it to Twake Drive under
-    `_Reunions/Reunion_{date}/Enregistrement_{date}.mp4`, then sends an
+    `_Meetings/Meeting - {date} {time} - {room id}/{date} - Recording.mp4`, then sends an
     email to every owner with the direct download link plus the Twake
     Drive link when available.
 
@@ -97,8 +98,6 @@ async def _process_screen_recording_sync(recording_id):
         logger.error("No owner found for recording %s", recording_id)
         return
 
-    meeting_time = recording.created_at.strftime("%d-%m-%Y_%H-%M")
-
     twake_drive_link = None
     if not step_done(recording, "twake"):
         # Transient failures here are retried by Celery (autoretry_for);
@@ -109,7 +108,9 @@ async def _process_screen_recording_sync(recording_id):
                 owner_access,
                 [
                     {
-                        "filename": f"Enregistrement_{meeting_time}.mp4",
+                        "filename": build_recording_filename(
+                            recording, "mp4", owner_access.user.language
+                        ),
                         "content": file_content,
                         "content_type": "video/mp4",
                     }
