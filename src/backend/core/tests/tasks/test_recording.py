@@ -74,8 +74,7 @@ def test_twake_upload_success_triggers_email_with_link(
         args, _ = upload_mock.call_args
         files = args[2]
         assert len(files) == 1
-        assert files[0]["filename"].startswith("Enregistrement_")
-        assert files[0]["filename"].endswith(".mp4")
+        assert files[0]["filename"].endswith(" - Recording.mp4")
         assert files[0]["content_type"] == "video/mp4"
         mail_mock.return_value.send.assert_called_once()
 
