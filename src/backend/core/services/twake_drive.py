@@ -15,8 +15,6 @@ logger = logging.getLogger(__name__)
 ROOT_DIR_ID = "io.cozy.files.root-dir"
 TRASH_PATH_PREFIX = "/.cozy_trash"
 
-MEETINGS_DIR_NAME = "_Meetings"
-
 # "Magic folder" reference, following the cozy-client convention
 # (`io.cozy.apps/administrative`, `io.cozy.apps/notes`, ...). The referenced
 # `io.cozy.apps` document does not exist: the stack only stores the pair
@@ -28,19 +26,69 @@ MEETINGS_DIR_REFERENCE = {"type": "io.cozy.apps", "id": "io.cozy.apps/meet"}
 MEETING_DATE_FORMAT = "%Y %m %d"
 MEETING_DATETIME_FORMAT = "%Y %m %d %H%M"
 
+# Words used in folder and file names, per language. Anything that is not
+# French falls back to English.
+DEFAULT_LANGUAGE = "en"
+LABELS = {
+    "en": {
+        "meetings_root": "_Meetings",
+        "meeting": "Meeting",
+        "summary": "Summary",
+        "transcript": "Transcript",
+        "recording": "Recording",
+        "linto_shortcut": "More details in LinTO",
+    },
+    "fr": {
+        "meetings_root": "_Réunions",
+        "meeting": "Réunion",
+        "summary": "Résumé",
+        "transcript": "Transcription",
+        "recording": "Enregistrement",
+        "linto_shortcut": "Plus de détails dans LinTO",
+    },
+}
+
+
+def get_labels(language=None):
+    """Return the naming labels for a user language such as `fr-fr` or `en`."""
+    code = (language or "").replace("_", "-").split("-")[0].lower()
+    return LABELS.get(code, LABELS[DEFAULT_LANGUAGE])
+
 
 def meeting_date(recording):
     """Date prefix of the files uploaded for a meeting."""
     return recording.created_at.strftime(MEETING_DATE_FORMAT)
 
 
-def build_meeting_dirname(recording):
+def build_meeting_dirname(recording, language=None):
     """Name of the per-meeting folder: `Meeting - {date} {time} - {room id}`.
 
     The time keeps two recordings of the same room on the same day apart.
     """
     started_at = recording.created_at.strftime(MEETING_DATETIME_FORMAT)
-    return f"Meeting - {started_at} - {recording.room_id}"
+    return f"{get_labels(language)['meeting']} - {started_at} - {recording.room_id}"
+
+
+def build_summary_filename(recording, extension, language=None):
+    """Name of the published document: `{date} - Summary.{extension}`."""
+    return f"{meeting_date(recording)} - {get_labels(language)['summary']}.{extension}"
+
+
+def build_transcript_filename(recording, language=None):
+    """Name of the raw transcript note: `{date} - Transcript.cozy-note`."""
+    return f"{meeting_date(recording)} - {get_labels(language)['transcript']}.cozy-note"
+
+
+def build_recording_filename(recording, extension, language=None):
+    """Name of the uploaded media: `{date} - Recording.{extension}`."""
+    return (
+        f"{meeting_date(recording)} - {get_labels(language)['recording']}.{extension}"
+    )
+
+
+def build_linto_shortcut_filename(language=None):
+    """Name of the shortcut to the LinTO Studio conversation."""
+    return f"{get_labels(language)['linto_shortcut']}.url"
 
 
 async def get_drive_token(cloudery_url, cloudery_token, instance):
@@ -235,34 +283,34 @@ async def add_reference(instance, token, reference, dir_id):
                 )
 
 
-async def ensure_meetings_directory(instance, token):
+async def ensure_meetings_directory(instance, token, language=None):
     """Return {"id", "path"} of the meetings "magic folder", creating it if needed.
 
     Port of cozy-client `ensureMagicFolder`: look the folder up by reference
     first, so a renamed or moved folder is still found. Fall back to the
-    default path (which also adopts a pre-existing, unreferenced `_Meetings`
-    folder), and tag it with the reference.
+    default, localized path (which also adopts a pre-existing, unreferenced
+    folder of that name), and tag it with the reference.
     """
     directory = await get_referenced_directory(instance, token, MEETINGS_DIR_REFERENCE)
     if directory:
         return directory
 
-    path = f"/{MEETINGS_DIR_NAME}"
+    path = f"/{get_labels(language)['meetings_root']}"
     dir_id = await ensure_directory(instance, token, path, ROOT_DIR_ID, favorite=True)
     await add_reference(instance, token, MEETINGS_DIR_REFERENCE, dir_id)
     return {"id": dir_id, "path": path}
 
 
-async def ensure_meeting_directory(instance, token, recording):
+async def ensure_meeting_directory(instance, token, recording, language=None):
     """Create {meetings folder}/{meeting folder} and return the latter's id.
 
     Ref: meet2twake ensureMeetingDirectory (lines 503-509)
     """
-    meetings_dir = await ensure_meetings_directory(instance, token)
+    meetings_dir = await ensure_meetings_directory(instance, token, language)
     return await ensure_directory(
         instance,
         token,
-        f"{meetings_dir['path']}/{build_meeting_dirname(recording)}",
+        f"{meetings_dir['path']}/{build_meeting_dirname(recording, language)}",
         meetings_dir["id"],
     )
 

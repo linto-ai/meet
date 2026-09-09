@@ -40,7 +40,9 @@ async def upload_recording_files(recording, owner_access, files):
 
     drive_token = await get_drive_token(cloudery_url, cloudery_token, instance)
 
-    dir_id = await ensure_meeting_directory(instance, drive_token, recording)
+    dir_id = await ensure_meeting_directory(
+        instance, drive_token, recording, language=user.language
+    )
 
     uploaded = []
     for f in files:
