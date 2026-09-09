@@ -17,7 +17,12 @@ from asgiref.sync import async_to_sync, sync_to_async
 from core import models
 from core.recording.enums import FileExtension
 from core.services.audio_extract import extract_audio_from_video
-from core.services.twake_drive import meeting_date
+from core.services.twake_drive import (
+    build_linto_shortcut_filename,
+    build_recording_filename,
+    build_summary_filename,
+    build_transcript_filename,
+)
 from core.tasks._base import NotificationTask
 from core.tasks._errors import TransientError, classify_external
 from core.tasks._state import ensure_state, mark_done, save_state, step_done
@@ -528,7 +533,6 @@ async def _process_linto_transcription_sync(recording_id):
         "odt": "application/vnd.oasis.opendocument.text",
     }
     pub_mime = mime_types.get(pub_format, "application/octet-stream")
-    pub_filename = f"{meeting_date(recording)} - Summary.{pub_format}"
 
     # Extract summary preview text (needed for Docs content and email)
     summary_preview = None
@@ -545,6 +549,9 @@ async def _process_linto_transcription_sync(recording_id):
     owner_access = await sync_to_async(
         lambda: recording.accesses.filter(role="owner").select_related("user").first()
     )()
+    # Folder and file names on Twake Drive follow the owner's language.
+    owner_language = owner_access.user.language if owner_access else None
+    pub_filename = build_summary_filename(recording, pub_format, owner_language)
 
     if (
         owner_access
@@ -598,9 +605,8 @@ async def _process_linto_transcription_sync(recording_id):
                     instance=instance,
                 )
 
-                meeting_time = recording.created_at.strftime("%d-%m-%Y_%H-%M")
                 dir_id = await ensure_meeting_directory(
-                    instance, drive_token, recording
+                    instance, drive_token, recording, language=owner_language
                 )
 
                 transcript_content = (media.full_text or "") if media else ""
@@ -608,7 +614,7 @@ async def _process_linto_transcription_sync(recording_id):
                     instance=instance,
                     token=drive_token,
                     dir_id=dir_id,
-                    filename=f"{meeting_date(recording)} - Transcript.cozy-note",
+                    filename=build_transcript_filename(recording, owner_language),
                     content=transcript_content,
                     content_type="text/vnd.cozy.note+markdown",
                 )
@@ -629,7 +635,9 @@ async def _process_linto_transcription_sync(recording_id):
                         instance=instance,
                         token=drive_token,
                         dir_id=dir_id,
-                        filename=f"Enregistrement_{meeting_time}.mp4",
+                        filename=build_recording_filename(
+                            recording, "mp4", owner_language
+                        ),
                         content=file_content,
                         content_type="video/mp4",
                     )
@@ -642,7 +650,9 @@ async def _process_linto_transcription_sync(recording_id):
                         instance=instance,
                         token=drive_token,
                         dir_id=dir_id,
-                        filename=f"Enregistrement_{meeting_time}.ogg",
+                        filename=build_recording_filename(
+                            recording, "ogg", owner_language
+                        ),
                         content=ogg_audio,
                         content_type="audio/ogg",
                     )
@@ -651,7 +661,9 @@ async def _process_linto_transcription_sync(recording_id):
                         instance=instance,
                         token=drive_token,
                         dir_id=dir_id,
-                        filename=f"Enregistrement_{meeting_time}.ogg",
+                        filename=build_recording_filename(
+                            recording, "ogg", owner_language
+                        ),
                         content=file_content,
                         content_type="audio/ogg",
                     )
@@ -668,7 +680,7 @@ async def _process_linto_transcription_sync(recording_id):
                         instance=instance,
                         token=drive_token,
                         dir_id=dir_id,
-                        filename="Plus_de_detail_dans_linto.url",
+                        filename=build_linto_shortcut_filename(owner_language),
                         content=shortcut_content,
                         content_type="application/x-url",
                     )
