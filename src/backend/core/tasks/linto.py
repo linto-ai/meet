@@ -619,16 +619,6 @@ async def _process_linto_transcription_sync(recording_id):
                     content_type="text/vnd.cozy.note+markdown",
                 )
 
-                if summary_preview:
-                    await save_file(
-                        instance=instance,
-                        token=drive_token,
-                        dir_id=dir_id,
-                        filename="Résumé.cozy-note",
-                        content=summary_preview,
-                        content_type="text/vnd.cozy.note+markdown",
-                    )
-
                 # Upload original recording (video or audio)
                 if recording.extension == FileExtension.MP4.value:
                     await save_file(
