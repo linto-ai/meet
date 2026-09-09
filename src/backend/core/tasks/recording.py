@@ -35,7 +35,7 @@ def process_screen_recording_to_twake(self, recording_id):
     """Upload a screen recording (MP4) to Twake Drive and notify owners.
 
     Downloads the MP4 from S3 storage, uploads it to Twake Drive under
-    `_Meetings/Reunion_{date}/Enregistrement_{date}.mp4`, then sends an
+    `_Meetings/Meeting - {date} {time} - {room id}/Enregistrement_{date}.mp4`, then sends an
     email to every owner with the direct download link plus the Twake
     Drive link when available.
 

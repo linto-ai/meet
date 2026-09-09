@@ -25,6 +25,23 @@ MEETINGS_DIR_NAME = "_Meetings"
 # moves it.
 MEETINGS_DIR_REFERENCE = {"type": "io.cozy.apps", "id": "io.cozy.apps/meet"}
 
+MEETING_DATE_FORMAT = "%Y %m %d"
+MEETING_DATETIME_FORMAT = "%Y %m %d %H%M"
+
+
+def meeting_date(recording):
+    """Date prefix of the files uploaded for a meeting."""
+    return recording.created_at.strftime(MEETING_DATE_FORMAT)
+
+
+def build_meeting_dirname(recording):
+    """Name of the per-meeting folder: `Meeting - {date} {time} - {room id}`.
+
+    The time keeps two recordings of the same room on the same day apart.
+    """
+    started_at = recording.created_at.strftime(MEETING_DATETIME_FORMAT)
+    return f"Meeting - {started_at} - {recording.room_id}"
+
 
 async def get_drive_token(cloudery_url, cloudery_token, instance):
     """Get a drive token for the given instance from the Cloudery.
@@ -236,8 +253,8 @@ async def ensure_meetings_directory(instance, token):
     return {"id": dir_id, "path": path}
 
 
-async def ensure_meeting_directory(instance, token, dirname):
-    """Create {meetings folder}/{dirname} directory structure.
+async def ensure_meeting_directory(instance, token, recording):
+    """Create {meetings folder}/{meeting folder} and return the latter's id.
 
     Ref: meet2twake ensureMeetingDirectory (lines 503-509)
     """
@@ -245,7 +262,7 @@ async def ensure_meeting_directory(instance, token, dirname):
     return await ensure_directory(
         instance,
         token,
-        f"{meetings_dir['path']}/{dirname}",
+        f"{meetings_dir['path']}/{build_meeting_dirname(recording)}",
         meetings_dir["id"],
     )
 

@@ -8,12 +8,16 @@ network: the HTTP helpers are patched and only the orchestration is exercised.
 
 # pylint: disable=redefined-outer-name
 
+from datetime import datetime, timezone
 from unittest import mock
 
 import pytest
 from asgiref.sync import async_to_sync
 
 from core.services import twake_drive
+
+RECORDING_ID = "4c3d9f1e-1234-4abc-9def-000000000001"
+ROOM_ID = "9a8b7c6d-0000-4000-8000-000000000002"
 
 
 def _directory(dir_id, path, created_at):
@@ -26,6 +30,16 @@ def _directory(dir_id, path, created_at):
             "created_at": created_at,
         },
     }
+
+
+@pytest.fixture
+def recording():
+    """A recording of a room, created on 2026-09-08."""
+    return mock.Mock(
+        id=RECORDING_ID,
+        room_id=ROOM_ID,
+        created_at=datetime(2026, 9, 8, 14, 30, tzinfo=timezone.utc),
+    )
 
 
 def test_references_url_encodes_slash_in_document_id():
@@ -61,6 +75,15 @@ def test_pick_live_directory_returns_none_when_nothing_matches():
     assert twake_drive.pick_live_directory(trashed) is None
 
 
+def test_build_meeting_dirname_uses_date_time_and_room_id(recording):
+    """Folder name is `Meeting - {YYYY MM DD HHMM} - {room id}`."""
+    assert twake_drive.meeting_date(recording) == "2026 09 08"
+    assert (
+        twake_drive.build_meeting_dirname(recording)
+        == f"Meeting - 2026 09 08 1430 - {ROOM_ID}"
+    )
+
+
 @pytest.fixture
 def drive():
     """Patch the HTTP layer of the service."""
@@ -82,44 +105,50 @@ def drive():
         }
 
 
-def test_ensure_meeting_directory_reuses_renamed_magic_folder(drive):
-    """A referenced folder is used as is, even if renamed or moved."""
+def test_ensure_meetings_directory_reuses_renamed_magic_folder(drive):
+    """A referenced meetings folder is used as is, even if renamed or moved."""
+    drive["get_referenced"].return_value = {"id": "root-id", "path": "/Perso/Réunions"}
+
+    meetings_dir = async_to_sync(twake_drive.ensure_meetings_directory)(
+        "instance.test", "token"
+    )
+
+    assert meetings_dir == {"id": "root-id", "path": "/Perso/Réunions"}
+    drive["ensure_directory"].assert_not_awaited()
+    drive["add_reference"].assert_not_awaited()
+
+
+def test_ensure_meetings_directory_creates_and_tags_default_folder(drive):
+    """Without a referenced folder, `_Meetings` is created and tagged."""
+    drive["get_referenced"].return_value = None
+    drive["ensure_directory"].return_value = "root-id"
+
+    meetings_dir = async_to_sync(twake_drive.ensure_meetings_directory)(
+        "instance.test", "token"
+    )
+
+    assert meetings_dir == {"id": "root-id", "path": "/_Meetings"}
+    drive["ensure_directory"].assert_awaited_once_with(
+        "instance.test", "token", "/_Meetings", twake_drive.ROOT_DIR_ID, favorite=True
+    )
+    drive["add_reference"].assert_awaited_once_with(
+        "instance.test", "token", twake_drive.MEETINGS_DIR_REFERENCE, "root-id"
+    )
+
+
+def test_ensure_meeting_directory_nests_under_the_meetings_folder(drive, recording):
+    """The meeting folder is created by path under the (possibly renamed) root."""
     drive["get_referenced"].return_value = {"id": "root-id", "path": "/Perso/Réunions"}
     drive["ensure_directory"].return_value = "meeting-id"
 
     dir_id = async_to_sync(twake_drive.ensure_meeting_directory)(
-        "instance.test", "token", "Reunion_01-01-2026_10-00"
+        "instance.test", "token", recording
     )
 
     assert dir_id == "meeting-id"
     drive["ensure_directory"].assert_awaited_once_with(
-        "instance.test", "token", "/Perso/Réunions/Reunion_01-01-2026_10-00", "root-id"
-    )
-    drive["add_reference"].assert_not_awaited()
-
-
-def test_ensure_meeting_directory_creates_and_tags_default_folder(drive):
-    """Without a referenced folder, `_Meetings` is created and tagged."""
-    drive["get_referenced"].return_value = None
-    drive["ensure_directory"].side_effect = ["root-id", "meeting-id"]
-
-    dir_id = async_to_sync(twake_drive.ensure_meeting_directory)(
-        "instance.test", "token", "Reunion_01-01-2026_10-00"
-    )
-
-    assert dir_id == "meeting-id"
-    assert drive["ensure_directory"].await_args_list == [
-        mock.call(
-            "instance.test",
-            "token",
-            "/_Meetings",
-            twake_drive.ROOT_DIR_ID,
-            favorite=True,
-        ),
-        mock.call(
-            "instance.test", "token", "/_Meetings/Reunion_01-01-2026_10-00", "root-id"
-        ),
-    ]
-    drive["add_reference"].assert_awaited_once_with(
-        "instance.test", "token", twake_drive.MEETINGS_DIR_REFERENCE, "root-id"
+        "instance.test",
+        "token",
+        f"/Perso/Réunions/Meeting - 2026 09 08 1430 - {ROOM_ID}",
+        "root-id",
     )

@@ -17,6 +17,7 @@ from asgiref.sync import async_to_sync, sync_to_async
 from core import models
 from core.recording.enums import FileExtension
 from core.services.audio_extract import extract_audio_from_video
+from core.services.twake_drive import meeting_date
 from core.tasks._base import NotificationTask
 from core.tasks._errors import TransientError, classify_external
 from core.tasks._state import ensure_state, mark_done, save_state, step_done
@@ -521,14 +522,13 @@ async def _process_linto_transcription_sync(recording_id):
 
     # Prepare publication filename and mime type
     room_name = recording.room.name or "Meeting"
-    date_str = recording.created_at.strftime("%Y-%m-%d")
     mime_types = {
         "pdf": "application/pdf",
         "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "odt": "application/vnd.oasis.opendocument.text",
     }
     pub_mime = mime_types.get(pub_format, "application/octet-stream")
-    pub_filename = f"transcription-{room_name}-{date_str}.{pub_format}"
+    pub_filename = f"{meeting_date(recording)} - Summary.{pub_format}"
 
     # Extract summary preview text (needed for Docs content and email)
     summary_preview = None
@@ -599,15 +599,16 @@ async def _process_linto_transcription_sync(recording_id):
                 )
 
                 meeting_time = recording.created_at.strftime("%d-%m-%Y_%H-%M")
-                dirname = f"Reunion_{meeting_time}"
-                dir_id = await ensure_meeting_directory(instance, drive_token, dirname)
+                dir_id = await ensure_meeting_directory(
+                    instance, drive_token, recording
+                )
 
                 transcript_content = (media.full_text or "") if media else ""
                 await save_file(
                     instance=instance,
                     token=drive_token,
                     dir_id=dir_id,
-                    filename=f"Transcription_{meeting_time}.cozy-note",
+                    filename=f"{meeting_date(recording)} - Transcript.cozy-note",
                     content=transcript_content,
                     content_type="text/vnd.cozy.note+markdown",
                 )
