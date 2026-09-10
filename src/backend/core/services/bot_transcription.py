@@ -629,17 +629,26 @@ class BotTranscriptionService:
         return orgs[0].get("_id") or orgs[0].get("id")
 
     # Exchange answers that mean "not for this user" rather than "broken".
-    NOT_ENTITLED_CODES = {"no_linked_key", "revoked", "domain_inactive"}
+    # `no_entitlement` is what Studio answers since the entitlements API v1
+    # (nothing declared for that identity, or every feature off); the two older
+    # codes are kept so a Studio still on the previous build behaves the same.
+    NOT_ENTITLED_CODES = {
+        "no_entitlement",
+        "no_linked_key",
+        "revoked",
+        "domain_inactive",
+    }
 
     def _user_key_token(self, user):
         """Exchange the user's identity for a short token of their OWN key.
 
         ``POST {studio}/api/auth/external/token {provider, subject, email}``
-        with the integration credential: studio-api resolves the LinTO API key
-        linked to that person (or creates one just-in-time when the email's
-        domain is active) and mints a token that expires within the hour. A
-        ``404 no_linked_key`` / ``403 revoked|domain_inactive`` is a normal
-        answer — the option is not active for this user — not an error. Both
+        with the integration credential: studio-api resolves the entitlement of
+        that person (their own record, else their email domain's), finds the
+        LinTO API key standing for them — creating one just-in-time when they
+        have rights and no key yet — and mints a token that expires within the
+        hour. A ``404 no_entitlement`` / ``403 revoked`` is a normal answer —
+        the option is not active for this user — not an error. Both
         outcomes are cached per user for ``LINTO_STUDIO_TOKEN_CACHE_TTL``
         seconds (never beyond the token's own life).
         """
