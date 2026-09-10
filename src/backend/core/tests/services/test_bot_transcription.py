@@ -514,15 +514,16 @@ class TestUserKeyToken:
         assert len(responses.calls) == 3
 
     @responses.activate
-    def test_no_linked_key_means_not_entitled_and_is_cached(self, user_key_settings):
+    @pytest.mark.parametrize("code", ["no_entitlement", "no_linked_key"])
+    def test_no_entitlement_means_not_entitled_and_is_cached(
+        self, user_key_settings, code
+    ):
         user = UserFactory(sub="nobody")
-        responses.add(
-            responses.POST, EXCHANGE, status=404, json={"code": "no_linked_key"}
-        )
+        responses.add(responses.POST, EXCHANGE, status=404, json={"code": code})
         service = BotTranscriptionService()
         assert service.studio_token_for(user) == {
             "enabled": False,
-            "reason": "no_linked_key",
+            "reason": code,
         }
         assert service.studio_token_for(user)["enabled"] is False
         assert len(responses.calls) == 1
