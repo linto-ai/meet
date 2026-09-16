@@ -153,11 +153,15 @@ def drive():
         mock.patch.object(
             twake_drive, "add_reference", new_callable=mock.AsyncMock
         ) as add_ref,
+        mock.patch.object(
+            twake_drive, "get_dir_id", new_callable=mock.AsyncMock, return_value=None
+        ) as get_dir_id,
     ):
         yield {
             "get_referenced": get_referenced,
             "ensure_directory": ensure,
             "add_reference": add_ref,
+            "get_dir_id": get_dir_id,
         }
 
 
@@ -201,6 +205,27 @@ def test_ensure_meetings_directory_creates_and_tags_default_folder(
     )
     drive["add_reference"].assert_awaited_once_with(
         "instance.test", "token", twake_drive.MEETINGS_DIR_REFERENCE, "root-id"
+    )
+
+
+def test_ensure_meetings_directory_adopts_legacy_folder(drive):
+    """Without a referenced folder, a pre-existing `/_Reunions` is tagged and reused.
+
+    Users of the previous version already have that folder: creating a
+    localized one next to it would split their recordings in two places.
+    """
+    drive["get_referenced"].return_value = None
+    drive["get_dir_id"].return_value = "legacy-id"
+
+    meetings_dir = async_to_sync(twake_drive.ensure_meetings_directory)(
+        "instance.test", "token", "fr-fr"
+    )
+
+    assert meetings_dir == {"id": "legacy-id", "path": "/_Reunions"}
+    drive["get_dir_id"].assert_awaited_once_with("instance.test", "token", "/_Reunions")
+    drive["ensure_directory"].assert_not_awaited()
+    drive["add_reference"].assert_awaited_once_with(
+        "instance.test", "token", twake_drive.MEETINGS_DIR_REFERENCE, "legacy-id"
     )
 
 

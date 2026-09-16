@@ -23,6 +23,11 @@ TRASH_PATH_PREFIX = "/.cozy_trash"
 # moves it.
 MEETINGS_DIR_REFERENCE = {"type": "io.cozy.apps", "id": "io.cozy.apps/meet"}
 
+# Path of the meetings folder before it was localized and tagged with the
+# reference above. Users of that version already have it: it is adopted rather
+# than duplicated the first time the reference is missing.
+LEGACY_MEETINGS_DIR_PATH = "/_Reunions"
+
 MEETING_DATE_FORMAT = "%Y %m %d"
 MEETING_DATETIME_FORMAT = "%Y %m %d %H%M"
 
@@ -303,16 +308,22 @@ async def ensure_meetings_directory(instance, token, language=None):
     """Return {"id", "path"} of the meetings "magic folder", creating it if needed.
 
     Port of cozy-client `ensureMagicFolder`: look the folder up by reference
-    first, so a renamed or moved folder is still found. Fall back to the
-    default, localized path (which also adopts a pre-existing, unreferenced
-    folder of that name), and tag it with the reference.
+    first, so a renamed or moved folder is still found. Otherwise adopt the
+    legacy `/_Reunions` folder when it exists, or fall back to the default,
+    localized path (which also adopts a pre-existing, unreferenced folder of
+    that name). Whichever folder that resolves to is tagged with the reference.
     """
     directory = await get_referenced_directory(instance, token, MEETINGS_DIR_REFERENCE)
     if directory:
         return directory
 
-    path = f"/{get_labels(language)['meetings_root']}"
-    dir_id = await ensure_directory(instance, token, path, ROOT_DIR_ID, favorite=True)
+    path = LEGACY_MEETINGS_DIR_PATH
+    dir_id = await get_dir_id(instance, token, path)
+    if dir_id is None:
+        path = f"/{get_labels(language)['meetings_root']}"
+        dir_id = await ensure_directory(
+            instance, token, path, ROOT_DIR_ID, favorite=True
+        )
     await add_reference(instance, token, MEETINGS_DIR_REFERENCE, dir_id)
     return {"id": dir_id, "path": path}
 
