@@ -992,6 +992,19 @@ class Base(Configuration):
     LINTO_STUDIO_TOKEN_SOURCE = values.Value(
         "service_account", environ_name="LINTO_STUDIO_TOKEN_SOURCE", environ_prefix=None
     )
+    # ── Per-user feature gating (entitlements) kill switch ────────────────────
+    # When False, the per-user feature system is OFF for the whole instance:
+    # every LinTO capability (live and deferred transcription, summary,
+    # translation, recording) is granted to every participant, Studio's
+    # entitlement resolution is never called, and the browser gets its Studio
+    # token from the shared service account whatever LINTO_STUDIO_TOKEN_SOURCE
+    # says (there is no per-user key without an entitlement). This is how an
+    # instance ships every feature before the external subscription system
+    # (Twake) feeds Studio; remove the variable the day it does. Default True:
+    # the gating is on and the ENTITLEMENTS_BACKEND decides.
+    LINTO_ENTITLEMENTS_ENABLED = values.BooleanValue(
+        True, environ_name="LINTO_ENTITLEMENTS_ENABLED", environ_prefix=None
+    )
     # user_key mode — the identity Meet presents to the studio-api exchange:
     # `provider` labels THIS Meet instance (the same person on two instances is
     # two identities; keys are linked per provider), `subject` = user.sub,

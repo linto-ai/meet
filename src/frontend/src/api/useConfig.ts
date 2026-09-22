@@ -19,6 +19,9 @@ export interface LintoRuntimeConfig {
   // — the panel always asks the bridge): the shared service account, or the
   // user's own LinTO API key via the studio-api identity exchange.
   token_source: 'service_account' | 'user_key'
+  // Per-user feature gating (LINTO_ENTITLEMENTS_ENABLED). false = the kill
+  // switch: every LinTO capability is granted to everyone, no entitlement lookup.
+  entitlements_enabled: boolean
   // LiveKit signaling URL injected into the native bot descriptor.
   native_livekit_url: string
   visio_native_enabled: boolean
