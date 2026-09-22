@@ -4,6 +4,7 @@
 
 from unittest import mock
 
+from django.core.cache import cache as django_cache
 from django.test import override_settings
 
 import pytest
@@ -11,8 +12,6 @@ import requests
 import responses
 from rest_framework.status import HTTP_201_CREATED, HTTP_403_FORBIDDEN
 from rest_framework.test import APIClient
-
-from django.core.cache import cache as django_cache
 
 from core import factories
 from core.api.serializers import UserMeSerializer
@@ -130,9 +129,7 @@ def test_auth_backend_login_succeeds_when_access_denied():
         return_value={"can_create": False},
     ):
         # Should not raise — user logs in, frontend gates access
-        backend.post_get_or_create_user(
-            user, {"email": user.email}, is_new_user=False
-        )
+        backend.post_get_or_create_user(user, {"email": user.email}, is_new_user=False)
 
 
 def test_auth_backend_login_succeeds_when_entitlements_unavailable():
@@ -145,9 +142,7 @@ def test_auth_backend_login_succeeds_when_entitlements_unavailable():
         side_effect=EntitlementsUnavailableError("unavailable"),
     ):
         # Should not raise
-        backend.post_get_or_create_user(
-            user, {"email": user.email}, is_new_user=False
-        )
+        backend.post_get_or_create_user(user, {"email": user.email}, is_new_user=False)
 
 
 # -- UserMeSerializer (can_create field) --

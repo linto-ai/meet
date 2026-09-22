@@ -227,7 +227,7 @@ def recording_setup(linto_settings):
         mock.patch("core.api.viewsets.get_worker_service"),
         mock.patch("core.api.viewsets.WorkerServiceMediator"),
     ):
-        yield client, room
+        yield client, room, user
 
 
 def _start(client, room, body):
@@ -238,7 +238,7 @@ def _start(client, room, body):
 
 @responses.activate
 def test_transcribe_is_refused_without_the_async_capability(recording_setup):
-    client, room = recording_setup
+    client, room, _user = recording_setup
     responses.add(
         responses.POST, RESOLVE, json={"organizationId": "o", "capabilities": LIVE_ONLY}
     )
@@ -257,7 +257,7 @@ def test_transcribe_is_refused_without_the_async_capability(recording_setup):
 
 @responses.activate
 def test_transcribe_is_allowed_with_the_async_capability(recording_setup):
-    client, room = recording_setup
+    client, room, _user = recording_setup
     responses.add(
         responses.POST,
         RESOLVE,
@@ -274,6 +274,76 @@ def test_transcribe_is_allowed_with_the_async_capability(recording_setup):
 
 def test_transcribe_is_allowed_with_the_kill_switch_off(recording_setup, settings):
     settings.LINTO_ENTITLEMENTS_ENABLED = False
-    client, room = recording_setup
+    client, room, _user = recording_setup
     res = _start(client, room, {"mode": "transcript"})
     assert res.status_code == 201
+
+
+# -- recording gate: LINTO_RECORDING_ENTITLEMENT_ENABLED --
+
+
+@responses.activate
+def test_recording_is_open_to_everyone_by_default(recording_setup):
+    """Without the `recording` capability the recording still starts while the
+    instance does not gate it (ADR 061: it does not close by default)."""
+    client, room, _user = recording_setup
+    responses.add(responses.POST, RESOLVE, status=404, json={"code": "no_entitlement"})
+    res = _start(client, room, {"mode": "screen_recording"})
+    assert res.status_code == 201
+
+
+@responses.activate
+def test_recording_requires_the_capability_when_gated(recording_setup, settings):
+    settings.LINTO_RECORDING_ENTITLEMENT_ENABLED = True
+    client, room, user = recording_setup
+    responses.add(
+        responses.POST, RESOLVE, json={"organizationId": "o", "capabilities": LIVE_ONLY}
+    )
+    res = _start(client, room, {"mode": "screen_recording"})
+    assert res.status_code == 403
+    assert res.json() == {
+        "error": "the recording is not active for this account",
+        "code": "no_entitlement",
+        "feature": "recording",
+    }
+    # A transcript-mode recording is not a video recording. (Clearing the
+    # cache drops the session too: log in again.)
+    django_cache.clear()
+    client.force_login(user)
+    responses.replace(
+        responses.POST,
+        RESOLVE,
+        json={
+            "organizationId": "o",
+            "capabilities": {"transcription": {"live": True, "async": True}},
+        },
+    )
+    res = _start(client, room, {"mode": "transcript"})
+    assert res.status_code == 201
+
+
+@responses.activate
+def test_recording_allowed_with_the_capability_when_gated(recording_setup, settings):
+    settings.LINTO_RECORDING_ENTITLEMENT_ENABLED = True
+    client, room, _user = recording_setup
+    responses.add(
+        responses.POST,
+        RESOLVE,
+        json={"organizationId": "o", "capabilities": {"recording": True}},
+    )
+    res = _start(client, room, {"mode": "screen_recording"})
+    assert res.status_code == 201
+
+
+def test_recording_gate_yields_to_the_kill_switch(recording_setup, settings):
+    settings.LINTO_RECORDING_ENTITLEMENT_ENABLED = True
+    settings.LINTO_ENTITLEMENTS_ENABLED = False
+    client, room, _user = recording_setup
+    assert _start(client, room, {"mode": "screen_recording"}).status_code == 201
+
+
+def test_config_exposes_the_recording_gate(settings):
+    settings.LINTO_FEATURE_ENABLED = True
+    settings.LINTO_RECORDING_ENTITLEMENT_ENABLED = True
+    data = APIClient().get("/api/v1.0/config/").json()
+    assert data["linto"]["recording_entitlement_enabled"] is True

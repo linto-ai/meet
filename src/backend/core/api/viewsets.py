@@ -45,8 +45,8 @@ from core.api import throttling
 from core.api.exceptions import ensure_room_not_deleted
 from core.api.filters import ListFileFilter
 from core.api.locks import room_locked_for_update
+from core.entitlements.capabilities import has_linto_capability, recording_entitled
 from core.enums import MEDIA_STORAGE_URL_PATTERN
-from core.entitlements.capabilities import has_linto_capability
 from core.recording.enums import FileExtension
 from core.recording.event.authentication import RecordingProcessWebhookAuthentication
 from core.recording.services.metadata_collector import (
@@ -502,6 +502,19 @@ class RoomViewSet(  # pylint: disable=too-many-public-methods
                     "error": "the deferred transcription is not active for this account",
                     "code": "no_entitlement",
                     "feature": "transcription.async",
+                },
+                status=drf_status.HTTP_403_FORBIDDEN,
+            )
+
+        # The video recording itself is gated only where the instance says so.
+        if mode == models.RecordingModeChoices.SCREEN_RECORDING and not (
+            recording_entitled(request.user)
+        ):
+            return drf_response.Response(
+                {
+                    "error": "the recording is not active for this account",
+                    "code": "no_entitlement",
+                    "feature": "recording",
                 },
                 status=drf_status.HTTP_403_FORBIDDEN,
             )
