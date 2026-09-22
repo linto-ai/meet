@@ -81,12 +81,13 @@ class _Media:
         self.turns = turns or []
 
 
-def _patch_sdk(stack, *, summary=None):
+def _patch_sdk(stack, *, summary=None, services=None):
     """Patch ``linto.LinTO``; return the mock instance wired for a happy run.
 
     ``summary=None`` → no LLM service (document = raw DOCX download).
     ``summary={"content": ..., "jobId": ...}`` → the summarize handle fires
     ``done`` immediately with that payload (document = template export).
+    ``services`` → what ``list_llm_services`` answers (default one "llm" route).
     """
     sdk = stack.enter_context(mock.patch("linto.LinTO")).return_value
     sdk.get_media = mock.AsyncMock(return_value=_Media())
@@ -99,7 +100,9 @@ def _patch_sdk(stack, *, summary=None):
     if summary is None:
         sdk.list_llm_services = mock.AsyncMock(return_value=[])
     else:
-        sdk.list_llm_services = mock.AsyncMock(return_value=[{"route": "llm"}])
+        sdk.list_llm_services = mock.AsyncMock(
+            return_value=services if services is not None else [{"route": "llm"}]
+        )
         handle = mock.Mock()
         callbacks = {}
 
@@ -326,6 +329,39 @@ class TestHappyPath:
         assert filename.endswith(".pdf")
         assert content == b"%PDF"
         assert mimetype == "application/pdf"
+
+    def test_summarizes_with_the_service_chosen_in_the_panel(
+        self, no_twake, fast_resolve
+    ):
+        recipient = factories.UserFactory(email="starter@example.com")
+        room = _make_room(
+            {**PAYLOAD, "summary_service": "actions"}, recipient=recipient
+        )
+        with contextlib.ExitStack() as stack:
+            sdk = _patch_sdk(
+                stack,
+                summary={"content": "## Actions", "jobId": "job-1"},
+                services=[{"route": "llm"}, {"route": "actions"}],
+            )
+            _patch_service(stack)
+            linto_task._process_bot_live_summary_sync(str(room.id))
+        sdk.summarize.assert_awaited_once_with("conv-1", "actions")
+
+    def test_falls_back_when_the_chosen_service_is_gone(
+        self, no_twake, fast_resolve, settings
+    ):
+        settings.LINTO_LLM_SERVICE_ROUTE = None
+        recipient = factories.UserFactory(email="starter@example.com")
+        room = _make_room(
+            {**PAYLOAD, "summary_service": "vanished"}, recipient=recipient
+        )
+        with contextlib.ExitStack() as stack:
+            sdk = _patch_sdk(
+                stack, summary={"content": "## Key points", "jobId": "job-1"}
+            )
+            _patch_service(stack)
+            linto_task._process_bot_live_summary_sync(str(room.id))
+        sdk.summarize.assert_awaited_once_with("conv-1", "llm")
 
     def test_falls_back_to_room_owner(self, no_twake, fast_resolve):
         """Unknown recipient_user_id → the room owner receives the summary."""

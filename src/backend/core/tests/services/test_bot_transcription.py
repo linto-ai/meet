@@ -134,11 +134,24 @@ class TestMarkStarted:
         assert linto["bot_id"] == "bot-1"
         assert linto["org_id"] == "org-1"
         assert linto["user_id"] == str(owner.id)
+        assert linto["summary_service"] is None  # no choice → instance default
         assert "recording_id" not in linto  # record was False → no egress
         # The banner call carries the run state, so the metadata can advertise
         # the Studio ids a late joiner needs to catch up.
         self.banner.assert_called_once_with(room, True, user=owner, linto=linto)
         self.rec.assert_not_called()
+
+    def test_persists_the_chosen_summary_service(self, studio_settings):
+        room, owner = _owner_room()
+        data = {"session_id": "s", "channel_id": "c", "summary_service": "minutes"}
+        result = BotTranscriptionService().mark_started(room, data, user=owner)
+        assert result["summary_service"] == "minutes"
+        room.refresh_from_db()
+        assert room.configuration["linto"]["summary_service"] == "minutes"
+        # Anything but a string is ignored.
+        data["summary_service"] = {"route": "x"}
+        result = BotTranscriptionService().mark_started(room, data, user=owner)
+        assert result["summary_service"] is None
 
     def test_record_add_on_dropped_without_screen_permission(self, studio_settings):
         # transcript authenticated (any logged user), screen_recording admin_owner.
@@ -286,6 +299,7 @@ class TestMarkStopped:
                 "org_id": "org-1",
                 "session_id": "sess-1",
                 "summary": True,
+                "summary_service": "minutes",
             }
         }
         room.save()
@@ -298,6 +312,7 @@ class TestMarkStopped:
         summary = room.configuration["linto_summary"]
         assert summary["conversation_name"] == "linto-x"
         assert summary["session_id"] == "sess-1"
+        assert summary["summary_service"] == "minutes"
         self.enqueue.assert_called_once_with(room)
 
     def test_admin_stopping_others_run_deletes_studio_session(self, studio_settings):
@@ -578,6 +593,96 @@ class TestUserKeyToken:
             fake_cache.get.return_value = None
             BotTranscriptionService().studio_token_for(user)
         assert fake_cache.set.call_args.args[2] == 30
+
+
+SERVICES_URL = f"{STUDIO}/api/services/org-pin/llm"
+
+
+class TestSummaryServices:
+    """summary_services: the gateway services carrying the `meet` scope, listed
+    through Studio under the service account, cached, never failing."""
+
+    @pytest.fixture(autouse=True)
+    def _pinned_org(self, studio_settings):
+        studio_settings.LINTO_STUDIO_DEFAULT_ORG_ID = "org-pin"
+        studio_settings.LINTO_LLM_SERVICE_ROUTE = None
+        studio_settings.CACHES = {
+            "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}
+        }
+        from django.core.cache import cache as django_cache  # noqa: PLC0415
+
+        django_cache.clear()
+
+    @responses.activate
+    def test_lists_the_meet_scoped_services_with_icon_and_default(
+        self, studio_settings
+    ):
+        responses.add(
+            responses.GET,
+            SERVICES_URL,
+            json=[
+                {
+                    "id": "1",
+                    "name": "Meeting minutes",
+                    "route": "minutes",
+                    "service_type": "summary",
+                    "description": {"en": "Minutes", "fr": "Compte rendu"},
+                    "scopes": ["linto", "meet"],
+                    "metadata": {"icon": "file-text"},
+                },
+                {
+                    "id": "2",
+                    "name": "Action items",
+                    "route": "actions",
+                    "service_type": "summary",
+                    "description": {},
+                    "scopes": ["meet"],
+                    "metadata": {},
+                },
+            ],
+        )
+        services = BotTranscriptionService().summary_services()
+        assert services == [
+            {
+                "route": "minutes",
+                "name": "Meeting minutes",
+                "description": {"en": "Minutes", "fr": "Compte rendu"},
+                "icon": "file-text",
+                "default": True,
+            },
+            {
+                "route": "actions",
+                "name": "Action items",
+                "description": {},
+                "icon": None,
+                "default": False,
+            },
+        ]
+        call = responses.calls[0].request
+        assert call.headers["Authorization"] == "Bearer static-token"
+        assert "scope=meet" in call.url
+
+    @responses.activate
+    def test_pinned_route_is_the_default_and_the_list_is_cached(self, studio_settings):
+        studio_settings.LINTO_LLM_SERVICE_ROUTE = "actions"
+        responses.add(
+            responses.GET,
+            SERVICES_URL,
+            json=[
+                {"name": "Minutes", "route": "minutes"},
+                {"name": "Actions", "route": "actions"},
+            ],
+        )
+        service = BotTranscriptionService()
+        first = service.summary_services()
+        assert [s["default"] for s in first] == [False, True]
+        service.summary_services()
+        assert len(responses.calls) == 1
+
+    @responses.activate
+    def test_studio_failure_means_no_choice(self, studio_settings):
+        responses.add(responses.GET, SERVICES_URL, status=503, body="down")
+        assert BotTranscriptionService().summary_services() == []
 
 
 class TestEntitlementsKillSwitch:
