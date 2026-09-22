@@ -150,6 +150,29 @@ class TestMarkStarted:
         assert result["record"] is False
         self.rec.assert_not_called()
 
+    def test_record_add_on_dropped_without_the_recording_capability(
+        self, studio_settings
+    ):
+        """LINTO_RECORDING_ENTITLEMENT_ENABLED: the add-on needs `recording`."""
+        studio_settings.LINTO_FEATURE_ENABLED = True
+        studio_settings.LINTO_RECORDING_ENTITLEMENT_ENABLED = True
+        room, owner = _owner_room()
+        data = {"session_id": "s", "channel_id": "c", "record": True}
+        with mock.patch(
+            "core.entitlements.capabilities.user_linto_capabilities",
+            return_value={"recording": False},
+        ):
+            result = BotTranscriptionService().mark_started(room, data, user=owner)
+        assert result["record"] is False
+        self.rec.assert_not_called()
+        with mock.patch(
+            "core.entitlements.capabilities.user_linto_capabilities",
+            return_value={"recording": True},
+        ):
+            result = BotTranscriptionService().mark_started(room, data, user=owner)
+        assert result["record"] is True
+        self.rec.assert_called_once()
+
 
 class TestBannerMetadata:
     """_set_banner: the room-metadata contract read by EVERY participant.

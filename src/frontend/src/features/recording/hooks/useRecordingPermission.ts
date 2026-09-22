@@ -7,6 +7,7 @@ import { FeatureFlags } from '@/features/analytics/enums'
 import { useConfig } from '@/api/useConfig'
 import { useUser } from '@/features/auth/api/useUser'
 import { useRoomData } from '@/features/rooms/livekit/hooks/useRoomData'
+import { useLintoCapabilities } from '@/features/transcription-bot/hooks/useLintoCapabilities'
 
 /**
  * Internal hook that computes recording permission state for a given mode.
@@ -36,8 +37,21 @@ export const useRecordingPermission = (
       ? isLoggedIn
       : isAdminOrOwner
 
+  // The video recording may be reserved to a plan (LinTO fork): when the
+  // instance gates it, the participant needs the `recording` capability. It
+  // closes the FEATURE (not the organizer permission), so the panel shows the
+  // "advanced feature" view rather than "ask an administrator".
+  const { recording: recordingEntitled } = useLintoCapabilities()
+  const recordingGated = config?.linto?.recording_entitlement_enabled === true
+  const entitled =
+    mode !== RecordingMode.ScreenRecording ||
+    !recordingGated ||
+    recordingEntitled
+
   const isFeatureAvailable =
-    (featureEnabled || !isAnalyticsEnabled) && isRecordingModeEnabled
+    (featureEnabled || !isAnalyticsEnabled) &&
+    isRecordingModeEnabled &&
+    entitled
 
   return { isFeatureAvailable, hasPermission }
 }

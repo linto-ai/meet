@@ -22,6 +22,9 @@ export interface LintoRuntimeConfig {
   // Per-user feature gating (LINTO_ENTITLEMENTS_ENABLED). false = the kill
   // switch: every LinTO capability is granted to everyone, no entitlement lookup.
   entitlements_enabled: boolean
+  // The video recording requires the `recording` capability
+  // (LINTO_RECORDING_ENTITLEMENT_ENABLED); false = open to everyone.
+  recording_entitlement_enabled: boolean
   // LiveKit signaling URL injected into the native bot descriptor.
   native_livekit_url: string
   visio_native_enabled: boolean
