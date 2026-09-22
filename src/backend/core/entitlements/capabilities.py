@@ -103,3 +103,12 @@ def has_linto_capability(user, path):
             return False
         node = node.get(part)
     return node is True
+
+
+def recording_entitled(user):
+    """May ``user`` start a video recording? Always, unless the instance gates
+    the recording (``LINTO_RECORDING_ENTITLEMENT_ENABLED``), in which case the
+    ``recording`` capability is required."""
+    if not settings.LINTO_RECORDING_ENTITLEMENT_ENABLED:
+        return True
+    return has_linto_capability(user, "recording")

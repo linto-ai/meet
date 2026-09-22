@@ -34,6 +34,7 @@ import requests
 
 from core import models
 from core.api.permissions import get_recording_permission_level
+from core.entitlements.capabilities import recording_entitled
 from core.recording.worker.factories import get_worker_service
 from core.recording.worker.mediator import WorkerServiceMediator
 from core.services.room_management import RoomManagement
@@ -402,6 +403,13 @@ class BotTranscriptionService:
         ):
             logger.warning(
                 "LinTO: record requested without screen_recording permission for "
+                "room %s — dropping it",
+                room.id,
+            )
+            record = False
+        if record and not recording_entitled(user):
+            logger.warning(
+                "LinTO: record requested without the recording capability for "
                 "room %s — dropping it",
                 room.id,
             )

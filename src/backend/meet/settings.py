@@ -1005,6 +1005,15 @@ class Base(Configuration):
     LINTO_ENTITLEMENTS_ENABLED = values.BooleanValue(
         True, environ_name="LINTO_ENTITLEMENTS_ENABLED", environ_prefix=None
     )
+    # Extends the per-user gating to the VIDEO RECORDING: when True, the
+    # recording button and `start-recording` require the `recording`
+    # capability (entitlements API v1, ADR 061 of Twake). False by default:
+    # recording stays open to everyone, whether the key is sent or not — it is
+    # not an AI feature (LiveKit records, LinTO is not called). Distinct from
+    # the kill switch above, which switches the whole gating off.
+    LINTO_RECORDING_ENTITLEMENT_ENABLED = values.BooleanValue(
+        False, environ_name="LINTO_RECORDING_ENTITLEMENT_ENABLED", environ_prefix=None
+    )
     # user_key mode — the identity Meet presents to the studio-api exchange:
     # `provider` labels THIS Meet instance (the same person on two instances is
     # two identities; keys are linked per provider), `subject` = user.sub,

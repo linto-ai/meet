@@ -87,6 +87,11 @@ def get_frontend_configuration(request):
             # Per-user feature gating. False = every capability granted to
             # everyone, no entitlement lookup (LINTO_ENTITLEMENTS_ENABLED).
             "entitlements_enabled": settings.LINTO_ENTITLEMENTS_ENABLED,
+            # The video recording requires the `recording` capability
+            # (LINTO_RECORDING_ENTITLEMENT_ENABLED); False = open to everyone.
+            "recording_entitlement_enabled": (
+                settings.LINTO_RECORDING_ENTITLEMENT_ENABLED
+            ),
             "native_livekit_url": settings.LINTO_NATIVE_LIVEKIT_URL,
             "visio_native_enabled": settings.LINTO_VISIO_NATIVE_ENABLED,
             "bot_provider": settings.LINTO_BOT_PROVIDER,
