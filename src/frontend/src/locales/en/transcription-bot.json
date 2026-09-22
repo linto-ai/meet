@@ -10,7 +10,8 @@
     "options": {
       "summary": "Generate a summary",
       "summaryHelp": "A summary is sent at the end of the meeting.",
-      "record": "Record the meeting video"
+      "record": "Record the meeting video",
+      "summaryService": "Summary type"
     },
     "errors": {
       "noProfile": "No transcription profile is configured for this organization. Ask an administrator to create one in LinTO Studio.",

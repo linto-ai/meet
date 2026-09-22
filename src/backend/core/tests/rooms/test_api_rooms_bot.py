@@ -199,6 +199,39 @@ class TestStudioToken:
         assert "credentials" in res.json()["error"]
 
 
+class TestSummaryServices:
+    def test_lists_the_services_for_a_room_participant(self, linto_settings):
+        room = RoomFactory()
+        token = _room_token(room)
+        services = [
+            {
+                "route": "minutes",
+                "name": "Minutes",
+                "description": {},
+                "icon": None,
+                "default": True,
+            }
+        ]
+        with mock.patch(
+            "core.api.viewsets.BotTranscriptionService.summary_services",
+            return_value=services,
+        ):
+            res = APIClient().get(
+                f"/api/v1.0/rooms/{room.id}/linto/summary-services/?token={token}"
+            )
+        assert res.status_code == 200
+        assert res.json() == {"services": services}
+
+    def test_feature_off_is_a_404(self, linto_settings):
+        linto_settings.LINTO_FEATURE_ENABLED = False
+        room = RoomFactory()
+        token = _room_token(room)
+        res = APIClient().get(
+            f"/api/v1.0/rooms/{room.id}/linto/summary-services/?token={token}"
+        )
+        assert res.status_code == 404
+
+
 class TestAuth:
     def test_no_token_is_unauthorized(self, linto_settings):
         room = RoomFactory()

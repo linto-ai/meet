@@ -32,6 +32,7 @@ import {
   useStopLintoLive,
 } from '../api/lintoBotApi'
 import { LintoSettings } from './LintoSettings'
+import { SummaryServicePicker } from './SummaryServicePicker'
 import { LiveTranscript } from './LiveTranscript'
 
 // Suppress the room-wide state sync from clobbering optimistic state for a
@@ -56,7 +57,8 @@ export const LintoSidePanel = () => {
   const { t } = useTranslation('transcription-bot', { keyPrefix: 'lintoBot' })
 
   const { enabled } = useLintoConfig()
-  const { running, summary, record, error } = useSnapshot(lintoStore)
+  const { running, summary, summaryService, record, error } =
+    useSnapshot(lintoStore)
 
   const apiRoomData = useRoomData()
   const roomId = apiRoomData?.livekit?.room
@@ -148,6 +150,7 @@ export const LintoSidePanel = () => {
         lintoConfig,
         config: {
           summary,
+          summaryService,
           record: hasScreenRecordingAccess ? record : false,
           translations: [...lintoStore.selectedTranslations],
         },
@@ -312,6 +315,7 @@ export const LintoSidePanel = () => {
             <Text variant="xsNote" className={css({ paddingLeft: '1.625rem' })}>
               {t('options.summaryHelp')}
             </Text>
+            {summary && <SummaryServicePicker isDisabled={controlsDisabled} />}
             {hasScreenRecordingAccess && (
               <Checkbox
                 size="sm"

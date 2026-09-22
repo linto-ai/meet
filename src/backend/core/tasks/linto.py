@@ -259,12 +259,35 @@ async def _tag_and_move(linto, conversation_id, log_id, checkpoint):
             logger.exception("Move conversation error for %s, continuing", log_id)
 
 
-async def _summarize_conversation(linto, conversation_id, log_id, checkpoint):
+def _pick_summary_service(services, requested=None):
+    """The LLM service route to summarize with: the one the user picked in the
+    panel when Studio still offers it, else ``LINTO_LLM_SERVICE_ROUTE``, else
+    the first service."""
+    known = {s.get("route") for s in services} | {s.get("name") for s in services}
+    if requested and requested in known:
+        return requested
+    if requested:
+        logger.warning(
+            "Requested summary service %r is not offered any more, falling back",
+            requested,
+        )
+    return (
+        getattr(settings, "LINTO_LLM_SERVICE_ROUTE", None)
+        or services[0].get("route")
+        or services[0].get("name")
+    )
+
+
+async def _summarize_conversation(
+    linto, conversation_id, log_id, checkpoint, service_route=None
+):
     """Trigger an LLM summary (soft-fail). Returns the ``summary_result`` dict.
 
-    The dict carries ``success`` and, on success, ``content`` / ``job_id``. It
-    is EMPTY when the feature is disabled, the step is already checkpointed, no
-    LLM service is available, or the summary failed.
+    ``service_route`` is the summary service the user chose (the live panel);
+    None = the instance default. The dict carries ``success`` and, on success,
+    ``content`` / ``job_id``. It is EMPTY when the feature is disabled, the
+    step is already checkpointed, no LLM service is available, or the summary
+    failed.
     """
     summary_result = {}
     if not getattr(settings, "LINTO_LLM_SUMMARY_ENABLED", True):
@@ -274,11 +297,7 @@ async def _summarize_conversation(linto, conversation_id, log_id, checkpoint):
     try:
         services = await linto.list_llm_services()
         if services:
-            service_route = (
-                getattr(settings, "LINTO_LLM_SERVICE_ROUTE", None)
-                or services[0].get("route")
-                or services[0].get("name")
-            )
+            service_route = _pick_summary_service(services, service_route)
             logger.info(
                 "Triggering LLM summary for %s (service=%s)", log_id, service_route
             )
@@ -1118,7 +1137,11 @@ async def _process_bot_live_summary_sync(room_id):
     # 4. Tag + move + summarize + document (recipient-independent).
     await _tag_and_move(linto, conversation_id, room_id, checkpoint)
     summary_result = await _summarize_conversation(
-        linto, conversation_id, room_id, checkpoint
+        linto,
+        conversation_id,
+        room_id,
+        checkpoint,
+        service_route=payload.get("summary_service"),
     )
     pdf_content, pub_format = await _generate_document(
         linto, conversation_id, summary_result, room_id, checkpoint

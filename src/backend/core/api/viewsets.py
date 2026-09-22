@@ -894,6 +894,26 @@ class RoomViewSet(
     @decorators.action(
         detail=True,
         methods=["get"],
+        url_path="linto/summary-services",
+        permission_classes=[permissions.HasLiveKitRoomAccess],
+        authentication_classes=[LiveKitTokenAuthentication],
+    )
+    @FeatureFlag.require("linto")
+    def linto_summary_services(self, request, pk=None):  # pylint: disable=unused-argument
+        """The summary services the panel offers: the LLM Gateway services
+        carrying the ``meet`` scope, listed through Studio for the organization
+        the summaries are produced in. ``{"services": [{route, name,
+        description, icon, default}]}``; an empty list when Studio cannot
+        answer (the panel then shows no choice)."""
+        self.get_object()  # room access check
+        services = BotTranscriptionService().summary_services()
+        return drf_response.Response(
+            {"services": services}, status=drf_status.HTTP_200_OK
+        )
+
+    @decorators.action(
+        detail=True,
+        methods=["get"],
         url_path="linto/studio-token",
         permission_classes=[permissions.HasLiveKitRoomAccess],
         authentication_classes=[LiveKitTokenAuthentication],
