@@ -6,7 +6,11 @@ import {
 import { fetchApi } from '@/api/fetchApi'
 import { ApiError } from '@/api/ApiError'
 import type { LintoRuntimeConfig } from '@/api/useConfig'
-import { LintoBotConfig, LintoBotProfilesResult } from '../types/linto'
+import {
+  LintoBotConfig,
+  LintoBotProfilesResult,
+  LintoSummaryService,
+} from '../types/linto'
 import { useLintoCapabilities } from '../hooks/useLintoCapabilities'
 import {
   StudioAuthUnavailable,
@@ -89,6 +93,34 @@ export function useLintoBotProfiles(
         // Studio down): degrade the same way.
         return { profiles: [], hasDefault: false, reason: 'upstream_error' }
       }
+    },
+    enabled: !!roomId && !!token && !!config?.enabled && live,
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
+// ── Summary services (Meet backend) ───────────────────────────────────────────
+
+/**
+ * The summary services the panel lets the user choose from: the LLM Gateway
+ * services carrying the `meet` scope, listed by the Meet backend through
+ * Studio for the organization the summaries are produced in. Empty when the
+ * backend cannot answer (the panel then shows no choice).
+ */
+export function useLintoSummaryServices(
+  roomId: string | undefined,
+  token: string | undefined
+) {
+  const { config } = useStudioClient()
+  const { live } = useLintoCapabilities()
+  return useQuery<LintoSummaryService[], ApiError>({
+    queryKey: ['lintoSummaryServices', roomId],
+    queryFn: async () => {
+      const search = token ? `?token=${encodeURIComponent(token)}` : ''
+      const res = await fetchApi<{ services?: LintoSummaryService[] }>(
+        `rooms/${roomId}/linto/summary-services/${search}`
+      )
+      return res.services ?? []
     },
     enabled: !!roomId && !!token && !!config?.enabled && live,
     staleTime: 5 * 60 * 1000,
@@ -188,6 +220,7 @@ const startLintoLive = async (
       org_id: run.organizationId ?? organizationId,
       bot_id: run.botId,
       summary: config.summary,
+      summary_service: config.summary ? config.summaryService : undefined,
       record: config.record,
       token,
     }),

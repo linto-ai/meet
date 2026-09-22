@@ -16,6 +16,7 @@ export { useLintoTranscriptFeed } from './hooks/useLintoTranscriptFeed'
 // only mints the native token + runs the room-wide lifecycle hooks.
 export {
   useLintoBotProfiles,
+  useLintoSummaryServices,
   useStartLintoLive,
   useStopLintoLive,
 } from './api/lintoBotApi'
@@ -33,5 +34,6 @@ export type {
   LintoBotProfilesReason,
   LintoBotProfilesResult,
   LintoCapabilities,
+  LintoSummaryService,
 } from './types/linto'
 export { LINTO_SEGMENT_PREFIX } from './types/linto'

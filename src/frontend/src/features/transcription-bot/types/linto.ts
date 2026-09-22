@@ -10,6 +10,9 @@ export interface LintoBotConfig {
   // Live transcription is implicit (always on). `summary` adds an autonomous
   // summary at stop (default true); `record` adds a LiveKit video recording.
   summary: boolean
+  // The summary service (LLM Gateway route) picked in the panel; undefined =
+  // the instance default.
+  summaryService?: string
   record: boolean
   // Target translation language codes (0..N).
   translations: string[]
@@ -67,6 +70,20 @@ export interface LintoCapabilities {
   translation?: boolean
   recording?: boolean
   [feature: string]: unknown
+}
+
+// A summary service the panel offers (GET rooms/{id}/linto/summary-services):
+// an LLM Gateway service carrying the `meet` scope, listed through Studio.
+export interface LintoSummaryService {
+  route: string
+  name: string
+  // i18n descriptions as the gateway holds them ({ en, fr, … }).
+  description: Record<string, string>
+  // Icon name set by the gateway admin (Phosphor-style vocabulary), null when
+  // none: the panel falls back to a generic pictogram.
+  icon: string | null
+  // The instance default (LINTO_LLM_SERVICE_ROUTE, else the first one).
+  default: boolean
 }
 
 // A quickMeeting transcriber profile advertised by bot-profiles.

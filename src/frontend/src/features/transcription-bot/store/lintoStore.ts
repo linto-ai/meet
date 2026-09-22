@@ -45,6 +45,8 @@ type LintoState = {
   // two flat options are independent add-ons: an autonomous summary at stop
   // (default ON) and a LiveKit video recording (default OFF).
   summary: boolean
+  // Summary service route picked in the panel (undefined → instance default).
+  summaryService?: string
   record: boolean
   selectedLanguage?: string
   // ASR profile id picked in the dropdown ("" / undefined → backend picks first).
@@ -82,6 +84,7 @@ export const lintoStore = proxy<LintoState>({
   startedByMe: false,
   localActionUntil: 0,
   summary: true,
+  summaryService: undefined,
   record: false,
   selectedLanguage: undefined,
   selectedProfile: undefined,

@@ -385,7 +385,8 @@ class BotTranscriptionService:
 
         ``data`` carries the Studio ids the browser obtained via the SDK
         (``session_id``, ``channel_id``, ``org_id``, ``bot_id``) plus the add-ons
-        (``summary`` default True, ``record`` default False). Re-checks the
+        (``summary`` default True, ``summary_service`` the chosen summary
+        service route, ``record`` default False). Re-checks the
         transcript permission (defence in depth), starts the optional video
         egress when allowed, persists ``room.configuration["linto"]`` and sets the
         banner. Returns the persisted state.
@@ -415,8 +416,15 @@ class BotTranscriptionService:
             )
             record = False
 
+        summary_service = data.get("summary_service") or None
+        if summary_service is not None and not isinstance(summary_service, str):
+            summary_service = None
+
         linto = {
             "summary": summary,
+            # The summary service (LLM Gateway route) the user picked in the
+            # panel; None = the instance default (LINTO_LLM_SERVICE_ROUTE).
+            "summary_service": summary_service,
             "record": record,
             "org_id": data.get("org_id"),
             "session_id": data.get("session_id"),
@@ -502,6 +510,7 @@ class BotTranscriptionService:
                 "session_id": session_id,
                 "conversation_name": conversation_name,
                 "recipient_user_id": linto.get("user_id"),
+                "summary_service": linto.get("summary_service"),
                 "record": bool(linto.get("record", False)),
                 "steps": {},
                 "attempts": 0,
@@ -574,6 +583,73 @@ class BotTranscriptionService:
                 room.id,
                 exc,
             )
+
+    # ── Summary services offered to the panel ─────────────────────────────
+    # LLM Gateway usage scope of the services Meet lists (gateway 2.6 `scopes`).
+    SUMMARY_SERVICE_SCOPE = "meet"
+    SUMMARY_SERVICES_CACHE_KEY = "linto:summary-services"
+    SUMMARY_SERVICES_CACHE_TTL = 300
+
+    def summary_services(self):
+        """The summary services the panel lets the user choose from.
+
+        The LLM Gateway services carrying the ``meet`` scope, listed through
+        Studio (``GET /api/services/{org}/llm?scope=meet``) under the service
+        account, in the organization the summaries are produced in — for now
+        the instance's organization (``LINTO_STUDIO_DEFAULT_ORG_ID``, the
+        Linagora one), not yet the user's. Cached 5 min. Each entry:
+        ``{route, name, description, icon, default}``; ``icon`` is the
+        gateway's ``metadata.icon`` when the admin set one (None otherwise),
+        ``default`` marks ``LINTO_LLM_SERVICE_ROUTE`` (else the first one).
+        Returns ``[]`` when Studio cannot answer: the panel then shows no
+        choice and the summary falls back to the default service.
+        """
+        cached = cache.get(self.SUMMARY_SERVICES_CACHE_KEY)
+        if cached is not None:
+            return cached
+        try:
+            headers = self._headers()
+            org_id = self._service_account_org(headers)
+            r = requests.get(
+                f"{self.studio_base}/api/services/{org_id}/llm",
+                params={"scope": self.SUMMARY_SERVICE_SCOPE},
+                headers=headers,
+                timeout=DEFAULT_TIMEOUT,
+            )
+        except (requests.RequestException, BotTranscriptionException) as exc:
+            logger.warning("LinTO: summary services unavailable: %s", exc)
+            return []
+        if r.status_code != 200:
+            logger.warning(
+                "LinTO: summary services listing failed: %s %s",
+                r.status_code,
+                r.text[:200],
+            )
+            return []
+        data = r.json() or []
+        raw = data if isinstance(data, list) else data.get("services", [])
+        pinned = settings.LINTO_LLM_SERVICE_ROUTE
+        services = []
+        for service in raw:
+            route = service.get("route") or service.get("name")
+            if not route:
+                continue
+            metadata = service.get("metadata") or {}
+            services.append(
+                {
+                    "route": route,
+                    "name": service.get("name") or route,
+                    "description": service.get("description") or {},
+                    "icon": metadata.get("icon") or None,
+                    "default": bool(pinned) and pinned in (route, service.get("name")),
+                }
+            )
+        if services and not any(s["default"] for s in services):
+            services[0]["default"] = True
+        cache.set(
+            self.SUMMARY_SERVICES_CACHE_KEY, services, self.SUMMARY_SERVICES_CACHE_TTL
+        )
+        return services
 
     # ── Studio token for the browser SDK (identity bridge) ───────────────
     def studio_token_for(self, user):

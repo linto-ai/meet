@@ -10,7 +10,8 @@
     "options": {
       "summary": "Générer un compte rendu",
       "summaryHelp": "Un compte rendu est envoyé à la fin de la réunion.",
-      "record": "Enregistrer la vidéo de la réunion"
+      "record": "Enregistrer la vidéo de la réunion",
+      "summaryService": "Type de compte rendu"
     },
     "errors": {
       "noProfile": "Aucun profil de transcription n'est configuré pour cette organisation. Demandez à un administrateur d'en créer un dans LinTO Studio.",
