@@ -8,7 +8,8 @@ import {
   useHasRecordingAccess,
   useRecordingStatuses,
 } from '@/features/recording'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useLintoCapabilities } from '@/features/transcription-bot/hooks/useLintoCapabilities'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -38,6 +39,12 @@ export const ScreenRecordingSidePanel = () => {
   const { t } = useTranslation('rooms', { keyPrefix })
 
   const [includeTranscript, setIncludeTranscript] = useState(false)
+  // "Transcribe this recording" is a LinTO feature (deferred transcription):
+  // offered only to a participant whose capabilities grant it.
+  const { async: canTranscribeAsync } = useLintoCapabilities()
+  useEffect(() => {
+    if (!canTranscribeAsync && includeTranscript) setIncludeTranscript(false)
+  }, [canTranscribeAsync, includeTranscript])
 
   const isAdminOrOwner = useIsAdminOrOwner()
 
@@ -191,21 +198,24 @@ export const ScreenRecordingSidePanel = () => {
 
         <div className={css({ height: '15px' })} />
 
-        <div
-          className={css({
-            width: '100%',
-            marginLeft: '20px',
-          })}
-        >
-          <Checkbox
-            size="sm"
-            isSelected={includeTranscript}
-            onChange={setIncludeTranscript}
-            isDisabled={statuses.isActive || isPendingToStart}
+        {canTranscribeAsync && (
+          <div
+            className={css({
+              width: '100%',
+              marginLeft: '20px',
+            })}
           >
-            <Text variant="sm">{t('details.transcription')}</Text>
-          </Checkbox>
-        </div>
+            <Checkbox
+              size="sm"
+              data-testid="recording-transcribe"
+              isSelected={includeTranscript}
+              onChange={setIncludeTranscript}
+              isDisabled={statuses.isActive || isPendingToStart}
+            >
+              <Text variant="sm">{t('details.transcription')}</Text>
+            </Checkbox>
+          </div>
+        )}
       </VStack>
       <ControlsButton
         i18nKeyPrefix={keyPrefix}

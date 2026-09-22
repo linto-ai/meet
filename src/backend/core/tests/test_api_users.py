@@ -127,6 +127,9 @@ def test_api_users_retrieve_me_authenticated(settings):
         "short_name": user.short_name,
         "language": user.language,
         "timezone": "UTC",
+        "can_create": True,
+        # LinTO capabilities (fork): nothing decides them on a bare instance.
+        "linto": None,
     }
 
 

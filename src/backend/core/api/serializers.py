@@ -20,6 +20,8 @@ from rest_framework.exceptions import PermissionDenied
 from timezone_field.rest_framework import TimeZoneSerializerField
 
 from core import models, utils
+from core.entitlements import EntitlementsUnavailableError, get_user_entitlements
+from core.entitlements.capabilities import user_linto_capabilities
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +63,36 @@ class UserLightSerializer(serializers.ModelSerializer):
         model = models.User
         fields = ["id", "full_name", "short_name"]
         read_only_fields = ["id", "full_name", "short_name"]
+
+
+class UserMeSerializer(UserSerializer):
+    """Serialize users for me endpoint."""
+
+    can_create = serializers.SerializerMethodField(read_only=True)
+    # LinTO capabilities of the person (fork): what the AI buttons are gated
+    # on. None = nothing decides them here (no AI button at all).
+    linto = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = models.User
+        fields = [*UserSerializer.Meta.fields, "can_create", "linto"]
+        read_only_fields = [
+            *UserSerializer.Meta.read_only_fields,
+            "can_create",
+            "linto",
+        ]
+
+    def get_can_create(self, user) -> bool:
+        """Check entitlements for the current user."""
+        try:
+            entitlements = get_user_entitlements(user.sub, user.email)
+            return entitlements.get("can_create", False)
+        except EntitlementsUnavailableError:
+            return False
+
+    def get_linto(self, user) -> dict | None:
+        """The LinTO capabilities of the current user."""
+        return user_linto_capabilities(user)
 
 
 class ResourceAccessSerializerMixin:
@@ -312,7 +344,6 @@ class StartRecordingSerializer(BaseValidationOnlySerializer):
         allow_null=True,
         help_text="Recording options",
     )
-
 
 
 class RequestEntrySerializer(BaseValidationOnlySerializer):
