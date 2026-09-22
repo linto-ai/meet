@@ -37,6 +37,11 @@ def exception_handler(exc, context):
 @api_view(["GET"])
 def get_frontend_configuration(request):
     """Returns the frontend configuration dict as configured in settings."""
+    # Local import: the service module imports core.api (permissions/serializers).
+    from core.services.bot_transcription import (  # noqa: PLC0415
+        effective_token_source,
+    )
+
     frontend_configuration = {
         "LANGUAGE_CODE": settings.LANGUAGE_CODE,
         "recording": {
@@ -76,8 +81,12 @@ def get_frontend_configuration(request):
             "hide_legacy_tools": settings.LINTO_HIDE_LEGACY_TOOLS,
             "studio_api_url": settings.LINTO_STUDIO_BROWSER_API_URL,
             # Where the browser's Studio JWT comes from (informational: the
-            # panel always asks GET rooms/{id}/linto/studio-token).
-            "token_source": settings.LINTO_STUDIO_TOKEN_SOURCE,
+            # panel always asks GET rooms/{id}/linto/studio-token). Reported
+            # AFTER the kill switch below: the service account when it is off.
+            "token_source": effective_token_source(),
+            # Per-user feature gating. False = every capability granted to
+            # everyone, no entitlement lookup (LINTO_ENTITLEMENTS_ENABLED).
+            "entitlements_enabled": settings.LINTO_ENTITLEMENTS_ENABLED,
             "native_livekit_url": settings.LINTO_NATIVE_LIVEKIT_URL,
             "visio_native_enabled": settings.LINTO_VISIO_NATIVE_ENABLED,
             "bot_provider": settings.LINTO_BOT_PROVIDER,

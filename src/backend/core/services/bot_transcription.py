@@ -48,6 +48,16 @@ DEFAULT_TIMEOUT = 15
 TOKEN_SOURCE_SERVICE_ACCOUNT = "service_account"  # noqa: S105
 TOKEN_SOURCE_USER_KEY = "user_key"  # noqa: S105
 
+
+def effective_token_source():
+    """Where the browser's Studio token comes from, once the kill switch is
+    applied: ``LINTO_STUDIO_TOKEN_SOURCE``, forced to the service account when
+    the per-user feature system is off (``LINTO_ENTITLEMENTS_ENABLED=False``)."""
+    if not settings.LINTO_ENTITLEMENTS_ENABLED:
+        return TOKEN_SOURCE_SERVICE_ACCOUNT
+    return settings.LINTO_STUDIO_TOKEN_SOURCE
+
+
 # LiveKit room-metadata key lit while a LinTO bot transcribes the room. Read by
 # EVERY participant's frontend (banner, CC badge, panel state) — the shared
 # source of truth, replayed to late joiners by LiveKit itself.
@@ -572,6 +582,10 @@ class BotTranscriptionService:
           identity exchange (``POST /api/auth/external/token``); the
           organization is the key's. No per-instance limit.
 
+        With the per-user feature system switched off
+        (``LINTO_ENTITLEMENTS_ENABLED=False``) the token always comes from the
+        service account: there is no per-user key without an entitlement.
+
         Returns ``{"enabled": True, "token", "base_url", "organization_id",
         "expires_in", "capabilities"}``, or ``{"enabled": False, "reason"}`` when
         the option is not active for this user. Raises
@@ -579,7 +593,7 @@ class BotTranscriptionService:
         The browser never receives a long-lived key: ``expires_in`` (seconds,
         ``None`` = unknown) lets it refresh before expiry.
         """
-        source = settings.LINTO_STUDIO_TOKEN_SOURCE
+        source = effective_token_source()
         if source == TOKEN_SOURCE_SERVICE_ACCOUNT:
             return self._service_account_token()
         if source == TOKEN_SOURCE_USER_KEY:

@@ -36,3 +36,19 @@ def test_config_recording_permissions_default_values(settings):
     data = response.json()
     assert data["recording"]["screen_recording_permission"] == "admin_owner"
     assert data["recording"]["transcript_permission"] == "admin_owner"
+
+
+def test_config_linto_reports_the_kill_switch_and_effective_token_source(settings):
+    """LINTO_ENTITLEMENTS_ENABLED is exposed, and `token_source` is the one the
+    bridge really uses: the service account once the gating is off."""
+    settings.LINTO_FEATURE_ENABLED = True
+    settings.LINTO_STUDIO_TOKEN_SOURCE = "user_key"
+    settings.LINTO_ENTITLEMENTS_ENABLED = True
+    data = APIClient().get("/api/v1.0/config/").json()
+    assert data["linto"]["entitlements_enabled"] is True
+    assert data["linto"]["token_source"] == "user_key"
+
+    settings.LINTO_ENTITLEMENTS_ENABLED = False
+    data = APIClient().get("/api/v1.0/config/").json()
+    assert data["linto"]["entitlements_enabled"] is False
+    assert data["linto"]["token_source"] == "service_account"

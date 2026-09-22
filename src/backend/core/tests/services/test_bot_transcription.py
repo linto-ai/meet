@@ -33,6 +33,7 @@ from core.services.bot_transcription import (
     BotTranscriptionException,
     BotTranscriptionService,
     PermissionDeniedError,
+    effective_token_source,
 )
 
 pytestmark = pytest.mark.django_db
@@ -554,6 +555,29 @@ class TestUserKeyToken:
             fake_cache.get.return_value = None
             BotTranscriptionService().studio_token_for(user)
         assert fake_cache.set.call_args.args[2] == 30
+
+
+class TestEntitlementsKillSwitch:
+    """LINTO_ENTITLEMENTS_ENABLED=False: the per-user feature system is off —
+    the token comes from the service account whatever the configured source,
+    and the identity exchange is never called."""
+
+    @responses.activate
+    def test_gating_off_forces_the_service_account(self, user_key_settings):
+        user_key_settings.LINTO_ENTITLEMENTS_ENABLED = False
+        user_key_settings.LINTO_STUDIO_DEFAULT_ORG_ID = "org-linagora"
+        user = UserFactory(sub="anyone")
+        result = BotTranscriptionService().studio_token_for(user)
+        assert result["enabled"] is True
+        assert result["organization_id"] == "org-linagora"
+        assert result["token"] == "integration-key"
+        assert not any(c.request.url == EXCHANGE for c in responses.calls)
+
+    def test_gating_on_keeps_the_configured_source(self, user_key_settings):
+        user_key_settings.LINTO_ENTITLEMENTS_ENABLED = True
+        assert effective_token_source() == "user_key"
+        user_key_settings.LINTO_ENTITLEMENTS_ENABLED = False
+        assert effective_token_source() == "service_account"
 
 
 class TestResolveConversationId:
