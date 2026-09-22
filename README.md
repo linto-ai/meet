@@ -81,6 +81,27 @@ On the 29th of January 2026, Prime Minister Sébastien Lecornu, announced the fu
 
 We're currently working on both technical and user documentation for La Suite Meet. In the meantime, many of the essential aspects are already well covered by the [LiveKit documentation](https://docs.livekit.io/home/) and their [self-hosting guide](https://docs.livekit.io/home/self-hosting/deployment/). Stay tuned for more updates!
 
+## LinTO fork: live transcription and per-user features
+
+This fork (branch `linto-live`) adds an in-meeting **LinTO** tool: live
+transcription by a LinTO Studio bot, live translation, a summary at the end of
+the meeting, and the deferred transcription of a recording. The panel talks to
+studio-api through the LinTO JS SDK with a short-lived token the Meet backend
+hands it (`GET rooms/{id}/linto/studio-token/`, the identity bridge). The
+variables below are read by the backend (`src/backend/meet/settings.py`).
+
+| Variable | Default | Role |
+|---|---|---|
+| `LINTO_FEATURE_ENABLED` | `False` | Instance-wide switch of the LinTO tool. |
+| `LINTO_STUDIO_ENABLED`, `LINTO_STUDIO_BASE_URL` | — | The Studio control plane (deferred transcription of recordings, summaries). |
+| `LINTO_STUDIO_BROWSER_API_URL` | — | Browser-facing studio-api base the SDK talks to. |
+| `LINTO_STUDIO_AUTH_EMAIL` / `PASSWORD`, `LINTO_STUDIO_INTEGRATION_TOKEN` | — | The backend's credential towards Studio (service account, or the integration key). |
+| `LINTO_STUDIO_TOKEN_SOURCE` | `service_account` | Where the browser's Studio token comes from: the shared service account (`LINTO_STUDIO_DEFAULT_ORG_ID`, one live transcription at a time), or `user_key` (the user's own LinTO key, through the studio-api identity exchange, `LINTO_IDENTITY_PROVIDER`). |
+| `LINTO_ENTITLEMENTS_ENABLED` | `True` | **Kill switch of the per-user feature system.** `False` grants every LinTO capability to every participant, never calls Studio's entitlement resolution, and takes the Studio token from the service account whatever `LINTO_STUDIO_TOKEN_SOURCE` says. Use it to ship every feature before an external subscription system feeds Studio (decision of 2026-09-21 for the Linagora instance); remove it the day it does. |
+| `LINTO_STUDIO_DEFAULT_PROFILE_ID` | — | Pinned quickMeeting ASR profile (the user never picks one). |
+| `LINTO_LLM_SERVICE_ROUTE` | — | Summary service (LLM Gateway route) used when the user did not choose one. |
+| `LINTO_HIDE_LEGACY_TOOLS` | `False` | Hide the legacy "Transcribe" tool in favour of the LinTO one. |
+
 ## Self-host
 
 ### La Suite Meet is easy to install on your own servers
