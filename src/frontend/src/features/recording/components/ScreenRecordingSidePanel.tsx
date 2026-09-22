@@ -8,7 +8,8 @@ import {
   useHasRecordingAccess,
   useRecordingStatuses,
 } from '@/features/recording'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useLintoCapabilities } from '@/features/transcription-bot/hooks/useLintoCapabilities'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -44,6 +45,12 @@ export const ScreenRecordingSidePanel = () => {
   const { t } = useTranslation('rooms', { keyPrefix })
 
   const [includeTranscript, setIncludeTranscript] = useState(false)
+  // "Transcribe this recording" is a LinTO feature (deferred transcription):
+  // offered only to a participant whose capabilities grant it.
+  const { async: canTranscribeAsync } = useLintoCapabilities()
+  useEffect(() => {
+    if (!canTranscribeAsync && includeTranscript) setIncludeTranscript(false)
+  }, [canTranscribeAsync, includeTranscript])
 
   const isAdminOrOwner = useIsAdminOrOwner()
   const { isOpenToAuthenticated } = useRecordingPermission(
@@ -239,7 +246,7 @@ export const ScreenRecordingSidePanel = () => {
             </Text>
           </RowWrapper>
         )}
-        {hasTranscriptAccess && (
+        {hasTranscriptAccess && canTranscribeAsync && (
           <>
             <div className={css({ height: '15px' })} />
             <div
@@ -250,6 +257,7 @@ export const ScreenRecordingSidePanel = () => {
             >
               <Checkbox
                 size="sm"
+                data-testid="recording-transcribe"
                 isSelected={includeTranscript}
                 onChange={setIncludeTranscript}
                 isDisabled={statuses.isActive || isPendingToStart}

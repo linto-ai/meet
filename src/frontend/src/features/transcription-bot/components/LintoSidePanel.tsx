@@ -25,6 +25,7 @@ import {
 import { lintoStore, resetLintoRun } from '../store/lintoStore'
 import { clearTranscript } from '../store/transcriptStore'
 import { useLintoConfig } from '../hooks/useLintoConfig'
+import { useLintoCapabilities } from '../hooks/useLintoCapabilities'
 import {
   useLintoBotProfiles,
   useStartLintoLive,
@@ -63,6 +64,8 @@ export const LintoSidePanel = () => {
   const token = apiRoomData?.livekit?.token
 
   const { user } = useUser()
+  const { loading: capabilitiesLoading, live: canTranscribeLive } =
+    useLintoCapabilities()
   const { data: configData } = useConfig()
   const lintoConfig = configData?.linto
   const isAdminOrOwner = useIsAdminOrOwner()
@@ -233,10 +236,14 @@ export const LintoSidePanel = () => {
     )
   }
 
-  // The LinTO option is not active for this account (no linked key, or a key
-  // that may not run a quickMeeting): nothing to start. A run started by
-  // someone else is still readable below, exactly like a viewer without rights.
-  const noEntitlement = profilesData?.reason === 'no_entitlement'
+  // The LinTO option is not active for this account: the capabilities of
+  // users/me do not grant the live transcription (decided before any Studio
+  // call), or the identity bridge itself answered "not entitled". Nothing to
+  // start; a run started by someone else is still readable below, exactly
+  // like a viewer without rights.
+  const noEntitlement =
+    (!capabilitiesLoading && !canTranscribeLive) ||
+    profilesData?.reason === 'no_entitlement'
   if (!running && noEntitlement) {
     return (
       <Div

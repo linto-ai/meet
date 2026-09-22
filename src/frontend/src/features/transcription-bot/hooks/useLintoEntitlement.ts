@@ -1,20 +1,16 @@
-import { useRoomData } from '@/features/rooms/livekit/hooks/useRoomData'
-import { useLintoBotProfiles } from '../api/lintoBotApi'
+import { useLintoCapabilities } from './useLintoCapabilities'
 
 export type LintoEntitlement = 'unknown' | 'entitled' | 'no_entitlement'
 
 /**
- * Is the LinTO option active for the current participant? Derived from the
- * profiles query (shared with the panel, so no extra request): the identity
- * bridge answers "not entitled" when no LinTO key is linked to the user (or
- * the key may not run a quickMeeting). 'unknown' while loading / for guests.
+ * Is the live transcription option active for the current participant?
+ * Derived from the capabilities of GET users/me (`linto.transcription.live`),
+ * never from a Studio call: a participant without the right never triggers
+ * the identity bridge. 'unknown' while the user is still loading; guests are
+ * not entitled (they have no identity to bridge).
  */
 export const useLintoEntitlement = (): LintoEntitlement => {
-  const apiRoomData = useRoomData()
-  const { data } = useLintoBotProfiles(
-    apiRoomData?.livekit?.room,
-    apiRoomData?.livekit?.token
-  )
-  if (!data) return 'unknown'
-  return data.reason === 'no_entitlement' ? 'no_entitlement' : 'entitled'
+  const { loading, live } = useLintoCapabilities()
+  if (loading) return 'unknown'
+  return live ? 'entitled' : 'no_entitlement'
 }

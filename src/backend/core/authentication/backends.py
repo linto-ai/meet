@@ -15,6 +15,7 @@ from lasuite.oidc_login.backends import (
 )
 from rest_framework.authentication import SessionAuthentication
 
+from core.entitlements import EntitlementsUnavailableError, get_user_entitlements
 from core.models import User
 from core.services.twake_drive import clean_instance
 from core.validators import sub_validator
@@ -71,6 +72,21 @@ class OIDCAuthenticationBackend(LaSuiteOIDCAuthenticationBackend):
         email = claims["email"]
         if is_new_user and email and settings.SIGNUP_NEW_USER_TO_MARKETING_EMAIL:
             self.signup_to_marketing_email(email)
+
+        # Warm the entitlements cache on login (force_refresh)
+        try:
+            get_user_entitlements(
+                user_sub=user.sub,
+                user_email=user.email,
+                user_info=claims,
+                force_refresh=True,
+            )
+        except EntitlementsUnavailableError:
+            email_domain = user.email.split("@")[-1] if "@" in user.email else "?"
+            logger.warning(
+                "Entitlements unavailable for user@%s during login",
+                email_domain,
+            )
 
     @staticmethod
     def signup_to_marketing_email(email):

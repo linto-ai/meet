@@ -7,6 +7,7 @@ import { fetchApi } from '@/api/fetchApi'
 import { ApiError } from '@/api/ApiError'
 import type { LintoRuntimeConfig } from '@/api/useConfig'
 import { LintoBotConfig, LintoBotProfilesResult } from '../types/linto'
+import { useLintoCapabilities } from '../hooks/useLintoCapabilities'
 import {
   StudioAuthUnavailable,
   StudioClient,
@@ -53,12 +54,17 @@ const nativeMeta = (
  * `reason='unprovisioned'` (org has none), `'ok'`, `'no_entitlement'` when the
  * LinTO option is not active for this account, or `'upstream_error'` when
  * Studio is unreachable / the browser has no Studio auth.
+ *
+ * This is the first thing that asks the Meet backend for a Studio token, so it
+ * only runs for a participant whose capabilities (users/me) grant the live
+ * transcription, and only where the panel needs it (settings, start).
  */
 export function useLintoBotProfiles(
   roomId: string | undefined,
   token: string | undefined
 ) {
   const { getClient, config } = useStudioClient()
+  const { live } = useLintoCapabilities()
   return useQuery<LintoBotProfilesResult, ApiError>({
     queryKey: ['lintoBotProfiles', roomId],
     queryFn: async (): Promise<LintoBotProfilesResult> => {
@@ -84,7 +90,7 @@ export function useLintoBotProfiles(
         return { profiles: [], hasDefault: false, reason: 'upstream_error' }
       }
     },
-    enabled: !!roomId && !!token && !!config?.enabled,
+    enabled: !!roomId && !!token && !!config?.enabled && live,
     staleTime: 5 * 60 * 1000,
   })
 }

@@ -46,6 +46,7 @@ from core.api.exceptions import ensure_room_not_deleted
 from core.api.filters import ListFileFilter
 from core.api.locks import room_locked_for_update
 from core.enums import MEDIA_STORAGE_URL_PATTERN
+from core.entitlements.capabilities import has_linto_capability
 from core.recording.enums import FileExtension
 from core.recording.event.authentication import RecordingProcessWebhookAuthentication
 from core.recording.services.metadata_collector import (
@@ -178,7 +179,7 @@ class UserViewSet(
         """
         context = {"request": request}
         return drf_response.Response(
-            self.serializer_class(request.user, context=context).data
+            serializers.UserMeSerializer(request.user, context=context).data
         )
 
     @decorators.action(
@@ -483,6 +484,27 @@ class RoomViewSet(  # pylint: disable=too-many-public-methods
         mode = serializer.validated_data["mode"]
         options = serializer.validated_data.get("options")
         room = self.get_object()
+
+        # A deferred transcription (transcript mode, or a video recording with
+        # `transcribe`) is a LinTO feature: the person needs `transcription.async`
+        # when LinTO handles recordings. Studio re-checks it when the file is
+        # uploaded; this refuses up front what the UI does not offer.
+        wants_transcription = mode == models.RecordingModeChoices.TRANSCRIPT or bool(
+            options is not None and getattr(options, "transcribe", False)
+        )
+        if (
+            wants_transcription
+            and settings.LINTO_STUDIO_ENABLED
+            and not has_linto_capability(request.user, "transcription.async")
+        ):
+            return drf_response.Response(
+                {
+                    "error": "the deferred transcription is not active for this account",
+                    "code": "no_entitlement",
+                    "feature": "transcription.async",
+                },
+                status=drf_status.HTTP_403_FORBIDDEN,
+            )
 
         options_data = options.model_dump(exclude_none=True) if options else {}
         if options is not None and options.encoding is not None:
