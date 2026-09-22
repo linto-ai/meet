@@ -44,6 +44,7 @@ from core import analytics, enums, models, utils
 from core.api import throttling
 from core.api.filters import ListFileFilter
 from core.enums import MEDIA_STORAGE_URL_PATTERN
+from core.entitlements.capabilities import has_linto_capability
 from core.recording.enums import FileExtension
 from core.recording.event.authentication import (
     RecordingProcessWebhookAuthentication,
@@ -239,7 +240,7 @@ class UserViewSet(
         """
         context = {"request": request}
         return drf_response.Response(
-            self.serializer_class(request.user, context=context).data
+            serializers.UserMeSerializer(request.user, context=context).data
         )
 
 
@@ -418,6 +419,27 @@ class RoomViewSet(
         mode = serializer.validated_data["mode"]
         options = serializer.validated_data.get("options")
         room = self.get_object()
+
+        # A deferred transcription (transcript mode, or a video recording with
+        # `transcribe`) is a LinTO feature: the person needs `transcription.async`
+        # when LinTO handles recordings. Studio re-checks it when the file is
+        # uploaded; this refuses up front what the UI does not offer.
+        wants_transcription = mode == models.RecordingModeChoices.TRANSCRIPT or bool(
+            options is not None and getattr(options, "transcribe", False)
+        )
+        if (
+            wants_transcription
+            and settings.LINTO_STUDIO_ENABLED
+            and not has_linto_capability(request.user, "transcription.async")
+        ):
+            return drf_response.Response(
+                {
+                    "error": "the deferred transcription is not active for this account",
+                    "code": "no_entitlement",
+                    "feature": "transcription.async",
+                },
+                status=drf_status.HTTP_403_FORBIDDEN,
+            )
 
         try:
             with transaction.atomic():

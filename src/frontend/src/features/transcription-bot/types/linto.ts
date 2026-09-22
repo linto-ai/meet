@@ -56,6 +56,19 @@ export interface LintoBotStatus {
   captions: LintoCaption[]
 }
 
+// Per-feature LinTO capabilities of a participant, as GET users/me carries
+// them (`linto`): resolved by the Meet backend's entitlements system from what
+// LinTO Studio holds for that person. Absent = false; unknown keys may come
+// along (the entitlement's `features` object is extensible).
+export interface LintoCapabilities {
+  quickMeeting?: boolean
+  transcription?: { live?: boolean; async?: boolean }
+  summary?: boolean
+  translation?: boolean
+  recording?: boolean
+  [feature: string]: unknown
+}
+
 // A quickMeeting transcriber profile advertised by bot-profiles.
 export interface LintoBotProfile {
   id: string

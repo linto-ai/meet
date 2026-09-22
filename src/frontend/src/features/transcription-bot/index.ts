@@ -9,6 +9,7 @@ export { LintoProvider } from './components/LintoProvider'
 export { useLintoConfig } from './hooks/useLintoConfig'
 export { useLintoStatus } from './hooks/useLintoStatus'
 export { useLintoEntitlement } from './hooks/useLintoEntitlement'
+export { useLintoCapabilities } from './hooks/useLintoCapabilities'
 export { useLintoTranscriptFeed } from './hooks/useLintoTranscriptFeed'
 
 // api — browser-first: the panel drives Studio via the JS SDK; the Meet backend
@@ -31,5 +32,6 @@ export type {
   LintoBotProfile,
   LintoBotProfilesReason,
   LintoBotProfilesResult,
+  LintoCapabilities,
 } from './types/linto'
 export { LINTO_SEGMENT_PREFIX } from './types/linto'
