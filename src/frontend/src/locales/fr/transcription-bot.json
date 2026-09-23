@@ -1,7 +1,7 @@
 {
   "lintoBot": {
     "heading": "Transcrire en direct",
-    "body": "Les propos sont transcrits pendant la réunion, avec le nom de la personne qui parle. La langue parlée est détectée automatiquement.",
+    "body": "Sous-titres en direct, langue détectée automatiquement.",
     "start": "Démarrer la transcription",
     "stop": "Arrêter la transcription",
     "notAvailable": "La transcription en direct n'est pas disponible dans cette réunion.",
@@ -43,7 +43,7 @@
   },
   "deferred": {
     "heading": "Transcrire après la réunion",
-    "body": "La réunion est enregistrée, puis transcrite une fois terminée.",
+    "body": "Enregistrement transcrit à la fin de la réunion.",
     "language": "Langue parlée",
     "languageAuto": "Détection automatique",
     "summary": "Compte rendu à la fin de la réunion",

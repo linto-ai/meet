@@ -1,7 +1,7 @@
 {
   "lintoBot": {
     "heading": "Live transkribieren",
-    "body": "Das Gesagte wird während des Meetings transkribiert, mit dem Namen der sprechenden Person. Die gesprochene Sprache wird automatisch erkannt.",
+    "body": "Live-Untertitel, Sprache wird automatisch erkannt.",
     "start": "Transkription starten",
     "stop": "Transkription beenden",
     "notAvailable": "Die Live-Transkription ist in diesem Meeting nicht verfügbar.",
@@ -43,7 +43,7 @@
   },
   "deferred": {
     "heading": "Nach dem Meeting transkribieren",
-    "body": "Das Meeting wird aufgezeichnet und nach seinem Ende transkribiert.",
+    "body": "Aufnahme, die nach dem Meeting transkribiert wird.",
     "language": "Gesprochene Sprache",
     "languageAuto": "Automatische Erkennung",
     "summary": "Protokoll am Ende des Meetings",

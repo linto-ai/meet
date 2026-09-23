@@ -1,7 +1,7 @@
 {
   "lintoBot": {
     "heading": "Chép lời trực tiếp",
-    "body": "Nội dung trao đổi được chép lời trong cuộc họp, kèm tên người nói. Ngôn ngữ nói được nhận diện tự động.",
+    "body": "Phụ đề trực tiếp, tự động nhận diện ngôn ngữ.",
     "start": "Bắt đầu chép lời",
     "stop": "Dừng chép lời",
     "notAvailable": "Chép lời trực tiếp không khả dụng trong cuộc họp này.",
@@ -43,7 +43,7 @@
   },
   "deferred": {
     "heading": "Chép lời sau cuộc họp",
-    "body": "Cuộc họp được ghi lại, rồi được chép lời sau khi kết thúc.",
+    "body": "Bản ghi được chép lời sau khi cuộc họp kết thúc.",
     "language": "Ngôn ngữ nói",
     "languageAuto": "Nhận diện tự động",
     "summary": "Biên bản khi kết thúc cuộc họp",
