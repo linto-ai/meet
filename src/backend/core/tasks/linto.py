@@ -399,6 +399,8 @@ async def _generate_document(
                     job_id=job_id,
                     format=pub_format,
                     template_id=template_id,
+                    # Studio scopes the export by the conversation (SDK 1.4.1).
+                    conversation_id=conversation_id,
                 )
                 logger.info(
                     "%s exported for %s: %d bytes",
