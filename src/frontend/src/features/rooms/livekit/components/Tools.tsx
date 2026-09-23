@@ -2,7 +2,7 @@ import { A, Div, Icon, Text } from '@/primitives'
 import { css } from '@/styled-system/css'
 import { Button as RACButton } from 'react-aria-components'
 import { useTranslation } from 'react-i18next'
-import { ReactNode } from 'react'
+import { ReactNode, useEffect, useRef } from 'react'
 import { SubPanelId, useSidePanel } from '../hooks/useSidePanel'
 import { useRestoreFocus } from '@/hooks/useRestoreFocus'
 import {
@@ -12,6 +12,7 @@ import {
   ScreenRecordingSidePanel,
 } from '@/features/recording'
 import { useConfig } from '@/api/useConfig'
+import { useRoomMetadata } from '@/features/recording/hooks/useRoomMetadata'
 import {
   LintoSidePanel,
   useLintoConfig,
@@ -124,6 +125,29 @@ export const Tools = () => {
   const { active: isLintoActive } = useLintoStatus()
   const showLintoTool =
     isLintoEnabled && (isLintoActive || lintoEntitlement !== 'no_entitlement')
+
+  // The three tools are exclusive: while one runs, opening the tools lands
+  // straight on ITS panel (the list is one "back" away, the other two tools
+  // keep their "another mode is running" notice). Decided when the panel
+  // OPENS only — pressing back must show the list, not bounce.
+  const metadata = useRoomMetadata()
+  const recordingMode = metadata?.recording_mode as string | undefined
+  const recordingActive =
+    !!recordingMode &&
+    ['starting', 'started', 'saving'].includes(
+      String(metadata?.recording_status ?? '')
+    )
+  const wasToolsOpenRef = useRef(isToolsOpen)
+  useEffect(() => {
+    const justOpened = isToolsOpen && !wasToolsOpenRef.current
+    wasToolsOpenRef.current = isToolsOpen
+    if (!justOpened || activeSubPanelId) return
+    if (isLintoActive && isLintoEnabled) openLinto()
+    else if (recordingActive && recordingMode === 'transcript') openTranscript()
+    else if (recordingActive) openScreenRecording()
+    // Only the opening transition matters; the run state is read at that moment.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isToolsOpen])
 
   // Restore focus to the element that opened the Tools panel
   // following the same pattern as Chat.

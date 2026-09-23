@@ -1,7 +1,7 @@
 {
   "lintoBot": {
     "heading": "Live transcriberen",
-    "body": "Wat er gezegd wordt, wordt tijdens de vergadering getranscribeerd, met de naam van de spreker. De gesproken taal wordt automatisch herkend.",
+    "body": "Live ondertitels, taal wordt automatisch herkend.",
     "start": "Transcriptie starten",
     "stop": "Transcriptie stoppen",
     "notAvailable": "Live transcriptie is niet beschikbaar in deze vergadering.",
@@ -43,7 +43,7 @@
   },
   "deferred": {
     "heading": "Na de vergadering transcriberen",
-    "body": "De vergadering wordt opgenomen en na afloop getranscribeerd.",
+    "body": "Opname die na de vergadering wordt getranscribeerd.",
     "language": "Gesproken taal",
     "languageAuto": "Automatische herkenning",
     "summary": "Verslag aan het einde van de vergadering",

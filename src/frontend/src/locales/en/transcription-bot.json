@@ -1,7 +1,7 @@
 {
   "lintoBot": {
     "heading": "Transcribe live",
-    "body": "What is said is transcribed during the meeting, with the speaker's name. The spoken language is detected automatically.",
+    "body": "Live captions, language detected automatically.",
     "start": "Start transcribing",
     "stop": "Stop transcribing",
     "notAvailable": "Live transcription is not available in this meeting.",
@@ -43,7 +43,7 @@
   },
   "deferred": {
     "heading": "Transcribe after the meeting",
-    "body": "The meeting is recorded, then transcribed once it ends.",
+    "body": "Recording transcribed once the meeting ends.",
     "language": "Spoken language",
     "languageAuto": "Automatic detection",
     "summary": "Summary at the end of the meeting",

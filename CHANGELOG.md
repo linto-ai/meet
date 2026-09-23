@@ -18,6 +18,8 @@ and this project adheres to
 
 ### Changed
 
+- 💄(frontend) opening the meeting tools during a run lands on the running tool's panel
+- 💄(frontend) shorter wording of the two transcription tools
 - 💄(frontend) two distinct tools, "Transcribe live" and "Transcribe after the meeting"
 - 💄(frontend) captions badge says "Available" instead of the product name
 - 🔥(backend) LINTO_HIDE_LEGACY_TOOLS is gone: both transcription tools always show
