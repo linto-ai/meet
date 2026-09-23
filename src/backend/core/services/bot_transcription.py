@@ -75,6 +75,9 @@ ROOM_METADATA_CHANNEL_ID_KEY = "linto_transcription_channel_id"
 ROOM_METADATA_CHANNEL_INDEX_KEY = "linto_transcription_channel_index"
 ROOM_METADATA_ORG_ID_KEY = "linto_transcription_org_id"
 ROOM_METADATA_STARTED_AT_KEY = "linto_transcription_started_at"
+# "1" when the starter left the late-joiner summary on: a participant joining
+# mid-run then asks Studio for the "before you arrived" summary; "0" = never.
+ROOM_METADATA_CATCHUP_KEY = "linto_transcription_catchup"
 
 # A Meet room drives ONE quickMeeting channel, always at index 0 — the index (not
 # the channel id) is what namespaces the bot's segment ids
@@ -91,6 +94,7 @@ ROOM_METADATA_KEYS = [
     ROOM_METADATA_CHANNEL_INDEX_KEY,
     ROOM_METADATA_ORG_ID_KEY,
     ROOM_METADATA_STARTED_AT_KEY,
+    ROOM_METADATA_CATCHUP_KEY,
 ]
 
 
@@ -308,6 +312,9 @@ class BotTranscriptionService:
                     metadata[ROOM_METADATA_CHANNEL_ID_KEY] = str(run["channel_id"])
                 if run.get("org_id"):
                     metadata[ROOM_METADATA_ORG_ID_KEY] = str(run["org_id"])
+                metadata[ROOM_METADATA_CATCHUP_KEY] = (
+                    "1" if run.get("catchup", True) else "0"
+                )
                 RoomManagement().update_metadata(str(room.id), metadata)
             else:
                 RoomManagement().update_metadata(
@@ -386,7 +393,8 @@ class BotTranscriptionService:
         ``data`` carries the Studio ids the browser obtained via the SDK
         (``session_id``, ``channel_id``, ``org_id``, ``bot_id``) plus the add-ons
         (``summary`` default True, ``summary_service`` the chosen summary
-        service route, ``record`` default False). Re-checks the
+        service route, ``record`` default False, ``catchup`` default True = a
+        late joiner gets the "before you arrived" summary). Re-checks the
         transcript permission (defence in depth), starts the optional video
         egress when allowed, persists ``room.configuration["linto"]`` and sets the
         banner. Returns the persisted state.
@@ -398,6 +406,7 @@ class BotTranscriptionService:
                 "the organizer restricts transcription to administrators/owners"
             )
         summary = bool(data.get("summary", True))
+        catchup = bool(data.get("catchup", True))
         record = bool(data.get("record", False))
         if record and not self._has_recording_permission(
             room, user, models.RecordingModeChoices.SCREEN_RECORDING
@@ -426,6 +435,9 @@ class BotTranscriptionService:
             # panel; None = the instance default (LINTO_LLM_SERVICE_ROUTE).
             "summary_service": summary_service,
             "record": record,
+            # Late-joiner summary: advertised in the room metadata so the
+            # joiner's browser knows whether to ask Studio for it.
+            "catchup": catchup,
             "org_id": data.get("org_id"),
             "session_id": data.get("session_id"),
             "channel_id": data.get("channel_id"),
@@ -650,6 +662,70 @@ class BotTranscriptionService:
             self.SUMMARY_SERVICES_CACHE_KEY, services, self.SUMMARY_SERVICES_CACHE_TTL
         )
         return services
+
+    TRANSCRIPTION_LANGUAGES_CACHE_KEY = "linto:transcription-languages"
+    TRANSCRIPTION_LANGUAGES_CACHE_TTL = 300
+
+    def transcription_languages(self):
+        """The languages the deferred transcription can be asked for.
+
+        The union of the languages the STT services of the gateway advertise
+        (``GET /api/services`` through Studio under the service account; each
+        service carries ``language`` as a comma-separated list, ``*`` meaning
+        automatic detection), so the "transcribe after the meeting" panel
+        offers exactly what the offline pipeline can honour (``linto.upload``
+        picks the service by language). ``*`` always comes first when any
+        service detects the language. Cached 5 min. ``[]`` when Studio
+        cannot answer: the panel then offers automatic detection only.
+        """
+        cached = cache.get(self.TRANSCRIPTION_LANGUAGES_CACHE_KEY)
+        if cached is not None:
+            return cached
+        try:
+            headers = self._headers()
+            r = requests.get(
+                f"{self.studio_base}/api/services",
+                headers=headers,
+                timeout=DEFAULT_TIMEOUT,
+            )
+        except (requests.RequestException, BotTranscriptionException) as exc:
+            logger.warning("LinTO: transcription services unavailable: %s", exc)
+            return []
+        if r.status_code != 200:
+            logger.warning(
+                "LinTO: transcription services listing failed: %s %s",
+                r.status_code,
+                r.text[:200],
+            )
+            return []
+        data = r.json() or []
+        raw = data if isinstance(data, list) else data.get("services", [])
+        auto = False
+        codes = []
+        for service in raw:
+            if not isinstance(service, dict):
+                continue
+            scope = service.get("scope") or []
+            if scope and "stt" not in scope:
+                continue
+            # NLP services (punctuation, diarization…) are typed; STT ones are not.
+            if (service.get("desc") or {}).get("type"):
+                continue
+            for raw_code in str(service.get("language") or "*").split(","):
+                code = raw_code.strip()
+                if not code:
+                    continue
+                if code == "*":
+                    auto = True
+                elif code not in codes:
+                    codes.append(code)
+        languages = (["*"] if auto else []) + sorted(codes)
+        cache.set(
+            self.TRANSCRIPTION_LANGUAGES_CACHE_KEY,
+            languages,
+            self.TRANSCRIPTION_LANGUAGES_CACHE_TTL,
+        )
+        return languages
 
     # ── Studio token for the browser SDK (identity bridge) ───────────────
     def studio_token_for(self, user):

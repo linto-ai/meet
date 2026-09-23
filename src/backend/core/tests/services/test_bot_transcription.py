@@ -22,6 +22,7 @@ from core import models
 from core.factories import RoomFactory, UserFactory
 from core.services.bot_transcription import (
     LINTO_CHANNEL_INDEX,
+    ROOM_METADATA_CATCHUP_KEY,
     ROOM_METADATA_CHANNEL_ID_KEY,
     ROOM_METADATA_CHANNEL_INDEX_KEY,
     ROOM_METADATA_KEYS,
@@ -135,11 +136,20 @@ class TestMarkStarted:
         assert linto["org_id"] == "org-1"
         assert linto["user_id"] == str(owner.id)
         assert linto["summary_service"] is None  # no choice → instance default
+        assert linto["catchup"] is True  # late-joiner summary on by default
         assert "recording_id" not in linto  # record was False → no egress
         # The banner call carries the run state, so the metadata can advertise
         # the Studio ids a late joiner needs to catch up.
         self.banner.assert_called_once_with(room, True, user=owner, linto=linto)
         self.rec.assert_not_called()
+
+    def test_persists_the_late_joiner_summary_choice(self, studio_settings):
+        room, owner = _owner_room()
+        data = {"session_id": "s", "channel_id": "c", "catchup": False}
+        result = BotTranscriptionService().mark_started(room, data, user=owner)
+        assert result["catchup"] is False
+        room.refresh_from_db()
+        assert room.configuration["linto"]["catchup"] is False
 
     def test_persists_the_chosen_summary_service(self, studio_settings):
         room, owner = _owner_room()
@@ -222,6 +232,7 @@ class TestBannerMetadata:
         assert metadata[ROOM_METADATA_CHANNEL_ID_KEY] == "chan-1"
         assert metadata[ROOM_METADATA_CHANNEL_INDEX_KEY] == LINTO_CHANNEL_INDEX
         assert metadata[ROOM_METADATA_ORG_ID_KEY] == "org-1"
+        assert metadata[ROOM_METADATA_CATCHUP_KEY] == "1"
         started_at = metadata[ROOM_METADATA_STARTED_AT_KEY]
         # ISO 8601 UTC, parseable by the browser's Date.parse.
         assert started_at.endswith("Z")
@@ -238,7 +249,22 @@ class TestBannerMetadata:
         ) as room_management:
             BotTranscriptionService()._set_banner(room, True, user=owner, linto={})
         metadata = room_management.return_value.update_metadata.call_args[0][1]
-        assert set(metadata) == {ROOM_METADATA_STATUS_KEY, ROOM_METADATA_STARTER_KEY}
+        assert set(metadata) == {
+            ROOM_METADATA_STATUS_KEY,
+            ROOM_METADATA_STARTER_KEY,
+            ROOM_METADATA_CATCHUP_KEY,
+        }
+
+    def test_late_joiner_summary_off_is_advertised(self, studio_settings):
+        room, owner = _owner_room()
+        with mock.patch(
+            "core.services.bot_transcription.RoomManagement"
+        ) as room_management:
+            BotTranscriptionService()._set_banner(
+                room, True, user=owner, linto={"catchup": False}
+            )
+        metadata = room_management.return_value.update_metadata.call_args[0][1]
+        assert metadata[ROOM_METADATA_CATCHUP_KEY] == "0"
 
     def test_inactive_removes_every_linto_key(self, studio_settings):
         room = RoomFactory()
@@ -683,6 +709,62 @@ class TestSummaryServices:
     def test_studio_failure_means_no_choice(self, studio_settings):
         responses.add(responses.GET, SERVICES_URL, status=503, body="down")
         assert BotTranscriptionService().summary_services() == []
+
+
+ASR_SERVICES_URL = f"{STUDIO}/api/services"
+
+
+class TestTranscriptionLanguages:
+    """transcription_languages: the union of what the gateway's STT services
+    advertise, `*` (automatic) first, cached, never failing."""
+
+    @pytest.fixture(autouse=True)
+    def _cache(self, studio_settings):
+        studio_settings.CACHES = {
+            "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}
+        }
+        from django.core.cache import cache as django_cache  # noqa: PLC0415
+
+        django_cache.clear()
+
+    @responses.activate
+    def test_unions_the_stt_languages_with_auto_first(self, studio_settings):
+        responses.add(
+            responses.GET,
+            ASR_SERVICES_URL,
+            json=[
+                {"name": "whisper", "scope": ["stt"], "language": "fr,en,*"},
+                {"name": "kaldi-fr", "scope": ["stt"], "language": "fr-FR"},
+                {"name": "kaldi-de", "language": "de"},
+                # NLP services are typed and never offer a language.
+                {"name": "punct", "scope": ["nlp"], "language": "fr"},
+                {"name": "diar", "desc": {"type": "diarization"}, "language": "en"},
+            ],
+        )
+        languages = BotTranscriptionService().transcription_languages()
+        assert languages == ["*", "de", "en", "fr", "fr-FR"]
+        assert responses.calls[0].request.headers["Authorization"] == (
+            "Bearer static-token"
+        )
+
+    @responses.activate
+    def test_no_auto_when_no_service_detects_and_the_list_is_cached(
+        self, studio_settings
+    ):
+        responses.add(
+            responses.GET,
+            ASR_SERVICES_URL,
+            json=[{"name": "kaldi", "scope": ["stt"], "language": "fr"}],
+        )
+        service = BotTranscriptionService()
+        assert service.transcription_languages() == ["fr"]
+        service.transcription_languages()
+        assert len(responses.calls) == 1
+
+    @responses.activate
+    def test_studio_failure_means_automatic_only(self, studio_settings):
+        responses.add(responses.GET, ASR_SERVICES_URL, status=503, body="down")
+        assert BotTranscriptionService().transcription_languages() == []
 
 
 class TestEntitlementsKillSwitch:
