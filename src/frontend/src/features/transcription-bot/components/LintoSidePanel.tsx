@@ -57,7 +57,7 @@ export const LintoSidePanel = () => {
   const { t } = useTranslation('transcription-bot', { keyPrefix: 'lintoBot' })
 
   const { enabled } = useLintoConfig()
-  const { running, summary, summaryService, record, error } =
+  const { running, translate, summary, summaryService, record, error } =
     useSnapshot(lintoStore)
 
   const apiRoomData = useRoomData()
@@ -152,7 +152,7 @@ export const LintoSidePanel = () => {
           summary,
           summaryService,
           record: hasScreenRecordingAccess ? record : false,
-          translations: [...lintoStore.selectedTranslations],
+          translations: translate ? [...lintoStore.selectedTranslations] : [],
         },
       })
     } catch (err) {
@@ -275,25 +275,29 @@ export const LintoSidePanel = () => {
     <Div
       data-testid="linto-panel"
       display="flex"
-      overflowY="scroll"
+      // While a run shows, the transcript owns the scrollbar (its own zone
+      // below the controls); the panel itself no longer scrolls as a whole.
+      overflowY={running ? 'hidden' : 'auto'}
       padding="0 1.5rem"
       flexGrow={1}
       flexDirection="column"
       alignItems="center"
+      className={css({ minHeight: 0 })}
     >
-      <VStack gap={0} marginBottom={15}>
+      <VStack gap={0} marginBottom={15} className={css({ flexShrink: 0 })}>
         <H lvl={1} margin={'sm'} fullWidth>
           {t('heading')}
         </H>
-        <Text variant="body" fullWidth>
-          {t('body')}
-        </Text>
+        {!running && (
+          <Text variant="body" fullWidth>
+            {t('body')}
+          </Text>
+        )}
       </VStack>
 
       {canControl && !running && (
         <>
-          <LintoSettings isDisabled={controlsDisabled} />
-
+          {/* Three flat options; what each one needs unfolds under it. */}
           <VStack
             gap={0.5}
             width="100%"
@@ -301,6 +305,18 @@ export const LintoSidePanel = () => {
             alignItems="start"
             className={css({ width: '100%' })}
           >
+            <Checkbox
+              size="sm"
+              data-testid="linto-mode-translate"
+              isSelected={translate}
+              onChange={(value) => {
+                lintoStore.translate = value
+              }}
+              isDisabled={controlsDisabled}
+            >
+              <Text variant="sm">{t('options.translate')}</Text>
+            </Checkbox>
+            {translate && <LintoSettings isDisabled={controlsDisabled} />}
             <Checkbox
               size="sm"
               data-testid="linto-mode-summary"
@@ -312,9 +328,6 @@ export const LintoSidePanel = () => {
             >
               <Text variant="sm">{t('options.summary')}</Text>
             </Checkbox>
-            <Text variant="xsNote" className={css({ paddingLeft: '1.625rem' })}>
-              {t('options.summaryHelp')}
-            </Text>
             {summary && <SummaryServicePicker isDisabled={controlsDisabled} />}
             {hasScreenRecordingAccess && (
               <Checkbox
@@ -369,7 +382,13 @@ export const LintoSidePanel = () => {
         </div>
       )}
 
-      <div className={css({ width: '100%', marginBottom: '1.5rem' })}>
+      <div
+        className={css({
+          width: '100%',
+          marginBottom: running ? '0.75rem' : '1.5rem',
+          flexShrink: 0,
+        })}
+      >
         {running
           ? canStop && (
               <Button

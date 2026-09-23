@@ -42,8 +42,10 @@ type LintoState = {
   // local start/stop state.
   localActionUntil: number
   // Live transcription is ALWAYS on when LinTO runs (you clicked the tool). The
-  // two flat options are independent add-ons: an autonomous summary at stop
+  // three flat options are independent add-ons: a live translation (default
+  // OFF, the targets are picked once it is on), an autonomous summary at stop
   // (default ON) and a LiveKit video recording (default OFF).
+  translate: boolean
   summary: boolean
   // Summary service route picked in the panel (undefined → instance default).
   summaryService?: string
@@ -83,6 +85,7 @@ export const lintoStore = proxy<LintoState>({
   userId: undefined,
   startedByMe: false,
   localActionUntil: 0,
+  translate: false,
   summary: true,
   summaryService: undefined,
   record: false,

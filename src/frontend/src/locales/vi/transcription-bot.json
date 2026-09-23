@@ -8,8 +8,8 @@
     "notAvailable": "Phiên âm LinTO không khả dụng trong phòng này.",
     "noEntitlement": "Tùy chọn phiên âm AI chưa được kích hoạt cho tài khoản của bạn.",
     "options": {
+      "translate": "Dịch theo thời gian thực",
       "summary": "Tạo bản tóm tắt",
-      "summaryHelp": "Bản tóm tắt được gửi vào cuối cuộc họp.",
       "record": "Ghi video cuộc họp"
     },
     "errors": {
@@ -21,7 +21,9 @@
       "heading": "Bản phiên âm trực tiếp",
       "empty": "Đang chờ những từ đầu tiên…",
       "displayLanguage": "Ngôn ngữ hiển thị",
-      "original": "Bản gốc (ngôn ngữ nói)"
+      "original": "Bản gốc (ngôn ngữ nói)",
+      "newLines_one": "{{count}} dòng mới",
+      "newLines_other": "{{count}} dòng mới"
     },
     "catchup": {
       "heading": "Trước khi bạn tham gia",
@@ -43,8 +45,7 @@
       "translationsNone": "Không có ngôn ngữ nào khớp.",
       "translationsCount_one": "Đã chọn {{count}} ngôn ngữ",
       "translationsCount_other": "Đã chọn {{count}} ngôn ngữ",
-      "translationsRemove": "Xóa {{lang}}",
-      "translationsHelp": "Tùy chọn: thêm ngôn ngữ để hiển thị bản dịch trực tiếp."
+      "translationsRemove": "Xóa {{lang}}"
     }
   },
   "banner": {

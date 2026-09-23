@@ -8,8 +8,8 @@
     "notAvailable": "Транскрипция LinTO недоступна в этой комнате.",
     "noEntitlement": "Функция ИИ-транскрипции не активирована для вашей учётной записи.",
     "options": {
+      "translate": "Переводить в реальном времени",
       "summary": "Сформировать резюме",
-      "summaryHelp": "Резюме отправляется в конце встречи.",
       "record": "Записать видео встречи"
     },
     "errors": {
@@ -21,7 +21,9 @@
       "heading": "Транскрипция в реальном времени",
       "empty": "Ожидание первых слов…",
       "displayLanguage": "Отображаемый язык",
-      "original": "Оригинал (язык речи)"
+      "original": "Оригинал (язык речи)",
+      "newLines_one": "{{count}} новая строка",
+      "newLines_other": "{{count}} новых строк"
     },
     "catchup": {
       "heading": "До вашего присоединения",
@@ -45,8 +47,7 @@
       "translationsCount_few": "Выбрано {{count}} языка",
       "translationsCount_many": "Выбрано {{count}} языков",
       "translationsCount_other": "Выбрано {{count}} языка",
-      "translationsRemove": "Удалить {{lang}}",
-      "translationsHelp": "Необязательно: добавьте языки для отображения перевода в реальном времени."
+      "translationsRemove": "Удалить {{lang}}"
     }
   },
   "banner": {
