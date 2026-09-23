@@ -317,7 +317,7 @@ class TestHappyPath:
 
         sdk.summarize.assert_awaited_once_with("conv-1", "llm")
         sdk.export_with_template.assert_awaited_once_with(
-            job_id="job-1", format="pdf", template_id="tpl-1"
+            job_id="job-1", format="pdf", template_id="tpl-1", conversation_id="conv-1"
         )
         sdk.download_conversation.assert_not_called()
         assert marked == ["tag", "move", "summary", "document", "share", "email"]
