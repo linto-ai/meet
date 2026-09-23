@@ -793,11 +793,21 @@ async def _process_linto_transcription_sync(recording_id):  # noqa: PLR0915
         else:
             audio_content = file_content
 
-    # 2. Initialize SDK (auto-discovers org, auto-selects ASR service)
-    linto = LinTO(
-        auth_token=settings.LINTO_STUDIO_API_TOKEN,
-        base_url=settings.LINTO_STUDIO_BASE_URL,
+    # 2. Initialize SDK (auto-discovers org, auto-selects ASR service). Same
+    # credential chain as the live flow (integration token → service-account
+    # login → static LINTO_STUDIO_API_TOKEN): a deployment whose static token
+    # belongs to another Studio (dev-meet's prod token against staging) still
+    # transcribes under the service account, in ITS organization.
+    from core.services.bot_transcription import (
+        BotTranscriptionException,
+        BotTranscriptionService,
     )
+
+    try:
+        sdk_token = await sync_to_async(BotTranscriptionService()._login)()  # noqa: SLF001  # pylint: disable=protected-access
+    except BotTranscriptionException:
+        sdk_token = settings.LINTO_STUDIO_API_TOKEN
+    linto = LinTO(auth_token=sdk_token, base_url=settings.LINTO_STUDIO_BASE_URL)
 
     language = recording.options.get("language") or "*"
     meeting_time = recording.created_at.strftime("%d-%m-%Y_%H-%M")

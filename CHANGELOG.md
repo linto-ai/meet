@@ -27,6 +27,7 @@ and this project adheres to
 
 ### Fixed
 
+- 🐛(backend) the deferred transcription authenticates like the live flow (service account first)
 - 🐛(frontend) the live captions no longer linger on screen after the transcription stops
 - 🐛(backend) make linto_state migration idempotent to self-heal history desync
 - 🐛(mail) load i18n tags in transcription email so it renders
