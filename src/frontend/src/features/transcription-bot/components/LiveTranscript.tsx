@@ -90,12 +90,12 @@ export const LiveTranscript = () => {
   const [detached, setDetached] = useState(false)
   const [unseen, setUnseen] = useState(0)
   const seenCountRef = useRef(0)
-  // Lines received after this instant are "new" and flash once on arrival;
-  // whatever was already there when the journal mounted stays quiet.
-  const mountedAtRef = useRef<number | null>(null)
-  useEffect(() => {
-    mountedAtRef.current = Date.now()
-  }, [])
+  // A line flashes once when it becomes FINAL: the partial shows dimmed and
+  // quiet, the flash marks the moment the wording settles. Lines already final
+  // when the journal mounts (reopened panel, hydrated history) stay quiet.
+  const [flashIds, setFlashIds] = useState<Set<string>>(() => new Set())
+  const partialStateRef = useRef<Map<string, boolean>>(new Map())
+  const journalReadyRef = useRef(false)
 
   const isAtBottom = (el: HTMLDivElement) =>
     el.scrollHeight - el.scrollTop - el.clientHeight <= STICK_THRESHOLD_PX
@@ -199,6 +199,22 @@ export const LiveTranscript = () => {
         </Text>
       </div>
     )
+
+  useEffect(() => {
+    const next: string[] = []
+    for (const entry of entries) {
+      const wasPartial = partialStateRef.current.get(entry.id)
+      const becameFinal = wasPartial === true && !entry.partial
+      const arrivedFinal =
+        wasPartial === undefined && !entry.partial && journalReadyRef.current
+      if (!entry.catchup && (becameFinal || arrivedFinal)) next.push(entry.id)
+      partialStateRef.current.set(entry.id, entry.partial)
+    }
+    journalReadyRef.current = true
+    if (next.length > 0) {
+      setFlashIds((current) => new Set([...current, ...next]))
+    }
+  }, [entries])
 
   useEffect(() => {
     const added = Math.max(0, entries.length - seenCountRef.current)
@@ -358,13 +374,9 @@ export const LiveTranscript = () => {
                 : entry.text
               const isTranslated = showTranslated && translated != null
               const time = formatTime(entry.receivedAt, i18n.language)
-              // Flash once when the line mounts, only for lines that arrived
-              // live after the journal opened (never the hydrated history).
-              const mountedAt = mountedAtRef.current
-              const isFresh =
-                !entry.catchup &&
-                mountedAt !== null &&
-                entry.receivedAt >= mountedAt
+              // The animation starts when the id enters the set, i.e. the
+              // instant the line became final; it never restarts afterwards.
+              const isFresh = !entry.partial && flashIds.has(entry.id)
               return (
                 <Fragment key={entry.id}>
                   {index === markerIndex && joinedMarker}
@@ -372,6 +384,7 @@ export const LiveTranscript = () => {
                     data-testid="linto-turn"
                     data-speaker={entry.locutor}
                     data-partial={entry.partial ? 'true' : 'false'}
+                    data-fresh={isFresh ? 'true' : 'false'}
                     {...(entry.catchup ? { 'data-catchup': 'true' } : {})}
                     className={css({
                       width: '100%',
