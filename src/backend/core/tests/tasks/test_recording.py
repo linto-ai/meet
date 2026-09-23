@@ -35,7 +35,10 @@ def s3_download():
 @pytest.fixture
 def owner_user():
     """Create a user with an OIDC sub."""
-    return factories.UserFactory(sub="owner-sub-1", email="owner@example.com")
+    # The factory picks a language at random; the Drive names are asserted in English.
+    return factories.UserFactory(
+        sub="owner-sub-1", email="owner@example.com", language="en-us"
+    )
 
 
 @pytest.fixture
