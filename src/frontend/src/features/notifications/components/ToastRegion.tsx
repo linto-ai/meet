@@ -12,6 +12,7 @@ import { ToastLowerHand } from './ToastLowerHand'
 import { ToastAnyRecording } from './ToastAnyRecording'
 import { ToastRecordingSaving } from './ToastRecordingSaving'
 import { ToastLintoSummary } from './ToastLintoSummary'
+import { ToastLintoCatchUp } from './ToastLintoCatchUp'
 import { ToastPermissionsRemoved } from './ToastPermissionsRemoved'
 import { ToastRecordingRequest } from './ToastRecordingRequest'
 import { ToastAutoMuteLargeRoom } from './ToastAutoMuteLargeRoom'
@@ -69,6 +70,8 @@ const renderToast = (
 
     case NotificationType.LintoSummarySaving:
       return <ToastLintoSummary key={toast.key} toast={toast} state={state} />
+    case NotificationType.LintoCatchUpReady:
+      return <ToastLintoCatchUp key={toast.key} toast={toast} state={state} />
     case NotificationType.RecordingSaving:
       return (
         <ToastRecordingSaving key={toast.key} toast={toast} state={state} />

@@ -20,4 +20,5 @@ export enum NotificationType {
   RoleChanged = 'roleChanged',
   RecordingPermissionsChanged = 'recordingPermissionsChanged',
   LintoSummarySaving = 'lintoSummarySaving',
+  LintoCatchUpReady = 'lintoCatchUpReady',
 }

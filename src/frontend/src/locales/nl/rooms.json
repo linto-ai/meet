@@ -419,23 +419,23 @@
       "participants": "Deelnemers",
       "effects": "Effecten",
       "chat": "Berichten in de chat",
-      "transcript": "Transcriberen",
+      "transcript": "Na de vergadering transcriberen",
       "screenRecording": "Opnemen",
       "admin": "Beheerdersbediening",
       "tools": "Meer tools",
       "info": "Vergaderinformatie",
-      "linto": "LinTO"
+      "linto": "Live transcriberen"
     },
     "content": {
       "participants": "deelnemers",
       "effects": "effecten",
       "chat": "berichten",
       "screenRecording": "opnemen",
-      "transcript": "transcriberen",
+      "transcript": "de transcriptie na de vergadering",
       "admin": "beheerdersbediening",
       "tools": "meer tools",
       "info": "vergaderinformatie",
-      "linto": "de LinTO-transcriptie"
+      "linto": "de live transcriptie"
     },
     "closeButton": "Verberg {{content}}"
   },
@@ -488,7 +488,8 @@
       "stop": "Stop met het transcriberen van de vergadering",
       "saving": "Opslaan…",
       "starting": "Wordt gestart…",
-      "anotherModeStarted": "Er loopt een opname. <br/> Ga naar het menu en stop deze."
+      "anotherModeStarted": "Er loopt een opname. <br/> Ga naar het menu en stop deze.",
+      "liveStarted": "Er loopt een live transcriptie. <br/> Stop deze voordat je na de vergadering transcribeert."
     },
     "linkMore": "Documentatie openen",
     "linkAriaLabel": "Documentatie over transcriptie openen - opent in nieuw venster",
@@ -543,7 +544,8 @@
       "stop": "Stop met opnemen van de vergadering",
       "saving": "Bezig met opslaan…",
       "starting": "Wordt gestart…",
-      "anotherModeStarted": "Er loopt een transcriptie. <br/> Ga naar het menu en stop deze."
+      "anotherModeStarted": "Er loopt een transcriptie. <br/> Ga naar het menu en stop deze.",
+      "liveStarted": "Er loopt een live transcriptie. <br/> Gebruik de optie 'Video opnemen' ervan, of stop deze."
     },
     "notAdminOrOwner": {
       "heading": "Toegang beperkt",

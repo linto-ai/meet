@@ -41,10 +41,13 @@ export const useSubtitles = () => {
   }, [room])
 
   // Open the overlay ONCE when LinTO takes over the captions (a later manual
-  // close is respected; a new run re-opens it).
+  // close is respected; a new run re-opens it). When the run stops, the
+  // overlay LinTO opened closes with it, so its last lines never linger; an
+  // overlay the reader opened themselves (native captions) is left alone.
   const autoOpenedRef = useRef(false)
   useEffect(() => {
     if (!isLintoActive) {
+      if (autoOpenedRef.current) layoutStore.showSubtitles = false
       autoOpenedRef.current = false
       return
     }

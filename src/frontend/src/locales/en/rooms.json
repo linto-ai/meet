@@ -419,23 +419,23 @@
       "participants": "Participants",
       "effects": "Backgrounds and Effects",
       "chat": "Messages in the chat",
-      "transcript": "Transcribe",
+      "transcript": "Transcribe after the meeting",
       "screenRecording": "Record",
       "admin": "Host settings",
       "tools": "More tools",
       "info": "Meeting information",
-      "linto": "LinTO"
+      "linto": "Transcribe live"
     },
     "content": {
       "participants": "participants",
       "effects": "Backgrounds and Effects",
       "chat": "messages",
-      "transcript": "transcribe",
+      "transcript": "transcription after the meeting",
       "screenRecording": "record",
       "admin": "host settings",
       "tools": "more tools",
       "info": "meeting information",
-      "linto": "the LinTO transcription"
+      "linto": "live transcription"
     },
     "closeButton": "Hide {{content}}"
   },
@@ -488,7 +488,8 @@
       "stop": "Stop transcribing the meeting",
       "saving": "Saving…",
       "starting": "Starting…",
-      "anotherModeStarted": "Screen recording is running. Switch panels and stop it."
+      "anotherModeStarted": "Screen recording is running. Switch panels and stop it.",
+      "liveStarted": "A live transcription is in progress. <br/> Stop it before transcribing after the meeting."
     },
     "linkMore": "Open documentation",
     "linkAriaLabel": "Open documentation about transcription - opens in new window",
@@ -543,7 +544,8 @@
       "stop": "Stop recording the meeting",
       "saving": "Saving…",
       "starting": "Starting…",
-      "anotherModeStarted": "Transcription is running. <br/> Switch panels and stop it."
+      "anotherModeStarted": "Transcription is running. <br/> Switch panels and stop it.",
+      "liveStarted": "A live transcription is in progress. <br/> Use its \"Record the video\" option, or stop it."
     },
     "notAdminOrOwner": {
       "heading": "Restricted Access",

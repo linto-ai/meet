@@ -114,9 +114,9 @@ export const Tools = () => {
   } = useSidePanel()
   const { t } = useTranslation('rooms', { keyPrefix: 'moreTools' })
   const { t: tLinto } = useTranslation('transcription-bot', {
-    keyPrefix: 'tools.lintoBot',
+    keyPrefix: 'tools',
   })
-  const { enabled: isLintoEnabled, hideLegacyTools } = useLintoConfig()
+  const { enabled: isLintoEnabled } = useLintoConfig()
   // The LinTO entry is offered to participants whose account has the option
   // (a linked LinTO key); it stays visible for everyone while a transcription
   // runs, so the others can read it.
@@ -195,21 +195,33 @@ export const Tools = () => {
           </A>
         )}
       </Text>
+      {/* Two distinct transcription tools: the live one (LinTO bot in the
+          room: captions, translation, summaries) and the deferred one (the
+          meeting is recorded, transcribed once it ends). */}
       {showLintoTool && (
         <ToolButton
           icon={<Icon name="speech_to_text" />}
-          title={tLinto('title')}
-          description={tLinto('body')}
+          title={tLinto('live.title')}
+          description={tLinto('live.body')}
           onPress={() => openLinto()}
           dataAttr="tool-linto-transcription"
         />
       )}
-      {isTranscriptEnabled && !(isLintoEnabled && hideLegacyTools) && (
+      {isTranscriptEnabled && (
         <ToolButton
           icon={<Icon name="speech_to_text" />}
-          title={t('tools.transcript.title')}
-          description={t('tools.transcript.body')}
+          title={
+            isLintoEnabled
+              ? tLinto('deferred.title')
+              : t('tools.transcript.title')
+          }
+          description={
+            isLintoEnabled
+              ? tLinto('deferred.body')
+              : t('tools.transcript.body')
+          }
           onPress={() => openTranscript()}
+          dataAttr="tool-transcript"
         />
       )}
       {isScreenRecordingEnabled && (

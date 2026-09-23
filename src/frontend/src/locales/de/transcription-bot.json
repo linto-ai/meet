@@ -1,67 +1,78 @@
 {
   "lintoBot": {
-    "heading": "Live-Transkription der Besprechung",
-    "content": "LinTO-Transkription",
-    "body": "LinTO transkribiert die Besprechung live, mit den Namen der Sprechenden. Wählen Sie unten die Optionen und starten Sie dann.",
-    "start": "Starten",
-    "stop": "Stoppen",
-    "notAvailable": "Die LinTO-Transkription ist in diesem Raum nicht verfügbar.",
-    "noEntitlement": "Die KI-Transkriptionsoption ist für Ihr Konto nicht aktiviert.",
+    "heading": "Live transkribieren",
+    "body": "Das Gesagte wird während des Meetings transkribiert, mit dem Namen der sprechenden Person. Die gesprochene Sprache wird automatisch erkannt.",
+    "start": "Transkription starten",
+    "stop": "Transkription beenden",
+    "notAvailable": "Die Live-Transkription ist in diesem Meeting nicht verfügbar.",
+    "noEntitlement": "Die Live-Transkription ist für dein Konto nicht aktiviert.",
+    "anotherModeStarted": "Eine Aufnahme läuft. <br/> Stoppe sie, bevor du live transkribierst.",
     "options": {
-      "translate": "In Echtzeit übersetzen",
-      "summary": "Eine Zusammenfassung erstellen",
-      "record": "Das Video der Besprechung aufzeichnen"
+      "catchup": "Zusammenfassung für Nachzügler",
+      "catchupHint": "Wer dem laufenden Meeting beitritt, erhält eine Zusammenfassung dessen, was vor der Ankunft gesagt wurde.",
+      "summary": "Protokoll am Ende des Meetings",
+      "summaryService": "Art des Protokolls",
+      "record": "Video aufzeichnen"
+    },
+    "translations": {
+      "label": "Übersetzen in",
+      "none": "Keine",
+      "other": "Andere Sprache",
+      "otherPlaceholder": "Sprache hinzufügen…",
+      "noneAvailable": "Es ist keine Übersetzung verfügbar."
     },
     "errors": {
-      "noProfile": "Für diese Organisation ist kein Transkriptionsprofil konfiguriert. Bitten Sie eine Administratorin oder einen Administrator, in LinTO Studio eines zu erstellen.",
-      "generic": "Die Transkription konnte nicht gestartet werden. Bitte versuchen Sie es erneut.",
+      "noProfile": "Für deine Organisation ist kein Transkriptionsprofil eingerichtet. Bitte eine Administratorin oder einen Administrator, eines anzulegen.",
+      "generic": "Die Transkription konnte nicht gestartet werden. Versuche es erneut.",
       "retry": "Erneut versuchen"
     },
     "live": {
-      "heading": "Live-Transkript",
+      "heading": "Transkript",
       "empty": "Warten auf die ersten Worte…",
       "displayLanguage": "Angezeigte Sprache",
-      "original": "Original (gesprochene Sprache)",
+      "original": "Gesprochene Sprache",
       "newLines_one": "{{count}} neue Zeile",
       "newLines_other": "{{count}} neue Zeilen"
     },
     "catchup": {
-      "heading": "Vor Ihrer Ankunft",
-      "loading": "Zusammenfassung wird erstellt…",
-      "error": "Die Zusammenfassung konnte nicht erstellt werden.",
-      "tooShort": "Vor Ihrer Ankunft wurde zu wenig gesagt.",
-      "refresh": "Aktualisieren",
-      "joined": "Sie sind um {{time}} beigetreten"
-    },
-    "settings": {
-      "language": "Sprache",
-      "languageAuto": "Automatisch",
-      "asrProfile": "Transkriptionsprofil",
-      "asrProfileAuto": "Automatisch (Standardprofil)",
-      "asrProfileEmpty": "Kein Profil verfügbar",
-      "asrProfileAdminNote": "Für diese Organisation ist kein Transkriptionsprofil konfiguriert. Bitten Sie eine Administratorin oder einen Administrator, in LinTO Studio eines zu erstellen.",
-      "translations": "Übersetzung",
-      "translationsSearch": "Sprache suchen…",
-      "translationsNone": "Keine Sprache stimmt überein.",
-      "translationsCount_one": "{{count}} Sprache ausgewählt",
-      "translationsCount_other": "{{count}} Sprachen ausgewählt",
-      "translationsRemove": "{{lang}} entfernen"
+      "heading": "Vor deiner Ankunft",
+      "loading": "Zusammenfassung wird vorbereitet…",
+      "close": "Zusammenfassung schließen",
+      "joined": "Du bist dem Meeting um {{time}} beigetreten"
     }
+  },
+  "deferred": {
+    "heading": "Nach dem Meeting transkribieren",
+    "body": "Das Meeting wird aufgezeichnet und nach seinem Ende transkribiert.",
+    "language": "Gesprochene Sprache",
+    "languageAuto": "Automatische Erkennung",
+    "summary": "Protokoll am Ende des Meetings",
+    "record": "Auch das Video aufzeichnen",
+    "noEntitlement": "Die Transkription nach dem Meeting ist für dein Konto nicht aktiviert."
   },
   "banner": {
     "inProgress": "Transkription läuft"
   },
   "stopToast": {
-    "ownEmail": "Das Protokoll wird Ihnen an <recipient>{{email}}</recipient> gesendet",
-    "generic": "Das Protokoll wird an die organisierende Person der Besprechung gesendet."
+    "ownEmail": "Das Protokoll wird dir an <recipient>{{email}}</recipient> gesendet",
+    "generic": "Das Protokoll wird an die organisierende Person des Meetings gesendet."
+  },
+  "catchupToast": {
+    "body": "Die Zusammenfassung dessen, was vor deiner Ankunft gesagt wurde, ist fertig.",
+    "open": "Transkript öffnen"
   },
   "tools": {
-    "lintoBot": {
-      "title": "LinTO",
-      "body": "Transkribieren Sie diese Besprechung live mit LinTO."
+    "live": {
+      "title": "Live transkribieren",
+      "body": "Untertitel, Übersetzung und Protokoll während des Meetings."
+    },
+    "deferred": {
+      "title": "Nach dem Meeting transkribieren",
+      "body": "Aufnahme, die nach dem Ende des Meetings transkribiert und zusammengefasst wird."
     }
   },
   "captions": {
-    "label": "LinTO-Untertitel"
+    "label": "Untertitel verfügbar",
+    "available": "Verfügbar"
   }
 }

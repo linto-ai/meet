@@ -419,23 +419,23 @@
       "participants": "Teilnehmende",
       "effects": "Hintergrund & Effekte",
       "chat": "Nachrichten im Chat",
-      "transcript": "Transkribieren",
+      "transcript": "Nach dem Meeting transkribieren",
       "screenRecording": "Aufzeichnen",
       "admin": "Admin-Einstellungen",
       "tools": "Weitere Tools",
       "info": "Meeting-Informationen",
-      "linto": "LinTO"
+      "linto": "Live transkribieren"
     },
     "content": {
       "participants": "Teilnehmende",
       "effects": "Hintergrund & Effekte",
       "chat": "Nachrichten",
-      "transcript": "transkribieren",
+      "transcript": "die Transkription nach dem Meeting",
       "screenRecording": "aufzeichnen",
       "admin": "Admin-Einstellungen",
       "tools": "Weitere Tools",
       "info": "Meeting-Informationen",
-      "linto": "die LinTO-Transkription"
+      "linto": "die Live-Transkription"
     },
     "closeButton": "{{content}} ausblenden"
   },
@@ -488,7 +488,8 @@
       "stop": "Meeting-Transkription beenden",
       "saving": "Speichern…",
       "starting": "Wird gestartet…",
-      "anotherModeStarted": "Eine Aufnahme läuft. <br/> Wechsele das Menü und stoppe sie."
+      "anotherModeStarted": "Eine Aufnahme läuft. <br/> Wechsele das Menü und stoppe sie.",
+      "liveStarted": "Eine Live-Transkription läuft. <br/> Stoppe sie, bevor du nach dem Meeting transkribierst."
     },
     "linkMore": "Dokumentation öffnen",
     "linkAriaLabel": "Dokumentation zur Transkription öffnen – öffnet in neuem Tab",
@@ -543,7 +544,8 @@
       "stop": "Meeting-Aufzeichnung beenden",
       "saving": "Wird gespeichert…",
       "starting": "Wird gestartet…",
-      "anotherModeStarted": "Eine Transkription läuft. <br/> Wechsele das Menü und stoppen sie."
+      "anotherModeStarted": "Eine Transkription läuft. <br/> Wechsele das Menü und stoppen sie.",
+      "liveStarted": "Eine Live-Transkription läuft. <br/> Nutze ihre Option „Video aufzeichnen“ oder stoppe sie."
     },
     "notAdminOrOwner": {
       "heading": "Zugriff eingeschränkt",

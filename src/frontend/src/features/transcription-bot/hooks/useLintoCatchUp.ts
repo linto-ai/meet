@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef } from 'react'
 import { useRoomContext } from '@livekit/components-react'
 import { useSnapshot } from 'valtio'
 import { useRoomData } from '@/features/rooms/livekit/hooks/useRoomData'
+import { useSidePanel } from '@/features/rooms/livekit/hooks/useSidePanel'
+import { notifyLintoCatchUpReady } from '@/features/notifications'
 import { useStudioClient } from '../api/studioAuth'
 import { IDLE_CATCH_UP, lintoStore } from '../store/lintoStore'
 import { hydrateCaptions } from '../store/transcriptStore'
@@ -132,19 +134,26 @@ export const mapSessionCaptions = (
   return lines.sort((a, b) => a.receivedAt - b.receivedAt)
 }
 
-/**
- * Manual re-run of the summary, wired to the panel's refresh button. Registered
- * by the hook while it is mounted; a no-op otherwise (starter, feature off).
- */
-let summaryRunner: (() => void) | null = null
-export const refreshLintoCatchUp = () => summaryRunner?.()
+/** The reader closed the "before you arrived" block: gone for this run. */
+export const dismissLintoCatchUp = () => {
+  lintoStore.catchUp = { ...lintoStore.catchUp, dismissed: true }
+}
 
 export const useLintoCatchUp = () => {
   const room = useRoomContext()
   const apiRoomData = useRoomData()
   const { getClient, config } = useStudioClient()
-  const { active, sessionId, channelIndex, startedAt } = useLintoStatus()
+  const { active, sessionId, channelIndex, startedAt, catchUpEnabled } =
+    useLintoStatus()
   const { startedByMe } = useSnapshot(lintoStore)
+  // Read through refs: `useSidePanel` hands out new function identities on
+  // every render, and the hydration effect below must NOT re-run (its cleanup
+  // cancels the fetch in flight) for that.
+  const { isLintoOpen, openLinto } = useSidePanel()
+  const isLintoOpenRef = useRef(isLintoOpen)
+  isLintoOpenRef.current = isLintoOpen
+  const openLintoRef = useRef(openLinto)
+  openLintoRef.current = openLinto
 
   const roomId = apiRoomData?.livekit?.room || room?.name || ''
   const roomToken = apiRoomData?.livekit?.token || ''
@@ -168,7 +177,9 @@ export const useLintoCatchUp = () => {
     }
   }, [getClient, roomId, roomToken, config?.studio_api_url])
 
-  /** Stream the "before you arrived" summary into the store. */
+  /** Stream the "before you arrived" summary into the store. It is computed
+   *  ONCE per run: no refresh, and the block can be closed for good. When it
+   *  lands while the panel is closed, a discreet toast offers to open it. */
   const runSummary = useCallback(
     async (
       linto: InstanceType<typeof LinTO>,
@@ -204,6 +215,7 @@ export const useLintoCatchUp = () => {
               status: 'streaming',
               text: fullText,
               updatedAt: Date.now(),
+              dismissed: false,
             }
           },
         })
@@ -212,6 +224,10 @@ export const useLintoCatchUp = () => {
           status: 'done',
           text,
           updatedAt: Date.now(),
+          dismissed: false,
+        }
+        if (text.trim() && !isLintoOpenRef.current) {
+          notifyLintoCatchUpReady(() => openLintoRef.current())
         }
       } catch (err) {
         if (controller.signal.aborted) return
@@ -271,9 +287,10 @@ export const useLintoCatchUp = () => {
       hydrateCaptions(
         mapSessionCaptions(session, sessionId, channelIndex, joinedAt, baseTime)
       )
+      // The summary is an option of the run: the history above is always
+      // hydrated, the LLM is only asked when the starter left it on.
+      if (!catchUpEnabled) return
       const token = session?.publicSessionToken
-      summaryRunner = () =>
-        void runSummary(linto, sessionId, channelIndex, joinedAt, token)
       await runSummary(linto, sessionId, channelIndex, joinedAt, token)
     }
     void run()
@@ -287,6 +304,7 @@ export const useLintoCatchUp = () => {
     sessionId,
     channelIndex,
     startedAt,
+    catchUpEnabled,
     roomId,
     config,
     room,
@@ -298,13 +316,11 @@ export const useLintoCatchUp = () => {
   useEffect(() => {
     if (active) return
     doneKeyRef.current = null
-    summaryRunner = null
     abortRef.current?.abort()
   }, [active])
 
   useEffect(
     () => () => {
-      summaryRunner = null
       abortRef.current?.abort()
     },
     []

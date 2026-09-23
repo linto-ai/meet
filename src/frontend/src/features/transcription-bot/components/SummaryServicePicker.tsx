@@ -49,21 +49,34 @@ const localizedDescription = (
 
 interface SummaryServicePickerProps {
   isDisabled?: boolean
+  // Controlled use (the deferred-transcription tool keeps its own choice);
+  // without these, the picker reads and writes the live panel's store.
+  value?: string
+  onChange?: (route: string) => void
 }
 
 /**
  * Which summary the meeting gets: the LLM Gateway services carrying the
- * `meet` scope, with their icon. The choice travels with `linto/started` and
- * reaches Studio when the summary is triggered at stop. Nothing is rendered
- * when the backend offers no service (the instance default applies).
+ * `meet` scope, with their icon. The choice travels with `linto/started`
+ * (live) or in the recording options (deferred) and reaches Studio when the
+ * summary is triggered. Nothing is rendered when the backend offers no
+ * service (the instance default applies). Both transcription tools use it.
  */
 export const SummaryServicePicker = ({
   isDisabled,
+  value,
+  onChange,
 }: SummaryServicePickerProps) => {
   const { t, i18n } = useTranslation('transcription-bot', {
     keyPrefix: 'lintoBot.options',
   })
-  const { summaryService } = useSnapshot(lintoStore)
+  const { summaryService: storeService } = useSnapshot(lintoStore)
+  const controlled = onChange !== undefined
+  const summaryService = controlled ? value : storeService
+  const setService = (route: string) => {
+    if (controlled) onChange(route)
+    else lintoStore.summaryService = route
+  }
   const apiRoomData = useRoomData()
   const { data } = useLintoSummaryServices(
     apiRoomData?.livekit?.room,
@@ -75,11 +88,14 @@ export const SummaryServicePicker = ({
   // keep a previous choice as long as it is still offered.
   useEffect(() => {
     if (services.length === 0) return
-    const current = lintoStore.summaryService
+    const current = controlled ? value : lintoStore.summaryService
     if (current && services.some((s) => s.route === current)) return
     const preferred = services.find((s) => s.default) ?? services[0]
-    lintoStore.summaryService = preferred.route
-  }, [services])
+    if (controlled) onChange(preferred.route)
+    else lintoStore.summaryService = preferred.route
+    // `onChange` is expected stable enough; a new identity must not re-default.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [services, controlled, value])
 
   if (services.length === 0) return null
 
@@ -92,9 +108,7 @@ export const SummaryServicePicker = ({
         aria-label={t('summaryService')}
         value={summaryService ?? ''}
         isDisabled={isDisabled}
-        onChange={(value) => {
-          lintoStore.summaryService = value
-        }}
+        onChange={setService}
         className={css({
           display: 'flex',
           flexDirection: 'column',
@@ -132,9 +146,7 @@ export const SummaryServicePicker = ({
                   })}
                 >
                   <Text variant="sm">{service.name}</Text>
-                  {description && (
-                    <Text variant="xsNote">{description}</Text>
-                  )}
+                  {description && <Text variant="xsNote">{description}</Text>}
                 </span>
               </span>
             </Radio>

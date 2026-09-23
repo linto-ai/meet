@@ -112,7 +112,8 @@ export function useLintoSummaryServices(
   token: string | undefined
 ) {
   const { config } = useStudioClient()
-  const { live } = useLintoCapabilities()
+  // Both transcription tools offer the summary: live and deferred.
+  const { live, async: deferred } = useLintoCapabilities()
   return useQuery<LintoSummaryService[], ApiError>({
     queryKey: ['lintoSummaryServices', roomId],
     queryFn: async () => {
@@ -122,7 +123,36 @@ export function useLintoSummaryServices(
       )
       return res.services ?? []
     },
-    enabled: !!roomId && !!token && !!config?.enabled && live,
+    enabled: !!roomId && !!token && !!config?.enabled && (live || deferred),
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
+// ── Deferred transcription languages (Meet backend) ───────────────────────────
+
+/**
+ * The languages the "transcribe after the meeting" tool can be asked for:
+ * what the gateway's STT services advertise, listed by the Meet backend
+ * through Studio. `*` = automatic detection. Empty when the backend cannot
+ * answer (the tool then offers the automatic detection only). Needs the
+ * deferred-transcription capability, like the tool itself.
+ */
+export function useLintoTranscriptionLanguages(
+  roomId: string | undefined,
+  token: string | undefined
+) {
+  const { config } = useStudioClient()
+  const { async: canTranscribeAsync } = useLintoCapabilities()
+  return useQuery<string[], ApiError>({
+    queryKey: ['lintoTranscriptionLanguages', roomId],
+    queryFn: async () => {
+      const search = token ? `?token=${encodeURIComponent(token)}` : ''
+      const res = await fetchApi<{ languages?: string[] }>(
+        `rooms/${roomId}/linto/transcription-languages/${search}`
+      )
+      return res.languages ?? []
+    },
+    enabled: !!roomId && !!token && !!config?.enabled && canTranscribeAsync,
     staleTime: 5 * 60 * 1000,
   })
 }
@@ -222,6 +252,7 @@ const startLintoLive = async (
       summary: config.summary,
       summary_service: config.summary ? config.summaryService : undefined,
       record: config.record,
+      catchup: config.catchup,
       token,
     }),
   })

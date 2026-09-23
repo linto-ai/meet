@@ -10,6 +10,7 @@ import {
 } from '@/features/recording'
 import { useEffect, useState } from 'react'
 import { useLintoCapabilities } from '@/features/transcription-bot/hooks/useLintoCapabilities'
+import { useLintoStatus } from '@/features/transcription-bot/hooks/useLintoStatus'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -70,7 +71,11 @@ export const ScreenRecordingSidePanel = () => {
   const statuses = useRecordingStatuses(RecordingMode.ScreenRecording)
 
   const room = useRoomContext()
-  const { openTranscript } = useSidePanel()
+  const { openTranscript, openLinto } = useSidePanel()
+  // A live LinTO transcription owns the room too (its own video option covers
+  // the recording): exclusive with this tool.
+  const { active: isLintoActive } = useLintoStatus()
+  const liveBlocks = isLintoActive && !statuses.isActive
 
   const handleRequestScreenRecording = async () => {
     await notifyParticipants({
@@ -220,10 +225,16 @@ export const ScreenRecordingSidePanel = () => {
       <ControlsButton
         i18nKeyPrefix={keyPrefix}
         handle={handleScreenRecording}
-        statuses={statuses}
+        statuses={{
+          ...statuses,
+          isAnotherModeStarted: statuses.isAnotherModeStarted || liveBlocks,
+        }}
         isPendingToStart={isPendingToStart}
         isPendingToStop={isPendingToStop}
-        openSidePanel={openTranscript}
+        openSidePanel={liveBlocks ? openLinto : openTranscript}
+        anotherModeKey={
+          liveBlocks ? 'button.liveStarted' : 'button.anotherModeStarted'
+        }
       />
     </Div>
   )

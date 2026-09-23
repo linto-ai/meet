@@ -419,23 +419,23 @@
       "participants": "Participants",
       "effects": "Arrière-plans et effets",
       "chat": "Messages dans l'appel",
-      "transcript": "Transcrire",
+      "transcript": "Transcrire après la réunion",
       "screenRecording": "Enregistrer",
       "admin": "Commandes de l'organisateur",
       "tools": "Outils de réunion",
       "info": "Informations sur la réunion",
-      "linto": "LinTO"
+      "linto": "Transcrire en direct"
     },
     "content": {
       "participants": "les participants",
       "effects": "les effets",
       "chat": "les messages",
-      "transcript": "transcrire",
+      "transcript": "la transcription après la réunion",
       "screenRecording": "enregistrer",
       "admin": "commandes de l'organisateur",
       "tools": "outils de réunion",
       "info": "informations sur la réunion",
-      "linto": "la transcription LinTO"
+      "linto": "la transcription en direct"
     },
     "closeButton": "Masquer {{content}}"
   },
@@ -488,7 +488,8 @@
       "stop": "Arrêter de transcrire la réunion",
       "saving": "Sauvegarde…",
       "starting": "Démarrage…",
-      "anotherModeStarted": "Un enregistrement est en cours. <br/> Changez de menu et arrêtez le."
+      "anotherModeStarted": "Un enregistrement est en cours. <br/> Changez de menu et arrêtez le.",
+      "liveStarted": "Une transcription en direct est en cours. <br/> Arrêtez-la avant de transcrire après la réunion."
     },
     "linkMore": "Ouvrir la documentation",
     "linkAriaLabel": "Ouvrir la documentation sur la transcription - ouvre dans une nouvelle fenêtre",
@@ -543,7 +544,8 @@
       "stop": "Arrêter d'enregistrer la réunion",
       "saving": "Sauvegarde…",
       "starting": "Démarrage…",
-      "anotherModeStarted": "Une transcription est en cours. <br/> Changez de menu et arrêtez la."
+      "anotherModeStarted": "Une transcription est en cours. <br/> Changez de menu et arrêtez la.",
+      "liveStarted": "Une transcription en direct est en cours. <br/> Utilisez son option « Enregistrer la vidéo », ou arrêtez-la."
     },
     "notAdminOrOwner": {
       "heading": "Accès restreint",

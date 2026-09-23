@@ -1,7 +1,8 @@
 // components
 export { LintoSidePanel } from './components/LintoSidePanel'
 export { LiveTranscript } from './components/LiveTranscript'
-export { LintoSettings } from './components/LintoSettings'
+export { SummaryServicePicker } from './components/SummaryServicePicker'
+export { TranslationPicker } from './components/TranslationPicker'
 export { LintoBanner } from './components/LintoBanner'
 export { LintoProvider } from './components/LintoProvider'
 
@@ -17,6 +18,7 @@ export { useLintoTranscriptFeed } from './hooks/useLintoTranscriptFeed'
 export {
   useLintoBotProfiles,
   useLintoSummaryServices,
+  useLintoTranscriptionLanguages,
   useStartLintoLive,
   useStopLintoLive,
 } from './api/lintoBotApi'

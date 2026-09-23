@@ -28,6 +28,9 @@ interface ControlsButtonProps {
   isPendingToStart: boolean
   isPendingToStop: boolean
   openSidePanel: () => void
+  // Key (under the prefix) of the notice shown when another mode runs —
+  // defaults to the egress wording; the LinTO live run has its own.
+  anotherModeKey?: string
 }
 
 const MIN_SPINNER_DISPLAY_TIME = 2000
@@ -39,6 +42,7 @@ export const ControlsButton = ({
   isPendingToStart,
   isPendingToStop,
   openSidePanel,
+  anotherModeKey = 'button.anotherModeStarted',
 }: ControlsButtonProps) => {
   const { t } = useTranslation('rooms', { keyPrefix: i18nKeyPrefix })
 
@@ -149,7 +153,7 @@ export const ControlsButton = ({
             name="info"
           />
           <Text variant={'smNote'}>
-            {parseLineBreaks(t('button.anotherModeStarted'))}
+            {parseLineBreaks(t(anotherModeKey))}
           </Text>
           <Icon
             className={css({

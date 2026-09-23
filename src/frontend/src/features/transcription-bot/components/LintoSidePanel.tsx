@@ -15,6 +15,11 @@ import {
   useHasRecordingAccess,
   useHasFeatureWithoutAdminRights,
 } from '@/features/recording'
+import { useRoomMetadata } from '@/features/recording/hooks/useRoomMetadata'
+import { useSidePanel } from '@/features/rooms/livekit/hooks/useSidePanel'
+import { Button as RACButton } from 'react-aria-components'
+import { Icon } from '@/primitives'
+import { parseLineBreaks } from '@/utils/parseLineBreaks'
 import { NoAccessView } from '@/features/recording/components/NoAccessView'
 import { FeatureFlags } from '@/features/analytics/enums'
 import {
@@ -31,7 +36,7 @@ import {
   useStartLintoLive,
   useStopLintoLive,
 } from '../api/lintoBotApi'
-import { LintoSettings } from './LintoSettings'
+import { TranslationPicker } from './TranslationPicker'
 import { SummaryServicePicker } from './SummaryServicePicker'
 import { LiveTranscript } from './LiveTranscript'
 
@@ -57,7 +62,7 @@ export const LintoSidePanel = () => {
   const { t } = useTranslation('transcription-bot', { keyPrefix: 'lintoBot' })
 
   const { enabled } = useLintoConfig()
-  const { running, translate, summary, summaryService, record, error } =
+  const { running, catchup, summary, summaryService, record, error } =
     useSnapshot(lintoStore)
 
   const apiRoomData = useRoomData()
@@ -72,6 +77,19 @@ export const LintoSidePanel = () => {
   const lintoConfig = configData?.linto
   const isAdminOrOwner = useIsAdminOrOwner()
   const { notifyParticipants } = useNotifyParticipants()
+  // The two transcription tools and the recording are exclusive: while an
+  // egress runs (deferred transcription or video recording), the live one
+  // cannot start — say so and point to the tool that owns it.
+  const metadata = useRoomMetadata()
+  const { openTranscript, openScreenRecording } = useSidePanel()
+  const recordingMode = metadata?.recording_mode as string | undefined
+  const recordingActive =
+    !!recordingMode &&
+    ['starting', 'started', 'saving'].includes(
+      String(metadata?.recording_status ?? '')
+    )
+  const openRecordingTool =
+    recordingMode === 'transcript' ? openTranscript : openScreenRecording
 
   // Permission gating (mirrors the legacy recording machinery).
   const hasTranscriptNoAccess = useHasFeatureWithoutAdminRights(
@@ -151,8 +169,9 @@ export const LintoSidePanel = () => {
         config: {
           summary,
           summaryService,
+          catchup,
           record: hasScreenRecordingAccess ? record : false,
-          translations: translate ? [...lintoStore.selectedTranslations] : [],
+          translations: [...lintoStore.selectedTranslations],
         },
       })
     } catch (err) {
@@ -297,26 +316,33 @@ export const LintoSidePanel = () => {
 
       {canControl && !running && (
         <>
-          {/* Three flat options; what each one needs unfolds under it. */}
+          {/* Flat options, as the Studio mobile app lays them out: the
+              translation targets first, then the summaries and the video. */}
           <VStack
-            gap={0.5}
+            gap={0.75}
             width="100%"
             marginBottom={20}
             alignItems="start"
             className={css({ width: '100%' })}
           >
+            <TranslationPicker isDisabled={controlsDisabled} />
             <Checkbox
               size="sm"
-              data-testid="linto-mode-translate"
-              isSelected={translate}
+              data-testid="linto-mode-catchup"
+              isSelected={catchup}
               onChange={(value) => {
-                lintoStore.translate = value
+                lintoStore.catchup = value
               }}
               isDisabled={controlsDisabled}
             >
-              <Text variant="sm">{t('options.translate')}</Text>
+              <Text variant="sm">{t('options.catchup')}</Text>
             </Checkbox>
-            {translate && <LintoSettings isDisabled={controlsDisabled} />}
+            <Text
+              variant="smNote"
+              className={css({ paddingLeft: '1.625rem', marginTop: '-0.5rem' })}
+            >
+              {t('options.catchupHint')}
+            </Text>
             <Checkbox
               size="sm"
               data-testid="linto-mode-summary"
@@ -344,6 +370,43 @@ export const LintoSidePanel = () => {
             )}
           </VStack>
         </>
+      )}
+
+      {canControl && !running && recordingActive && (
+        <RACButton
+          data-testid="linto-another-mode"
+          className={css({
+            backgroundColor: 'primary.50',
+            border: '1px solid',
+            borderColor: 'primary.200',
+            borderRadius: '6px',
+            padding: '0.75rem',
+            marginBottom: '0.75rem',
+            display: 'flex',
+            justifyContent: 'left',
+            textAlign: 'left',
+            alignItems: 'center',
+            width: '100%',
+            cursor: 'pointer',
+            _hover: {
+              backgroundColor: 'primary.100',
+              borderColor: 'primary.400',
+            },
+          })}
+          onPress={() => openRecordingTool()}
+        >
+          <Icon
+            className={css({ color: 'primary.500', marginRight: '1rem' })}
+            name="info"
+          />
+          <Text variant={'smNote'}>
+            {parseLineBreaks(t('anotherModeStarted'))}
+          </Text>
+          <Icon
+            className={css({ color: 'primary.500', marginLeft: 'auto' })}
+            name="chevron_right"
+          />
+        </RACButton>
       )}
 
       {error && (
@@ -407,7 +470,9 @@ export const LintoSidePanel = () => {
                 fullWidth
                 data-testid="linto-start"
                 onPress={handleStart}
-                isDisabled={isPendingToStart || !roomId || noProfiles}
+                isDisabled={
+                  isPendingToStart || !roomId || noProfiles || recordingActive
+                }
               >
                 {t('start')}
               </Button>

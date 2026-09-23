@@ -12,7 +12,6 @@ type Source = Track.Source
 // mints the native bot join token + lifecycle hooks via the Meet backend.
 export interface LintoRuntimeConfig {
   enabled: boolean
-  hide_legacy_tools: boolean
   // Browser-facing studio-api base URL the LinTO JS SDK talks to.
   studio_api_url: string
   // Where the backend gets the Studio token it hands the browser (informational
