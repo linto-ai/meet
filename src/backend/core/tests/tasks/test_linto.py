@@ -53,6 +53,46 @@ def _patch_sdk(stack):
     return linto_cls.return_value
 
 
+class TestStudioCredentials:
+    """The deferred pipeline authenticates like the live flow: the service
+    account (or integration token) first, the static token as the fallback."""
+
+    def test_uses_the_service_login_when_configured(self, settings):
+        settings.LINTO_STUDIO_API_TOKEN = "static-prod-token"
+        rec = _make_recording(models.RecordingModeChoices.TRANSCRIPT)
+        with contextlib.ExitStack() as stack:
+            _patch_storage(stack, b"OggS audio")
+            linto_cls = stack.enter_context(mock.patch("linto.LinTO"))
+            linto_cls.return_value.upload = mock.AsyncMock(
+                side_effect=RuntimeError("stop")
+            )
+            stack.enter_context(
+                mock.patch(
+                    "core.services.bot_transcription.BotTranscriptionService._login",
+                    return_value="service-token",
+                )
+            )
+            with pytest.raises(RuntimeError, match="stop"):
+                linto_task._process_linto_transcription_sync(str(rec.id))
+        assert linto_cls.call_args.kwargs["auth_token"] == "service-token"
+
+    def test_falls_back_to_the_static_token_without_credentials(self, settings):
+        settings.LINTO_STUDIO_API_TOKEN = "static-token"
+        settings.LINTO_STUDIO_AUTH_EMAIL = ""
+        settings.LINTO_STUDIO_AUTH_PASSWORD = ""
+        settings.LINTO_STUDIO_INTEGRATION_TOKEN = None
+        rec = _make_recording(models.RecordingModeChoices.TRANSCRIPT)
+        with contextlib.ExitStack() as stack:
+            _patch_storage(stack, b"OggS audio")
+            linto_cls = stack.enter_context(mock.patch("linto.LinTO"))
+            linto_cls.return_value.upload = mock.AsyncMock(
+                side_effect=RuntimeError("stop")
+            )
+            with pytest.raises(RuntimeError, match="stop"):
+                linto_task._process_linto_transcription_sync(str(rec.id))
+        assert linto_cls.call_args.kwargs["auth_token"] == "static-token"
+
+
 class TestAudioExtractionBranching:
     def test_mp4_source_triggers_audio_extraction(self):
         rec = _make_recording(models.RecordingModeChoices.SCREEN_RECORDING)

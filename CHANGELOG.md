@@ -54,6 +54,7 @@ and this project adheres to
 - 🐛(backend) a LiveKit room token names a user only through a proof signed by Meet
 - 🐛(backend) Twake Drive uploads go to the instance named by an OIDC claim, not one built from an email sub
 - 🐛(frontend) the live captions no longer linger on screen after the transcription stops
+- 🐛(backend) the deferred transcription authenticates like the live flow (service account first)
 
 ## [1.37.0] - 2026-11-01
 
