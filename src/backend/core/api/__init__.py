@@ -78,7 +78,6 @@ def get_frontend_configuration(request):
         # backend. `studio_api_url` is the browser-facing studio-api base.
         "linto": {
             "enabled": settings.LINTO_FEATURE_ENABLED,
-            "hide_legacy_tools": settings.LINTO_HIDE_LEGACY_TOOLS,
             "studio_api_url": settings.LINTO_STUDIO_BROWSER_API_URL,
             # Where the browser's Studio JWT comes from (informational: the
             # panel always asks GET rooms/{id}/linto/studio-token). Reported

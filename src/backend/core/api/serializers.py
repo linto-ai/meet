@@ -315,6 +315,10 @@ class RecordingOptions(BaseModel):
             Must be one of the valid RecordingModeChoices values when provided.
         collect_metadata: Whether to collect additional metadata during recording.
             When `None`, no metadata are collected.
+        summary: Whether the deferred transcription gets an LLM summary
+            (LinTO). When `None`, falls back to the application default.
+        summary_service: The LLM Gateway service route the summary is
+            produced with (LinTO). When `None`, the instance default applies.
 
     """
 
@@ -322,6 +326,8 @@ class RecordingOptions(BaseModel):
     transcribe: bool | None = None
     collect_metadata: bool | None = None
     original_mode: Literal["screen_recording", "transcript"] | None = None
+    summary: bool | None = None
+    summary_service: str | None = None
 
     model_config = {"extra": "forbid"}
 

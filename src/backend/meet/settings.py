@@ -926,11 +926,6 @@ class Base(Configuration):
     LINTO_FEATURE_ENABLED = values.BooleanValue(
         False, environ_name="LINTO_FEATURE_ENABLED", environ_prefix=None
     )
-    # When True, the single LinTO tool REPLACES the legacy "Transcrire" tool
-    # (egress recording + offline transcription). "Enregistrer" stays.
-    LINTO_HIDE_LEGACY_TOOLS = values.BooleanValue(
-        False, environ_name="LINTO_HIDE_LEGACY_TOOLS", environ_prefix=None
-    )
     # Bot provider requested from Studio. The Scheduler routes "visio" to the
     # native LiveKit bot first (capability "visio-native") and falls back to the
     # web bot when no native replica can serve it.

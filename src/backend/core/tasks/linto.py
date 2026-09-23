@@ -886,10 +886,20 @@ async def _process_linto_transcription_sync(recording_id):  # noqa: PLR0915
     # 5.1 / 5.2 Tag + move (soft-fail)
     await _tag_and_move(linto, conversation_id, recording_id, checkpoint)
 
-    # 5.5 LLM summary (soft-fail)
-    summary_result = await _summarize_conversation(
-        linto, conversation_id, recording_id, checkpoint
-    )
+    # 5.5 LLM summary (soft-fail) — unless the panel turned it off; the
+    # service is the one picked there (None = the instance default).
+    options = recording.options or {}
+    if options.get("summary") is False:
+        logger.info("Summary turned off for %s, skipping", recording_id)
+        summary_result = {}
+    else:
+        summary_result = await _summarize_conversation(
+            linto,
+            conversation_id,
+            recording_id,
+            checkpoint,
+            service_route=options.get("summary_service") or None,
+        )
 
     # 5.6 Document attachment (soft-fail)
     pdf_content, pub_format = await _generate_document(

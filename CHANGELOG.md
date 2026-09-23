@@ -8,12 +8,24 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- ✨(frontend) "Transcribe after the meeting": ASR language, summary and service
+- ✨(frontend) live translation targets picked as chips, like the Studio mobile app
+- ✨(frontend) "summary for latecomers" option of the live transcription, closable, once
+- ✨(backend) GET rooms/{id}/linto/transcription-languages (STT languages via Studio)
+- ✨(backend) summary on/off and service in the recording options (deferred pipeline)
+
 ### Changed
 
+- 💄(frontend) two distinct tools, "Transcribe live" and "Transcribe after the meeting"
+- 💄(frontend) captions badge says "Available" instead of the product name
+- 🔥(backend) LINTO_HIDE_LEGACY_TOOLS is gone: both transcription tools always show
 - 📝(backend) log the outcome of every Twake Drive recording upload
 
 ### Fixed
 
+- 🐛(frontend) the live captions no longer linger on screen after the transcription stops
 - 🐛(backend) make linto_state migration idempotent to self-heal history desync
 - 🐛(mail) load i18n tags in transcription email so it renders
 

@@ -232,6 +232,31 @@ class TestSummaryServices:
         assert res.status_code == 404
 
 
+class TestTranscriptionLanguages:
+    def test_lists_the_languages_for_a_room_participant(self, linto_settings):
+        room = RoomFactory()
+        token = _room_token(room)
+        with mock.patch(
+            "core.api.viewsets.BotTranscriptionService.transcription_languages",
+            return_value=["*", "en", "fr"],
+        ):
+            res = APIClient().get(
+                f"/api/v1.0/rooms/{room.id}/linto/transcription-languages/"
+                f"?token={token}"
+            )
+        assert res.status_code == 200
+        assert res.json() == {"languages": ["*", "en", "fr"]}
+
+    def test_feature_off_is_a_404(self, linto_settings):
+        linto_settings.LINTO_FEATURE_ENABLED = False
+        room = RoomFactory()
+        token = _room_token(room)
+        res = APIClient().get(
+            f"/api/v1.0/rooms/{room.id}/linto/transcription-languages/?token={token}"
+        )
+        assert res.status_code == 404
+
+
 class TestAuth:
     def test_no_token_is_unauthorized(self, linto_settings):
         room = RoomFactory()

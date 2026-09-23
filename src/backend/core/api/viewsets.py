@@ -914,6 +914,26 @@ class RoomViewSet(
     @decorators.action(
         detail=True,
         methods=["get"],
+        url_path="linto/transcription-languages",
+        permission_classes=[permissions.HasLiveKitRoomAccess],
+        authentication_classes=[LiveKitTokenAuthentication],
+    )
+    @FeatureFlag.require("linto")
+    def linto_transcription_languages(self, request, pk=None):  # pylint: disable=unused-argument
+        """The languages the "transcribe after the meeting" panel offers:
+        what the gateway's STT services advertise, through Studio.
+        ``{"languages": ["*", "en", "fr", …]}`` (``*`` = automatic detection);
+        an empty list when Studio cannot answer (the panel then offers the
+        automatic detection only)."""
+        self.get_object()  # room access check
+        languages = BotTranscriptionService().transcription_languages()
+        return drf_response.Response(
+            {"languages": languages}, status=drf_status.HTTP_200_OK
+        )
+
+    @decorators.action(
+        detail=True,
+        methods=["get"],
         url_path="linto/studio-token",
         permission_classes=[permissions.HasLiveKitRoomAccess],
         authentication_classes=[LiveKitTokenAuthentication],
