@@ -1,67 +1,78 @@
 {
   "lintoBot": {
-    "heading": "Live transcriptie van de vergadering",
-    "content": "LinTO-transcriptie",
-    "body": "LinTO transcribeert de vergadering live, met namen van sprekers. Kies hieronder de opties en start vervolgens.",
-    "start": "Starten",
-    "stop": "Stoppen",
-    "notAvailable": "LinTO-transcriptie is niet beschikbaar in deze ruimte.",
-    "noEntitlement": "De AI-transcriptieoptie is niet geactiveerd voor uw account.",
+    "heading": "Live transcriberen",
+    "body": "Wat er gezegd wordt, wordt tijdens de vergadering getranscribeerd, met de naam van de spreker. De gesproken taal wordt automatisch herkend.",
+    "start": "Transcriptie starten",
+    "stop": "Transcriptie stoppen",
+    "notAvailable": "Live transcriptie is niet beschikbaar in deze vergadering.",
+    "noEntitlement": "Live transcriptie is niet ingeschakeld voor je account.",
+    "anotherModeStarted": "Er loopt een opname. <br/> Stop deze voordat je live transcribeert.",
     "options": {
-      "translate": "Live vertalen",
-      "summary": "Een samenvatting genereren",
-      "record": "De video van de vergadering opnemen"
+      "catchup": "Samenvatting voor laatkomers",
+      "catchupHint": "Wie tijdens de vergadering aansluit, krijgt een samenvatting van wat er tot dan toe is gezegd.",
+      "summary": "Verslag aan het einde van de vergadering",
+      "summaryService": "Soort verslag",
+      "record": "Video opnemen"
+    },
+    "translations": {
+      "label": "Vertalen naar",
+      "none": "Geen",
+      "other": "Andere taal",
+      "otherPlaceholder": "Taal toevoegen…",
+      "noneAvailable": "Er is geen vertaling beschikbaar."
     },
     "errors": {
-      "noProfile": "Er is geen transcriptieprofiel geconfigureerd voor deze organisatie. Vraag een beheerder om er een aan te maken in LinTO Studio.",
-      "generic": "Het starten van de transcriptie is mislukt. Probeer het opnieuw.",
+      "noProfile": "Er is geen transcriptieprofiel ingesteld voor je organisatie. Vraag een beheerder om er een aan te maken.",
+      "generic": "De transcriptie kon niet worden gestart. Probeer het opnieuw.",
       "retry": "Opnieuw proberen"
     },
     "live": {
-      "heading": "Live transcript",
+      "heading": "Transcript",
       "empty": "Wachten op de eerste woorden…",
       "displayLanguage": "Weergegeven taal",
-      "original": "Origineel (gesproken taal)",
+      "original": "Gesproken taal",
       "newLines_one": "{{count}} nieuwe regel",
       "newLines_other": "{{count}} nieuwe regels"
     },
     "catchup": {
-      "heading": "Voordat u erbij kwam",
-      "loading": "Samenvatting wordt gegenereerd…",
-      "error": "De samenvatting kon niet worden gegenereerd.",
-      "tooShort": "Er is te weinig gezegd voordat u erbij kwam.",
-      "refresh": "Vernieuwen",
-      "joined": "U bent om {{time}} toegetreden"
-    },
-    "settings": {
-      "language": "Taal",
-      "languageAuto": "Automatisch",
-      "asrProfile": "Transcriptieprofiel",
-      "asrProfileAuto": "Automatisch (standaardprofiel)",
-      "asrProfileEmpty": "Geen profiel beschikbaar",
-      "asrProfileAdminNote": "Er is geen transcriptieprofiel geconfigureerd voor deze organisatie. Vraag een beheerder om er een aan te maken in LinTO Studio.",
-      "translations": "Vertaling",
-      "translationsSearch": "Zoek een taal…",
-      "translationsNone": "Geen enkele taal komt overeen.",
-      "translationsCount_one": "{{count}} taal geselecteerd",
-      "translationsCount_other": "{{count}} talen geselecteerd",
-      "translationsRemove": "{{lang}} verwijderen"
+      "heading": "Voordat je erbij kwam",
+      "loading": "Samenvatting wordt voorbereid…",
+      "close": "Samenvatting sluiten",
+      "joined": "Je bent om {{time}} bij de vergadering gekomen"
     }
+  },
+  "deferred": {
+    "heading": "Na de vergadering transcriberen",
+    "body": "De vergadering wordt opgenomen en na afloop getranscribeerd.",
+    "language": "Gesproken taal",
+    "languageAuto": "Automatische herkenning",
+    "summary": "Verslag aan het einde van de vergadering",
+    "record": "Ook de video opnemen",
+    "noEntitlement": "Transcriptie na de vergadering is niet ingeschakeld voor je account."
   },
   "banner": {
     "inProgress": "Transcriptie bezig"
   },
   "stopToast": {
-    "ownEmail": "De notulen worden naar u verzonden op <recipient>{{email}}</recipient>",
-    "generic": "De notulen worden naar de organisator van de vergadering verzonden."
+    "ownEmail": "Het verslag wordt naar je verzonden op <recipient>{{email}}</recipient>",
+    "generic": "Het verslag wordt naar de organisator van de vergadering verzonden."
+  },
+  "catchupToast": {
+    "body": "De samenvatting van wat er is gezegd voordat je erbij kwam, is klaar.",
+    "open": "Transcript openen"
   },
   "tools": {
-    "lintoBot": {
-      "title": "LinTO",
-      "body": "Transcribeer deze vergadering live met LinTO."
+    "live": {
+      "title": "Live transcriberen",
+      "body": "Ondertitels, vertaling en verslag tijdens de vergadering."
+    },
+    "deferred": {
+      "title": "Na de vergadering transcriberen",
+      "body": "Opname die na afloop van de vergadering wordt getranscribeerd en samengevat."
     }
   },
   "captions": {
-    "label": "LinTO-ondertitels"
+    "label": "Ondertitels beschikbaar",
+    "available": "Beschikbaar"
   }
 }

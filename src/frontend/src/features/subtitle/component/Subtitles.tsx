@@ -19,6 +19,7 @@ import {
 import { parseLintoSegmentId } from '@/features/transcription-bot/store/transcriptStore'
 import { UNATTRIBUTED_SPEAKER } from '@/features/transcription-bot/hooks/useLintoTranscriptFeed'
 import { lintoStore } from '@/features/transcription-bot/store/lintoStore'
+import { useLintoStatus } from '@/features/transcription-bot/hooks/useLintoStatus'
 
 const ORIGINAL = 'original'
 // Collapse region-tagged codes ("en-US") to their base ("en") for matching.
@@ -194,9 +195,19 @@ const useTranscriptionState = () => {
     []
   )
 
+  // The LinTO run ended: its last lines must not linger on screen. Only the
+  // `linto:*` segments go; whatever the native agent published stays.
+  const clearLintoSegments = useCallback(() => {
+    pendingTranslations.current = {}
+    setTranscriptionSegments((prev) =>
+      prev.filter((segment) => !parseLintoSegmentId(segment.id))
+    )
+  }, [])
+
   return {
     updateTranscriptionSegments,
     clearTranscriptionSegments,
+    clearLintoSegments,
     transcriptionSegments,
   }
 }
@@ -307,6 +318,7 @@ export const Subtitles = () => {
     transcriptionSegments,
     updateTranscriptionSegments,
     clearTranscriptionSegments,
+    clearLintoSegments,
   } = useTranscriptionState()
 
   useEffect(() => {
@@ -318,6 +330,14 @@ export const Subtitles = () => {
       room.off(RoomEvent.Disconnected, clearTranscriptionSegments)
     }
   }, [room, updateTranscriptionSegments, clearTranscriptionSegments])
+
+  // Stop of the LinTO run (room-wide state off): drop its captions.
+  const { active: isLintoActive } = useLintoStatus()
+  const wasLintoActiveRef = useRef(false)
+  useEffect(() => {
+    if (wasLintoActiveRef.current && !isLintoActive) clearLintoSegments()
+    wasLintoActiveRef.current = isLintoActive
+  }, [isLintoActive, clearLintoSegments])
 
   const transcriptionRows = useMemo(
     () =>

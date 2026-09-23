@@ -8,8 +8,10 @@ export interface LintoBotConfig {
   language?: string
   asrProfileId?: string
   // Live transcription is implicit (always on). `summary` adds an autonomous
-  // summary at stop (default true); `record` adds a LiveKit video recording.
+  // summary at stop (default true); `record` adds a LiveKit video recording;
+  // `catchup` lets a late joiner ask for the "before you arrived" summary.
   summary: boolean
+  catchup: boolean
   // The summary service (LLM Gateway route) picked in the panel; undefined =
   // the instance default.
   summaryService?: string
@@ -125,6 +127,8 @@ export const LINTO_METADATA_CHANNEL_INDEX_KEY =
   'linto_transcription_channel_index'
 export const LINTO_METADATA_ORG_ID_KEY = 'linto_transcription_org_id'
 export const LINTO_METADATA_STARTED_AT_KEY = 'linto_transcription_started_at'
+// '1' when the starter left the late-joiner summary on, '0' otherwise.
+export const LINTO_METADATA_CATCHUP_KEY = 'linto_transcription_catchup'
 
 // Segment-id namespace used by the LinTO bot for the transcription segments it
 // publishes into the LiveKit room.

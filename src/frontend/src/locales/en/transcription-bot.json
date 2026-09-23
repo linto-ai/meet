@@ -1,68 +1,78 @@
 {
   "lintoBot": {
-    "heading": "Live meeting transcription",
-    "content": "LinTO transcription",
-    "body": "LinTO transcribes the meeting live, with speaker names. Pick the options below, then start.",
-    "start": "Start",
-    "stop": "Stop",
-    "notAvailable": "LinTO transcription is not available in this room.",
-    "noEntitlement": "The AI transcription option is not active for your account.",
+    "heading": "Transcribe live",
+    "body": "What is said is transcribed during the meeting, with the speaker's name. The spoken language is detected automatically.",
+    "start": "Start transcribing",
+    "stop": "Stop transcribing",
+    "notAvailable": "Live transcription is not available in this meeting.",
+    "noEntitlement": "Live transcription is not enabled for your account.",
+    "anotherModeStarted": "A recording is in progress. <br/> Stop it before transcribing live.",
     "options": {
-      "translate": "Translate in real time",
-      "summary": "Generate a summary",
-      "record": "Record the meeting video",
-      "summaryService": "Summary type"
+      "catchup": "Summary for latecomers",
+      "catchupHint": "Whoever joins the meeting late gets a summary of what was said before they arrived.",
+      "summary": "Summary at the end of the meeting",
+      "summaryService": "Type of summary",
+      "record": "Record the video"
+    },
+    "translations": {
+      "label": "Translate into",
+      "none": "None",
+      "other": "Other language",
+      "otherPlaceholder": "Add a language…",
+      "noneAvailable": "No translation is available."
     },
     "errors": {
-      "noProfile": "No transcription profile is configured for this organization. Ask an administrator to create one in LinTO Studio.",
-      "generic": "Failed to start transcription. Please try again.",
+      "noProfile": "No transcription profile is set up for your organization. Ask an administrator to create one.",
+      "generic": "The transcription could not start. Try again.",
       "retry": "Try again"
     },
     "live": {
-      "heading": "Live transcript",
+      "heading": "Transcript",
       "empty": "Waiting for the first words…",
       "displayLanguage": "Displayed language",
-      "original": "Original (spoken language)",
+      "original": "Spoken language",
       "newLines_one": "{{count}} new line",
       "newLines_other": "{{count}} new lines"
     },
     "catchup": {
       "heading": "Before you arrived",
-      "loading": "Generating the summary…",
-      "error": "The summary could not be generated.",
-      "tooShort": "Too little was said before you arrived.",
-      "refresh": "Refresh",
-      "joined": "You joined at {{time}}"
-    },
-    "settings": {
-      "language": "Language",
-      "languageAuto": "Automatic",
-      "asrProfile": "Transcription profile",
-      "asrProfileAuto": "Automatic (default profile)",
-      "asrProfileEmpty": "No profile available",
-      "asrProfileAdminNote": "No transcription profile is configured for this organization. Ask an administrator to create one in LinTO Studio.",
-      "translations": "Translation",
-      "translationsSearch": "Search a language…",
-      "translationsNone": "No language matches.",
-      "translationsCount_one": "{{count}} language selected",
-      "translationsCount_other": "{{count}} languages selected",
-      "translationsRemove": "Remove {{lang}}"
+      "loading": "Preparing the summary…",
+      "close": "Close the summary",
+      "joined": "You joined the meeting at {{time}}"
     }
+  },
+  "deferred": {
+    "heading": "Transcribe after the meeting",
+    "body": "The meeting is recorded, then transcribed once it ends.",
+    "language": "Spoken language",
+    "languageAuto": "Automatic detection",
+    "summary": "Summary at the end of the meeting",
+    "record": "Also record the video",
+    "noEntitlement": "Transcription after the meeting is not enabled for your account."
   },
   "banner": {
     "inProgress": "Transcription in progress"
   },
   "stopToast": {
-    "ownEmail": "The minutes will be sent to you at <recipient>{{email}}</recipient>",
-    "generic": "The minutes will be sent to the meeting organizer."
+    "ownEmail": "The summary will be sent to <recipient>{{email}}</recipient>",
+    "generic": "The summary will be sent to the meeting organizer."
+  },
+  "catchupToast": {
+    "body": "The summary of what was said before you arrived is ready.",
+    "open": "Open the transcript"
   },
   "tools": {
-    "lintoBot": {
-      "title": "LinTO",
-      "body": "Transcribe this meeting live with LinTO."
+    "live": {
+      "title": "Transcribe live",
+      "body": "Captions, translation and summary during the meeting."
+    },
+    "deferred": {
+      "title": "Transcribe after the meeting",
+      "body": "Recording transcribed and summarized once the meeting ends."
     }
   },
   "captions": {
-    "label": "LinTO captions"
+    "label": "Captions available",
+    "available": "Available"
   }
 }

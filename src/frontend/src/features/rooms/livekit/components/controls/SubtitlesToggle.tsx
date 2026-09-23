@@ -62,7 +62,7 @@ export const SubtitlesToggle = () => {
             pointerEvents: 'none',
           })}
         >
-          LinTO
+          {tLinto('available')}
         </span>
       )}
     </div>

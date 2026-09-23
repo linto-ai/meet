@@ -3,4 +3,5 @@ export { NotificationType } from './NotificationType'
 export {
   notifyRecordingSaveInProgress,
   notifyLintoSummarySaving,
+  notifyLintoCatchUpReady,
 } from './utils'

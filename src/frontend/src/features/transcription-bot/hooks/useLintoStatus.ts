@@ -4,6 +4,7 @@ import { useUser } from '@/features/auth/api/useUser'
 import { useLintoConfig } from './useLintoConfig'
 import { lintoStore, resetLintoRun } from '../store/lintoStore'
 import {
+  LINTO_METADATA_CATCHUP_KEY,
   LINTO_METADATA_CHANNEL_ID_KEY,
   LINTO_METADATA_CHANNEL_INDEX_KEY,
   LINTO_METADATA_ORG_ID_KEY,
@@ -26,6 +27,9 @@ export interface LintoStatus {
   orgId: string
   // ISO 8601 UTC instant the run started ('' when unknown).
   startedAt: string
+  // The starter left the "summary for late joiners" option on (default on
+  // when the backend published nothing, for older runs).
+  catchUpEnabled: boolean
 }
 
 /**
@@ -45,6 +49,8 @@ export const useLintoStatus = (): LintoStatus => {
       channelIndex: Number(metadata?.[LINTO_METADATA_CHANNEL_INDEX_KEY] ?? 0),
       orgId: String(metadata?.[LINTO_METADATA_ORG_ID_KEY] ?? ''),
       startedAt: String(metadata?.[LINTO_METADATA_STARTED_AT_KEY] ?? ''),
+      catchUpEnabled:
+        String(metadata?.[LINTO_METADATA_CATCHUP_KEY] ?? '1') !== '0',
     }),
     [enabled, metadata]
   )

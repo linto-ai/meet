@@ -1,67 +1,78 @@
 {
   "lintoBot": {
-    "heading": "Phiên âm cuộc họp trực tiếp",
-    "content": "Phiên âm LinTO",
-    "body": "LinTO phiên âm cuộc họp trực tiếp, kèm tên người nói. Chọn các tùy chọn bên dưới rồi bắt đầu.",
-    "start": "Bắt đầu",
-    "stop": "Dừng",
-    "notAvailable": "Phiên âm LinTO không khả dụng trong phòng này.",
-    "noEntitlement": "Tùy chọn phiên âm AI chưa được kích hoạt cho tài khoản của bạn.",
+    "heading": "Chép lời trực tiếp",
+    "body": "Nội dung trao đổi được chép lời trong cuộc họp, kèm tên người nói. Ngôn ngữ nói được nhận diện tự động.",
+    "start": "Bắt đầu chép lời",
+    "stop": "Dừng chép lời",
+    "notAvailable": "Chép lời trực tiếp không khả dụng trong cuộc họp này.",
+    "noEntitlement": "Chép lời trực tiếp chưa được bật cho tài khoản của bạn.",
+    "anotherModeStarted": "Đang có một bản ghi. <br/> Hãy dừng nó trước khi chép lời trực tiếp.",
     "options": {
-      "translate": "Dịch theo thời gian thực",
-      "summary": "Tạo bản tóm tắt",
-      "record": "Ghi video cuộc họp"
+      "catchup": "Tóm tắt cho người đến muộn",
+      "catchupHint": "Ai tham gia khi cuộc họp đang diễn ra sẽ nhận được bản tóm tắt những gì đã nói trước khi họ đến.",
+      "summary": "Biên bản khi kết thúc cuộc họp",
+      "summaryService": "Loại biên bản",
+      "record": "Ghi video"
+    },
+    "translations": {
+      "label": "Dịch sang",
+      "none": "Không",
+      "other": "Ngôn ngữ khác",
+      "otherPlaceholder": "Thêm ngôn ngữ…",
+      "noneAvailable": "Không có bản dịch nào khả dụng."
     },
     "errors": {
-      "noProfile": "Chưa có hồ sơ phiên âm nào được cấu hình cho tổ chức này. Hãy yêu cầu quản trị viên tạo một hồ sơ trong LinTO Studio.",
-      "generic": "Không thể bắt đầu phiên âm. Vui lòng thử lại.",
+      "noProfile": "Chưa có hồ sơ chép lời nào được cấu hình cho tổ chức của bạn. Hãy yêu cầu quản trị viên tạo một hồ sơ.",
+      "generic": "Không thể bắt đầu chép lời. Hãy thử lại.",
       "retry": "Thử lại"
     },
     "live": {
-      "heading": "Bản phiên âm trực tiếp",
+      "heading": "Bản chép lời",
       "empty": "Đang chờ những từ đầu tiên…",
       "displayLanguage": "Ngôn ngữ hiển thị",
-      "original": "Bản gốc (ngôn ngữ nói)",
+      "original": "Ngôn ngữ nói",
       "newLines_one": "{{count}} dòng mới",
       "newLines_other": "{{count}} dòng mới"
     },
     "catchup": {
       "heading": "Trước khi bạn tham gia",
-      "loading": "Đang tạo bản tóm tắt…",
-      "error": "Không thể tạo bản tóm tắt.",
-      "tooShort": "Có quá ít nội dung được nói trước khi bạn tham gia.",
-      "refresh": "Làm mới",
-      "joined": "Bạn đã tham gia lúc {{time}}"
-    },
-    "settings": {
-      "language": "Ngôn ngữ",
-      "languageAuto": "Tự động",
-      "asrProfile": "Hồ sơ phiên âm",
-      "asrProfileAuto": "Tự động (hồ sơ mặc định)",
-      "asrProfileEmpty": "Không có hồ sơ khả dụng",
-      "asrProfileAdminNote": "Chưa có hồ sơ phiên âm nào được cấu hình cho tổ chức này. Hãy yêu cầu quản trị viên tạo một hồ sơ trong LinTO Studio.",
-      "translations": "Bản dịch",
-      "translationsSearch": "Tìm một ngôn ngữ…",
-      "translationsNone": "Không có ngôn ngữ nào khớp.",
-      "translationsCount_one": "Đã chọn {{count}} ngôn ngữ",
-      "translationsCount_other": "Đã chọn {{count}} ngôn ngữ",
-      "translationsRemove": "Xóa {{lang}}"
+      "loading": "Đang chuẩn bị bản tóm tắt…",
+      "close": "Đóng bản tóm tắt",
+      "joined": "Bạn đã tham gia cuộc họp lúc {{time}}"
     }
   },
+  "deferred": {
+    "heading": "Chép lời sau cuộc họp",
+    "body": "Cuộc họp được ghi lại, rồi được chép lời sau khi kết thúc.",
+    "language": "Ngôn ngữ nói",
+    "languageAuto": "Nhận diện tự động",
+    "summary": "Biên bản khi kết thúc cuộc họp",
+    "record": "Ghi cả video",
+    "noEntitlement": "Chép lời sau cuộc họp chưa được bật cho tài khoản của bạn."
+  },
   "banner": {
-    "inProgress": "Đang phiên âm"
+    "inProgress": "Đang chép lời"
   },
   "stopToast": {
     "ownEmail": "Biên bản sẽ được gửi cho bạn tại <recipient>{{email}}</recipient>",
     "generic": "Biên bản sẽ được gửi cho người tổ chức cuộc họp."
   },
+  "catchupToast": {
+    "body": "Bản tóm tắt những gì đã nói trước khi bạn tham gia đã sẵn sàng.",
+    "open": "Mở bản chép lời"
+  },
   "tools": {
-    "lintoBot": {
-      "title": "LinTO",
-      "body": "Phiên âm cuộc họp này trực tiếp với LinTO."
+    "live": {
+      "title": "Chép lời trực tiếp",
+      "body": "Phụ đề, bản dịch và biên bản trong cuộc họp."
+    },
+    "deferred": {
+      "title": "Chép lời sau cuộc họp",
+      "body": "Bản ghi được chép lời và tóm tắt sau khi cuộc họp kết thúc."
     }
   },
   "captions": {
-    "label": "Phụ đề LinTO"
+    "label": "Có phụ đề",
+    "available": "Khả dụng"
   }
 }

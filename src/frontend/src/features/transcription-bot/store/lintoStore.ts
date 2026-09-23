@@ -18,6 +18,8 @@ export type LintoCatchUpState = {
   text: string
   updatedAt: number | null
   error?: string
+  // The reader closed the block (its cross): it never comes back for this run.
+  dismissed: boolean
 }
 
 type LintoState = {
@@ -42,10 +44,10 @@ type LintoState = {
   // local start/stop state.
   localActionUntil: number
   // Live transcription is ALWAYS on when LinTO runs (you clicked the tool). The
-  // three flat options are independent add-ons: a live translation (default
-  // OFF, the targets are picked once it is on), an autonomous summary at stop
-  // (default ON) and a LiveKit video recording (default OFF).
-  translate: boolean
+  // flat options are independent add-ons: a live translation (the picked
+  // targets, none by default), a summary for whoever joins late (default ON),
+  // a summary at stop (default ON) and a LiveKit video recording (default OFF).
+  catchup: boolean
   summary: boolean
   // Summary service route picked in the panel (undefined → instance default).
   summaryService?: string
@@ -74,6 +76,7 @@ export const IDLE_CATCH_UP: LintoCatchUpState = {
   text: '',
   updatedAt: null,
   error: undefined,
+  dismissed: false,
 }
 
 export const lintoStore = proxy<LintoState>({
@@ -85,7 +88,7 @@ export const lintoStore = proxy<LintoState>({
   userId: undefined,
   startedByMe: false,
   localActionUntil: 0,
-  translate: false,
+  catchup: true,
   summary: true,
   summaryService: undefined,
   record: false,

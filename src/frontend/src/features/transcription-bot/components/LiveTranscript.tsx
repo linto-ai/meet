@@ -1,4 +1,5 @@
 import { css } from '@/styled-system/css'
+import { RiCloseLine } from '@remixicon/react'
 import { Button, Text } from '@/primitives'
 import {
   Fragment,
@@ -12,7 +13,7 @@ import { useTranslation } from 'react-i18next'
 import { useSnapshot } from 'valtio'
 import { transcriptStore } from '../store/transcriptStore'
 import { lintoStore } from '../store/lintoStore'
-import { refreshLintoCatchUp } from '../hooks/useLintoCatchUp'
+import { dismissLintoCatchUp } from '../hooks/useLintoCatchUp'
 import { LintoCaption } from '../types/linto'
 import { languageName } from '../utils/languageLabel'
 import { SimpleMarkdown } from './SimpleMarkdown'
@@ -154,12 +155,16 @@ export const LiveTranscript = () => {
 
   // Catch-up: everything said BEFORE I joined is history, shown dimmed above a
   // "you joined at HH:MM" divider. The starter saw it all and gets neither.
-  // `unavailable` (no LLM in this deployment) hides the summary block entirely.
+  // The summary block only shows while there is (or will be) something to
+  // read: nothing at all when the run has no summary, when too little was
+  // said, when the LLM failed, or once the reader closed it.
   const showCatchUp =
     !startedByMe &&
     joinedAt !== null &&
-    catchUp.status !== 'idle' &&
-    catchUp.status !== 'unavailable'
+    !catchUp.dismissed &&
+    (catchUp.status === 'loading' ||
+      catchUp.status === 'streaming' ||
+      (catchUp.status === 'done' && !!catchUp.text.trim()))
   // The divider sits right before the first line received live (or at the tail
   // when the whole journal is still history).
   const markerIndex = useMemo(() => {
@@ -306,26 +311,18 @@ export const LiveTranscript = () => {
             <Button
               variant="text"
               size="sm"
-              data-testid="linto-catchup-refresh"
-              onPress={() => refreshLintoCatchUp()}
-              isDisabled={
-                catchUp.status === 'loading' || catchUp.status === 'streaming'
-              }
+              data-testid="linto-catchup-close"
+              aria-label={t('catchup.close')}
+              onPress={() => dismissLintoCatchUp()}
             >
-              {t('catchup.refresh')}
+              <RiCloseLine size={16} aria-hidden="true" />
             </Button>
           </div>
           <div data-testid="linto-catchup-summary">
             {catchUp.text ? (
               <SimpleMarkdown text={catchUp.text} />
             ) : (
-              <Text variant="smNote">
-                {catchUp.status === 'error'
-                  ? t('catchup.error')
-                  : catchUp.status === 'too_short'
-                    ? t('catchup.tooShort')
-                    : t('catchup.loading')}
-              </Text>
+              <Text variant="smNote">{t('catchup.loading')}</Text>
             )}
           </div>
         </div>
