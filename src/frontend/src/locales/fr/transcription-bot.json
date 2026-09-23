@@ -8,8 +8,8 @@
     "notAvailable": "La transcription LinTO n'est pas disponible dans ce salon.",
     "noEntitlement": "L'option de transcription IA n'est pas activée pour votre compte.",
     "options": {
+      "translate": "Traduire en temps réel",
       "summary": "Générer un compte rendu",
-      "summaryHelp": "Un compte rendu est envoyé à la fin de la réunion.",
       "record": "Enregistrer la vidéo de la réunion",
       "summaryService": "Type de compte rendu"
     },
@@ -22,7 +22,9 @@
       "heading": "Transcription en direct",
       "empty": "En attente des premiers mots…",
       "displayLanguage": "Langue affichée",
-      "original": "Original (langue parlée)"
+      "original": "Original (langue parlée)",
+      "newLines_one": "{{count}} nouvelle ligne",
+      "newLines_other": "{{count}} nouvelles lignes"
     },
     "catchup": {
       "heading": "Avant votre arrivée",
@@ -44,8 +46,7 @@
       "translationsNone": "Aucune langue ne correspond.",
       "translationsCount_one": "{{count}} langue sélectionnée",
       "translationsCount_other": "{{count}} langues sélectionnées",
-      "translationsRemove": "Retirer {{lang}}",
-      "translationsHelp": "Optionnel : ajoutez des langues pour afficher la traduction en direct."
+      "translationsRemove": "Retirer {{lang}}"
     }
   },
   "banner": {

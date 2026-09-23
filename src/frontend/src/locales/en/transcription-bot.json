@@ -8,8 +8,8 @@
     "notAvailable": "LinTO transcription is not available in this room.",
     "noEntitlement": "The AI transcription option is not active for your account.",
     "options": {
+      "translate": "Translate in real time",
       "summary": "Generate a summary",
-      "summaryHelp": "A summary is sent at the end of the meeting.",
       "record": "Record the meeting video",
       "summaryService": "Summary type"
     },
@@ -22,7 +22,9 @@
       "heading": "Live transcript",
       "empty": "Waiting for the first words…",
       "displayLanguage": "Displayed language",
-      "original": "Original (spoken language)"
+      "original": "Original (spoken language)",
+      "newLines_one": "{{count}} new line",
+      "newLines_other": "{{count}} new lines"
     },
     "catchup": {
       "heading": "Before you arrived",
@@ -44,8 +46,7 @@
       "translationsNone": "No language matches.",
       "translationsCount_one": "{{count}} language selected",
       "translationsCount_other": "{{count}} languages selected",
-      "translationsRemove": "Remove {{lang}}",
-      "translationsHelp": "Optional: add languages to show the live translation."
+      "translationsRemove": "Remove {{lang}}"
     }
   },
   "banner": {

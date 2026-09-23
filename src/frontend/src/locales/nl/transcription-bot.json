@@ -8,8 +8,8 @@
     "notAvailable": "LinTO-transcriptie is niet beschikbaar in deze ruimte.",
     "noEntitlement": "De AI-transcriptieoptie is niet geactiveerd voor uw account.",
     "options": {
+      "translate": "Live vertalen",
       "summary": "Een samenvatting genereren",
-      "summaryHelp": "Aan het einde van de vergadering wordt een samenvatting verstuurd.",
       "record": "De video van de vergadering opnemen"
     },
     "errors": {
@@ -21,7 +21,9 @@
       "heading": "Live transcript",
       "empty": "Wachten op de eerste woorden…",
       "displayLanguage": "Weergegeven taal",
-      "original": "Origineel (gesproken taal)"
+      "original": "Origineel (gesproken taal)",
+      "newLines_one": "{{count}} nieuwe regel",
+      "newLines_other": "{{count}} nieuwe regels"
     },
     "catchup": {
       "heading": "Voordat u erbij kwam",
@@ -43,8 +45,7 @@
       "translationsNone": "Geen enkele taal komt overeen.",
       "translationsCount_one": "{{count}} taal geselecteerd",
       "translationsCount_other": "{{count}} talen geselecteerd",
-      "translationsRemove": "{{lang}} verwijderen",
-      "translationsHelp": "Optioneel: voeg talen toe om de live vertaling te tonen."
+      "translationsRemove": "{{lang}} verwijderen"
     }
   },
   "banner": {

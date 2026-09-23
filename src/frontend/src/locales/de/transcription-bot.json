@@ -8,8 +8,8 @@
     "notAvailable": "Die LinTO-Transkription ist in diesem Raum nicht verfügbar.",
     "noEntitlement": "Die KI-Transkriptionsoption ist für Ihr Konto nicht aktiviert.",
     "options": {
+      "translate": "In Echtzeit übersetzen",
       "summary": "Eine Zusammenfassung erstellen",
-      "summaryHelp": "Am Ende der Besprechung wird eine Zusammenfassung gesendet.",
       "record": "Das Video der Besprechung aufzeichnen"
     },
     "errors": {
@@ -21,7 +21,9 @@
       "heading": "Live-Transkript",
       "empty": "Warten auf die ersten Worte…",
       "displayLanguage": "Angezeigte Sprache",
-      "original": "Original (gesprochene Sprache)"
+      "original": "Original (gesprochene Sprache)",
+      "newLines_one": "{{count}} neue Zeile",
+      "newLines_other": "{{count}} neue Zeilen"
     },
     "catchup": {
       "heading": "Vor Ihrer Ankunft",
@@ -43,8 +45,7 @@
       "translationsNone": "Keine Sprache stimmt überein.",
       "translationsCount_one": "{{count}} Sprache ausgewählt",
       "translationsCount_other": "{{count}} Sprachen ausgewählt",
-      "translationsRemove": "{{lang}} entfernen",
-      "translationsHelp": "Optional: Sprachen hinzufügen, um die Live-Übersetzung anzuzeigen."
+      "translationsRemove": "{{lang}} entfernen"
     }
   },
   "banner": {

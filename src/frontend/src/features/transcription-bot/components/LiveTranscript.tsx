@@ -1,6 +1,13 @@
 import { css } from '@/styled-system/css'
 import { Button, Text } from '@/primitives'
-import { Fragment, useMemo } from 'react'
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSnapshot } from 'valtio'
 import { transcriptStore } from '../store/transcriptStore'
@@ -42,6 +49,9 @@ const formatTime = (ms: number, locale: string): string => {
   }
 }
 
+// How far from the bottom (px) still counts as "reading the live tail".
+const STICK_THRESHOLD_PX = 32
+
 const selectClass = css({
   width: '100%',
   padding: '0.4rem',
@@ -69,6 +79,52 @@ export const LiveTranscript = () => {
     catchUp,
   } = useSnapshot(lintoStore)
   const { byId, order } = useSnapshot(transcriptStore)
+
+  // ── The transcript zone scrolls on its own and follows the live tail ──
+  // While the reader sits at the bottom, every new line scrolls into view
+  // (smoothly); once they scroll up to read back, the view stays put and a
+  // pill counts the lines that arrived meanwhile — clicking it (or scrolling
+  // back down) re-attaches to the tail.
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+  const stickRef = useRef(true)
+  const [detached, setDetached] = useState(false)
+  const [unseen, setUnseen] = useState(0)
+  const seenCountRef = useRef(0)
+  // Lines received after this instant are "new" and flash once on arrival;
+  // whatever was already there when the journal mounted stays quiet.
+  const mountedAtRef = useRef<number | null>(null)
+  useEffect(() => {
+    mountedAtRef.current = Date.now()
+  }, [])
+
+  const isAtBottom = (el: HTMLDivElement) =>
+    el.scrollHeight - el.scrollTop - el.clientHeight <= STICK_THRESHOLD_PX
+
+  const scrollToBottom = useCallback((smooth: boolean) => {
+    const el = scrollRef.current
+    if (!el) return
+    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' })
+  }, [])
+
+  const onScroll = () => {
+    const el = scrollRef.current
+    if (!el) return
+    const atBottom = isAtBottom(el)
+    stickRef.current = atBottom
+    if (atBottom) {
+      setDetached(false)
+      setUnseen(0)
+    } else {
+      setDetached(true)
+    }
+  }
+
+  const reattach = () => {
+    stickRef.current = true
+    setDetached(false)
+    setUnseen(0)
+    scrollToBottom(true)
+  }
 
   // One entry per caption, in arrival order (partials refresh their own id).
   const entries = useMemo(
@@ -144,6 +200,17 @@ export const LiveTranscript = () => {
       </div>
     )
 
+  useEffect(() => {
+    const added = Math.max(0, entries.length - seenCountRef.current)
+    seenCountRef.current = entries.length
+    if (stickRef.current) {
+      // A partial refreshing in place also grows the tail: keep it in view.
+      scrollToBottom(true)
+    } else if (added > 0) {
+      setUnseen((n) => n + added)
+    }
+  }, [entries, scrollToBottom])
+
   // The displayed language is SHARED with the caption overlay (lintoStore).
   const setDisplay = (value: string) => {
     lintoStore.displayLanguage = value
@@ -162,6 +229,8 @@ export const LiveTranscript = () => {
         flexDirection: 'column',
         gap: '0.75rem',
         marginBottom: '1rem',
+        flex: 1,
+        minHeight: 0,
       })}
     >
       <Text variant="h3" margin={false}>
@@ -198,6 +267,9 @@ export const LiveTranscript = () => {
             border: '1px solid',
             borderColor: 'control.border',
             backgroundColor: 'greyscale.50',
+            flexShrink: 0,
+            maxHeight: '40%',
+            overflowY: 'auto',
           })}
         >
           <div
@@ -248,90 +320,146 @@ export const LiveTranscript = () => {
       ) : (
         <div
           className={css({
+            position: 'relative',
+            flex: 1,
+            minHeight: 0,
             display: 'flex',
             flexDirection: 'column',
-            gap: '0.125rem',
           })}
         >
-          {entries.map((entry, index) => {
-            const showSpeaker =
-              index === 0 || entries[index - 1].locutor !== entry.locutor
-            const showTranslated = effectiveDisplay !== ORIGINAL
-            const translated = translationFor(
-              entry.translations,
-              effectiveDisplay
-            )
-            // When the chosen language hasn't arrived for THIS line yet, fall
-            // back to the original so it never blanks out mid-stream.
-            const body = showTranslated
-              ? (translated ?? entry.text)
-              : entry.text
-            const isTranslated = showTranslated && translated != null
-            const time = formatTime(entry.receivedAt, i18n.language)
-            return (
-              <Fragment key={entry.id}>
-                {index === markerIndex && joinedMarker}
-                <div
-                  data-testid="linto-turn"
-                  data-speaker={entry.locutor}
-                  data-partial={entry.partial ? 'true' : 'false'}
-                  {...(entry.catchup ? { 'data-catchup': 'true' } : {})}
-                  className={css({
-                    width: '100%',
-                    marginTop: showSpeaker ? '0.5rem' : 0,
-                    opacity: entry.catchup ? 0.75 : 1,
-                  })}
-                >
-                  {showSpeaker && (
-                    <Text
-                      variant="sm"
-                      className={css({
-                        fontWeight: 'semibold',
-                        color: 'primary.700',
-                      })}
-                    >
-                      {entry.locutor}
-                    </Text>
-                  )}
+          <div
+            ref={scrollRef}
+            onScroll={onScroll}
+            data-testid="linto-journal"
+            data-detached={detached ? 'true' : 'false'}
+            className={css({
+              flex: 1,
+              minHeight: 0,
+              overflowY: 'auto',
+              overscrollBehavior: 'contain',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.125rem',
+              paddingRight: '0.25rem',
+            })}
+          >
+            {entries.map((entry, index) => {
+              const showSpeaker =
+                index === 0 || entries[index - 1].locutor !== entry.locutor
+              const showTranslated = effectiveDisplay !== ORIGINAL
+              const translated = translationFor(
+                entry.translations,
+                effectiveDisplay
+              )
+              // When the chosen language hasn't arrived for THIS line yet, fall
+              // back to the original so it never blanks out mid-stream.
+              const body = showTranslated
+                ? (translated ?? entry.text)
+                : entry.text
+              const isTranslated = showTranslated && translated != null
+              const time = formatTime(entry.receivedAt, i18n.language)
+              // Flash once when the line mounts, only for lines that arrived
+              // live after the journal opened (never the hydrated history).
+              const mountedAt = mountedAtRef.current
+              const isFresh =
+                !entry.catchup &&
+                mountedAt !== null &&
+                entry.receivedAt >= mountedAt
+              return (
+                <Fragment key={entry.id}>
+                  {index === markerIndex && joinedMarker}
                   <div
+                    data-testid="linto-turn"
+                    data-speaker={entry.locutor}
+                    data-partial={entry.partial ? 'true' : 'false'}
+                    {...(entry.catchup ? { 'data-catchup': 'true' } : {})}
                     className={css({
-                      display: 'flex',
-                      gap: '0.5rem',
-                      alignItems: 'baseline',
-                      opacity: entry.partial ? 0.6 : 1,
-                      fontStyle: entry.partial ? 'italic' : 'normal',
+                      width: '100%',
+                      marginTop: showSpeaker ? '0.5rem' : 0,
+                      opacity: entry.catchup ? 0.75 : 1,
+                      borderRadius: '4px',
+                      marginLeft: '-0.25rem',
+                      paddingLeft: '0.25rem',
+                      animation: isFresh
+                        ? 'linto_new_line 1.8s ease-out'
+                        : undefined,
                     })}
                   >
-                    {time && (
-                      <span
-                        data-testid="linto-turn-time"
+                    {showSpeaker && (
+                      <Text
+                        variant="sm"
                         className={css({
-                          flexShrink: 0,
-                          fontVariantNumeric: 'tabular-nums',
-                          fontSize: '0.6875rem',
-                          color: 'greyscale.500',
-                          paddingTop: '0.15rem',
+                          fontWeight: 'semibold',
+                          color: 'primary.700',
                         })}
                       >
-                        {time}
-                      </span>
+                        {entry.locutor}
+                      </Text>
                     )}
-                    {isTranslated ? (
-                      <div
-                        data-testid="linto-translation"
-                        data-lang={effectiveDisplay}
-                      >
+                    <div
+                      className={css({
+                        display: 'flex',
+                        gap: '0.5rem',
+                        alignItems: 'baseline',
+                        opacity: entry.partial ? 0.6 : 1,
+                        fontStyle: entry.partial ? 'italic' : 'normal',
+                      })}
+                    >
+                      {time && (
+                        <span
+                          data-testid="linto-turn-time"
+                          className={css({
+                            flexShrink: 0,
+                            fontVariantNumeric: 'tabular-nums',
+                            fontSize: '0.6875rem',
+                            color: 'greyscale.500',
+                            paddingTop: '0.15rem',
+                          })}
+                        >
+                          {time}
+                        </span>
+                      )}
+                      {isTranslated ? (
+                        <div
+                          data-testid="linto-translation"
+                          data-lang={effectiveDisplay}
+                        >
+                          <Text variant="sm">{body}</Text>
+                        </div>
+                      ) : (
                         <Text variant="sm">{body}</Text>
-                      </div>
-                    ) : (
-                      <Text variant="sm">{body}</Text>
-                    )}
+                      )}
+                    </div>
                   </div>
-                </div>
-              </Fragment>
-            )
-          })}
-          {markerIndex === entries.length && joinedMarker}
+                </Fragment>
+              )
+            })}
+            {markerIndex === entries.length && joinedMarker}
+          </div>
+          {detached && unseen > 0 && (
+            <button
+              type="button"
+              data-testid="linto-journal-new-lines"
+              onClick={reattach}
+              className={css({
+                position: 'absolute',
+                bottom: '0.5rem',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                paddingY: '0.25rem',
+                paddingX: '0.75rem',
+                borderRadius: '999px',
+                fontSize: '0.8125rem',
+                backgroundColor: 'primary',
+                color: 'white',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+                cursor: 'pointer',
+                animation: 'fade 0.2s ease-out',
+              })}
+            >
+              {t('live.newLines', { count: unseen })} ↓
+            </button>
+          )}
         </div>
       )}
     </div>

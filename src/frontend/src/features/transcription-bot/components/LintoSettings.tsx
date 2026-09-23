@@ -28,11 +28,11 @@ interface LintoSettingsProps {
 }
 
 /**
- * LinTO panel settings — deliberately minimal for the end user:
+ * The live-translation targets, shown under the "translate in real time"
+ * checkbox once it is ticked. Deliberately minimal for the end user:
  * - NO source-language choice (always automatic).
  * - NO ASR profile choice (pinned by ops via LINTO_STUDIO_DEFAULT_PROFILE_ID,
  *   invisible to the user).
- * The only thing the user configures is the (optional) live translations.
  */
 export const LintoSettings = ({ isDisabled }: LintoSettingsProps) => {
   const { t, i18n } = useTranslation('transcription-bot', {
@@ -99,16 +99,13 @@ export const LintoSettings = ({ isDisabled }: LintoSettingsProps) => {
   )
 
   return (
-    <VStack gap={0.75} width="100%" marginBottom={20} alignItems="start">
+    <VStack gap={0.75} width="100%" alignItems="start">
       <div
         data-testid="linto-target-langs"
-        className={css({ width: '100%' })}
+        className={css({ width: '100%', paddingLeft: '1.625rem' })}
         role="group"
         aria-label={t('translations')}
       >
-        <Text variant="sm">{t('translations')}</Text>
-        <Text variant="xsNote">{t('translationsHelp')}</Text>
-
         {/* Selected languages as removable chips — stay visible even when
             filtered out of the list below. */}
         {selectedChips.length > 0 && (
@@ -161,7 +158,6 @@ export const LintoSettings = ({ isDisabled }: LintoSettingsProps) => {
           disabled={isDisabled}
           onChange={(e) => setQuery(e.target.value)}
           aria-label={t('translationsSearch')}
-          style={{ marginTop: '0.375rem' }}
         />
 
         {/* Scrollable checkbox list — caps the height so the targets never push

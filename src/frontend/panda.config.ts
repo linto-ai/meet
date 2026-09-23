@@ -60,6 +60,12 @@ const config: Config = {
         },
       },
       fade: { from: { opacity: 0 }, to: { opacity: 1 } },
+      // A transcript line that just arrived: a soft flash that settles.
+      linto_new_line: {
+        '0%': { backgroundColor: 'rgba(0, 0, 145, 0.14)' },
+        '60%': { backgroundColor: 'rgba(0, 0, 145, 0.14)' },
+        '100%': { backgroundColor: 'transparent' },
+      },
       pulse: {
         '0%': { boxShadow: '0 0 0 0 rgba(255, 255, 255, 0.7)' },
         '75%': { boxShadow: '0 0 0 30px rgba(255, 255, 255, 0)' },
