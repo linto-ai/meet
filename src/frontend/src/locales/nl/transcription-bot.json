@@ -8,11 +8,11 @@
     "noEntitlement": "Live transcriptie is niet ingeschakeld voor je account.",
     "anotherModeStarted": "Er loopt een opname. <br/> Stop deze voordat je live transcribeert.",
     "options": {
-      "catchup": "Samenvatting voor laatkomers",
-      "catchupHint": "Wie te laat komt, ziet bij aankomst een samenvatting van wat hij heeft gemist.",
+      "catchup": "Inhaalsamenvatting",
+      "catchupHint": "Wie binnenkomt, ziet een samenvatting van wat hij heeft gemist.",
       "summary": "Verslag aan het einde van de vergadering",
       "summaryService": "Soort verslag",
-      "record": "Video opnemen"
+      "record": "Ook de video opnemen"
     },
     "translations": {
       "label": "Vertalen naar",
@@ -64,15 +64,17 @@
   "tools": {
     "live": {
       "title": "Live transcriberen",
-      "body": "Ondertitels, vertaling en verslag tijdens de vergadering."
+      "body": "Ondertitels, vertaling, inhaalsamenvatting en verslag."
     },
     "deferred": {
       "title": "Na de vergadering transcriberen",
-      "body": "Opname die na afloop van de vergadering wordt getranscribeerd en samengevat."
+      "body": "Opname die na de vergadering wordt getranscribeerd en samengevat."
     }
   },
   "captions": {
     "label": "Ondertitels beschikbaar",
-    "available": "Beschikbaar"
+    "available": "Beschikbaar",
+    "languageMenu": "Taal van de ondertitels",
+    "original": "Gesproken taal"
   }
 }

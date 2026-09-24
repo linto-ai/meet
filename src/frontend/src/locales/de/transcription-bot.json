@@ -8,11 +8,11 @@
     "noEntitlement": "Die Live-Transkription ist für dein Konto nicht aktiviert.",
     "anotherModeStarted": "Eine Aufnahme läuft. <br/> Stoppe sie, bevor du live transkribierst.",
     "options": {
-      "catchup": "Zusammenfassung für Nachzügler",
-      "catchupHint": "Wer zu spät kommt, sieht beim Eintreffen eine Zusammenfassung des Verpassten.",
+      "catchup": "Nachhol-Zusammenfassung",
+      "catchupHint": "Wer eintrifft, sieht eine Zusammenfassung des Verpassten.",
       "summary": "Protokoll am Ende des Meetings",
       "summaryService": "Art des Protokolls",
-      "record": "Video aufzeichnen"
+      "record": "Auch das Video aufzeichnen"
     },
     "translations": {
       "label": "Übersetzen in",
@@ -64,15 +64,17 @@
   "tools": {
     "live": {
       "title": "Live transkribieren",
-      "body": "Untertitel, Übersetzung und Protokoll während des Meetings."
+      "body": "Untertitel, Übersetzung, Nachhol-Zusammenfassung und Protokoll."
     },
     "deferred": {
       "title": "Nach dem Meeting transkribieren",
-      "body": "Aufnahme, die nach dem Ende des Meetings transkribiert und zusammengefasst wird."
+      "body": "Aufnahme, die nach dem Meeting transkribiert und zusammengefasst wird."
     }
   },
   "captions": {
     "label": "Untertitel verfügbar",
-    "available": "Verfügbar"
+    "available": "Verfügbar",
+    "languageMenu": "Untertitelsprache",
+    "original": "Gesprochene Sprache"
   }
 }

@@ -8,11 +8,11 @@
     "noEntitlement": "Chép lời trực tiếp chưa được bật cho tài khoản của bạn.",
     "anotherModeStarted": "Đang có một bản ghi. <br/> Hãy dừng nó trước khi chép lời trực tiếp.",
     "options": {
-      "catchup": "Tóm tắt cho người đến muộn",
-      "catchupHint": "Người đến muộn sẽ thấy tóm tắt những gì đã bỏ lỡ ngay khi vào.",
+      "catchup": "Tóm tắt phần đã bỏ lỡ",
+      "catchupHint": "Khi vào, người tham gia thấy tóm tắt những gì đã bỏ lỡ.",
       "summary": "Biên bản khi kết thúc cuộc họp",
       "summaryService": "Loại biên bản",
-      "record": "Ghi video"
+      "record": "Ghi cả video"
     },
     "translations": {
       "label": "Dịch sang",
@@ -64,7 +64,7 @@
   "tools": {
     "live": {
       "title": "Chép lời trực tiếp",
-      "body": "Phụ đề, bản dịch và biên bản trong cuộc họp."
+      "body": "Phụ đề, dịch, tóm tắt phần đã bỏ lỡ và biên bản."
     },
     "deferred": {
       "title": "Chép lời sau cuộc họp",
@@ -73,6 +73,8 @@
   },
   "captions": {
     "label": "Có phụ đề",
-    "available": "Khả dụng"
+    "available": "Khả dụng",
+    "languageMenu": "Ngôn ngữ phụ đề",
+    "original": "Ngôn ngữ nói"
   }
 }

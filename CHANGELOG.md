@@ -10,6 +10,7 @@ and this project adheres to
 
 ### Added
 
+- ✨(frontend) caption language picked from a chevron menu next to the CC button
 - ✨(frontend) "Transcribe after the meeting": ASR language, summary and service
 - ✨(frontend) live translation targets picked as chips, like the Studio mobile app
 - ✨(frontend) "summary for latecomers" option of the live transcription, closable, once
@@ -28,6 +29,8 @@ and this project adheres to
 
 ### Fixed
 
+- 🐛(frontend) the transcript journal and the caption overlay keep following the live tail
+- 🐛(frontend) the caption overlay takes the speaker of a final that reassigns it
 - 🐛(backend) the deferred transcription authenticates like the live flow (service account first)
 - 🐛(frontend) the live captions no longer linger on screen after the transcription stops
 - 🐛(backend) make linto_state migration idempotent to self-heal history desync
