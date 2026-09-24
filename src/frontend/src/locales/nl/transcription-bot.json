@@ -9,7 +9,7 @@
     "anotherModeStarted": "Er loopt een opname. <br/> Stop deze voordat je live transcribeert.",
     "options": {
       "catchup": "Samenvatting voor laatkomers",
-      "catchupHint": "Wie tijdens de vergadering aansluit, krijgt een samenvatting van wat er tot dan toe is gezegd.",
+      "catchupHint": "Wie te laat komt, ziet bij aankomst een samenvatting van wat hij heeft gemist.",
       "summary": "Verslag aan het einde van de vergadering",
       "summaryService": "Soort verslag",
       "record": "Video opnemen"

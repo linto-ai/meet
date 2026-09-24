@@ -9,7 +9,7 @@
     "anotherModeStarted": "Un enregistrement est en cours. <br/> Arrêtez-le avant de transcrire en direct.",
     "options": {
       "catchup": "Résumé pour les retardataires",
-      "catchupHint": "Qui rejoint la réunion en cours reçoit un résumé de ce qui s'est dit avant son arrivée.",
+      "catchupHint": "À son arrivée, un retardataire voit un résumé de ce qu'il a manqué.",
       "summary": "Compte rendu à la fin de la réunion",
       "summaryService": "Type de compte rendu",
       "record": "Enregistrer la vidéo"
