@@ -9,7 +9,7 @@
     "anotherModeStarted": "Eine Aufnahme läuft. <br/> Stoppe sie, bevor du live transkribierst.",
     "options": {
       "catchup": "Zusammenfassung für Nachzügler",
-      "catchupHint": "Wer dem laufenden Meeting beitritt, erhält eine Zusammenfassung dessen, was vor der Ankunft gesagt wurde.",
+      "catchupHint": "Wer zu spät kommt, sieht beim Eintreffen eine Zusammenfassung des Verpassten.",
       "summary": "Protokoll am Ende des Meetings",
       "summaryService": "Art des Protokolls",
       "record": "Video aufzeichnen"

@@ -9,7 +9,7 @@
     "anotherModeStarted": "Đang có một bản ghi. <br/> Hãy dừng nó trước khi chép lời trực tiếp.",
     "options": {
       "catchup": "Tóm tắt cho người đến muộn",
-      "catchupHint": "Ai tham gia khi cuộc họp đang diễn ra sẽ nhận được bản tóm tắt những gì đã nói trước khi họ đến.",
+      "catchupHint": "Người đến muộn sẽ thấy tóm tắt những gì đã bỏ lỡ ngay khi vào.",
       "summary": "Biên bản khi kết thúc cuộc họp",
       "summaryService": "Loại biên bản",
       "record": "Ghi video"

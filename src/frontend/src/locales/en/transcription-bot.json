@@ -9,7 +9,7 @@
     "anotherModeStarted": "A recording is in progress. <br/> Stop it before transcribing live.",
     "options": {
       "catchup": "Summary for latecomers",
-      "catchupHint": "Whoever joins the meeting late gets a summary of what was said before they arrived.",
+      "catchupHint": "On arrival, a latecomer sees a summary of what they missed.",
       "summary": "Summary at the end of the meeting",
       "summaryService": "Type of summary",
       "record": "Record the video"
