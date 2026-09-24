@@ -18,6 +18,7 @@ and this project adheres to
 
 ### Changed
 
+- 💄(frontend) the summary type is picked on cards (icon, name, description)
 - 💄(frontend) opening the meeting tools during a run lands on the running tool's panel
 - 💄(frontend) shorter wording of the two transcription tools
 - 💄(frontend) two distinct tools, "Transcribe live" and "Transcribe after the meeting"
