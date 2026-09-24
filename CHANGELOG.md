@@ -17,6 +17,7 @@ and this project adheres to
 - ✨(frontend) "summary for latecomers" option of the live transcription, closable, once
 - ✨(backend) GET rooms/{id}/linto/transcription-languages (STT languages via Studio)
 - ✨(backend) summary on/off and service in the recording options (deferred pipeline)
+- ✨(frontend) caption language picked from a chevron menu next to the CC button
 
 ### Changed
 
@@ -56,6 +57,8 @@ and this project adheres to
 - 🐛(backend) Twake Drive uploads go to the instance named by an OIDC claim, not one built from an email sub
 - 🐛(frontend) the live captions no longer linger on screen after the transcription stops
 - 🐛(backend) the deferred transcription authenticates like the live flow (service account first)
+- 🐛(frontend) the transcript journal and the caption overlay keep following the live tail
+- 🐛(frontend) the caption overlay takes the speaker of a final that reassigns it
 
 ## [1.37.0] - 2026-11-01
 

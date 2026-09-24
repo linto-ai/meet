@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { useSubtitles } from '../hooks/useSubtitles'
 import { css, cva } from '@/styled-system/css'
 import { styled } from '@/styled-system/jsx'
@@ -18,12 +25,13 @@ import {
 } from '@/stores/accessibility'
 import { parseLintoSegmentId } from '@/features/transcription-bot/store/transcriptStore'
 import { UNATTRIBUTED_SPEAKER } from '@/features/transcription-bot/hooks/useLintoTranscriptFeed'
-import { lintoStore } from '@/features/transcription-bot/store/lintoStore'
 import { useLintoStatus } from '@/features/transcription-bot/hooks/useLintoStatus'
+import { useLintoDisplayLanguages } from '@/features/transcription-bot/hooks/useLintoDisplayLanguages'
+import {
+  baseCode,
+  ORIGINAL,
+} from '@/features/transcription-bot/utils/languageLabel'
 
-const ORIGINAL = 'original'
-// Collapse region-tagged codes ("en-US") to their base ("en") for matching.
-const baseCode = (code: string): string => code.split('-')[0].toLowerCase()
 // Pick a segment's text in the chosen display language (translation when present
 // for that base code), else the original.
 const textFor = (
@@ -59,6 +67,10 @@ const MAX_SEGMENTS = 200
 // Fallback colour for lines that cannot be attributed to a participant (e.g.
 // LinTO lines published under the hidden bot's identity).
 const UNATTRIBUTED_COLOR = 'rgb(87, 44, 216)'
+const UNATTRIBUTED_PREFIX = 'unattributed:'
+
+// How close to the newest line (px) still counts as "following the tail".
+const STICK_THRESHOLD_PX = 32
 
 export interface TranscriptionSegment {
   id: string
@@ -111,7 +123,7 @@ const speakerOf = (
     }
   }
   return {
-    identity: `unattributed:${parseLintoSegmentId(segmentId) ? 'linto' : 'native'}`,
+    identity: `${UNATTRIBUTED_PREFIX}${parseLintoSegmentId(segmentId) ? 'linto' : 'native'}`,
     name: UNATTRIBUTED_SPEAKER,
     color: UNATTRIBUTED_COLOR,
   }
@@ -173,11 +185,17 @@ const useTranscriptionState = () => {
             // replace in place instead of ignoring it (keep translations).
             const existing = next[index]
             if (existing.final && !segment.final) continue
+            // Diarization settles on the FINAL: its speaker wins. A partial
+            // only fills in a line that had no attribution yet, so the name
+            // does not flicker while the utterance is still in flight.
+            const takeNewSpeaker = segment.final
+              ? speaker.identity !== existing.speaker.identity
+              : existing.speaker.identity.startsWith(UNATTRIBUTED_PREFIX)
             next = next.slice()
             next[index] = {
               ...existing,
               ...segment,
-              speaker: existing.speaker,
+              speaker: takeNewSpeaker ? speaker : existing.speaker,
               translations: { ...existing.translations, ...pending },
             }
             if (pending) delete pendingTranslations.current[segment.id]
@@ -310,9 +328,11 @@ const SubtitlesWrapper = styled(
 export const Subtitles = () => {
   const { areSubtitlesOpen } = useSubtitles()
   const room = useRoomContext()
-  // Shared with the LinTO panel: switching the "displayed language" there also
-  // switches the overlay (translation shown when available, else the original).
-  const { displayLanguage } = useSnapshot(lintoStore)
+  // Shared with the LinTO panel and the CC language menu: switching the
+  // "displayed language" there also switches the overlay (translation shown
+  // when available, else the original). A language no longer offered falls
+  // back to the original.
+  const { effective: displayLanguage } = useLintoDisplayLanguages()
 
   const {
     transcriptionSegments,
@@ -353,9 +373,30 @@ export const Subtitles = () => {
     [transcriptionSegments]
   )
 
+  // Follow the newest line. The list is `column-reverse`, so the newest line
+  // sits at scrollTop 0 and reading back makes scrollTop negative. While the
+  // reader stays within the threshold of it, every update (and a reopen)
+  // snaps back to 0; once they scroll back further, the view stays put.
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+  const followRef = useRef(true)
+  const onScroll = () => {
+    const el = scrollRef.current
+    // Closing collapses the height to 0: ignore the resulting scroll noise.
+    if (!el || !areSubtitlesOpen) return
+    followRef.current = Math.abs(el.scrollTop) <= STICK_THRESHOLD_PX
+  }
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    if (!el || !areSubtitlesOpen || !followRef.current) return
+    el.scrollTop = 0
+  }, [transcriptionRows, displayLanguage, areSubtitlesOpen])
+
   return (
     <SubtitlesWrapper areOpen={areSubtitlesOpen}>
       <div
+        ref={scrollRef}
+        onScroll={onScroll}
+        data-testid="caption-overlay"
         className={css({
           height: '100%',
           width: '100%',

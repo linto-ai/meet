@@ -8,11 +8,11 @@
     "noEntitlement": "Live transcription is not enabled for your account.",
     "anotherModeStarted": "A recording is in progress. <br/> Stop it before transcribing live.",
     "options": {
-      "catchup": "Summary for latecomers",
-      "catchupHint": "On arrival, a latecomer sees a summary of what they missed.",
+      "catchup": "Catch-up summary",
+      "catchupHint": "On arrival, a participant sees a summary of what they missed.",
       "summary": "Summary at the end of the meeting",
       "summaryService": "Type of summary",
-      "record": "Record the video"
+      "record": "Also record the video"
     },
     "translations": {
       "label": "Translate into",
@@ -64,7 +64,7 @@
   "tools": {
     "live": {
       "title": "Transcribe live",
-      "body": "Captions, translation and summary during the meeting."
+      "body": "Captions, translation, catch-up summary and minutes."
     },
     "deferred": {
       "title": "Transcribe after the meeting",
@@ -73,6 +73,8 @@
   },
   "captions": {
     "label": "Captions available",
-    "available": "Available"
+    "available": "Available",
+    "languageMenu": "Caption language",
+    "original": "Spoken language"
   }
 }

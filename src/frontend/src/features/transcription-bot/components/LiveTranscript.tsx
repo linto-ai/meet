@@ -5,6 +5,7 @@ import {
   Fragment,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -15,15 +16,9 @@ import { transcriptStore } from '../store/transcriptStore'
 import { lintoStore } from '../store/lintoStore'
 import { dismissLintoCatchUp } from '../hooks/useLintoCatchUp'
 import { LintoCaption } from '../types/linto'
-import { languageName } from '../utils/languageLabel'
+import { baseCode, languageName, ORIGINAL } from '../utils/languageLabel'
+import { useLintoDisplayLanguages } from '../hooks/useLintoDisplayLanguages'
 import { SimpleMarkdown } from './SimpleMarkdown'
-
-const ORIGINAL = 'original'
-
-// Targets are requested as short codes ("en", "de") but a provider may echo a
-// region-tagged variant ("en-US"). Collapse to the base code so the selector
-// has no duplicates and a short-code pick still matches a tagged translation.
-const baseCode = (code: string): string => code.split('-')[0].toLowerCase()
 
 // Find the translation for a (base) language inside an entry, tolerant of region
 // tags on the stored keys.
@@ -52,6 +47,10 @@ const formatTime = (ms: number, locale: string): string => {
 
 // How far from the bottom (px) still counts as "reading the live tail".
 const STICK_THRESHOLD_PX = 32
+// A scroll event this soon after a wheel / touch / key gesture is the user's.
+const USER_GESTURE_WINDOW_MS = 400
+// Keys that scroll a focused container upward (the only way to leave the tail).
+const SCROLL_UP_KEYS = new Set(['ArrowUp', 'PageUp', 'Home'])
 
 const selectClass = css({
   width: '100%',
@@ -72,25 +71,32 @@ export const LiveTranscript = () => {
   const { t, i18n } = useTranslation('transcription-bot', {
     keyPrefix: 'lintoBot',
   })
-  const {
-    selectedTranslations,
-    displayLanguage,
-    startedByMe,
-    joinedAt,
-    catchUp,
-  } = useSnapshot(lintoStore)
+  const { startedByMe, joinedAt, catchUp } = useSnapshot(lintoStore)
   const { byId, order } = useSnapshot(transcriptStore)
+  const {
+    languages: availableLangs,
+    effective: effectiveDisplay,
+    setDisplay,
+  } = useLintoDisplayLanguages()
 
   // ── The transcript zone scrolls on its own and follows the live tail ──
-  // While the reader sits at the bottom, every new line scrolls into view
-  // (smoothly); once they scroll up to read back, the view stays put and a
-  // pill counts the lines that arrived meanwhile — clicking it (or scrolling
-  // back down) re-attaches to the tail.
+  // While the reader sits at the bottom, every change (new line, partial
+  // refresh, translation, history hydration) keeps the tail in view; only a
+  // USER gesture scrolling up (wheel, touch, keyboard, scrollbar drag) leaves
+  // it. The view then stays put and a pill counts the lines that arrived
+  // meanwhile — clicking it (or scrolling back down) re-attaches to the tail.
+  // Programmatic or layout-driven scroll events never detach: a smooth
+  // animation, a shrinking partial or an insertion above would otherwise
+  // unhook the follow mode behind the reader's back.
   const scrollRef = useRef<HTMLDivElement | null>(null)
+  const contentRef = useRef<HTMLDivElement | null>(null)
   const stickRef = useRef(true)
+  const lastGestureRef = useRef(0)
+  const draggingRef = useRef(false)
+  const lastScrollTopRef = useRef(0)
   const [detached, setDetached] = useState(false)
   const [unseen, setUnseen] = useState(0)
-  const seenCountRef = useRef(0)
+  const seenIdsRef = useRef<Set<string>>(new Set())
   // A line flashes once when it becomes FINAL: the partial shows dimmed and
   // quiet, the flash marks the moment the wording settles. Lines already final
   // when the journal mounts (reopened panel, hydrated history) stay quiet.
@@ -110,12 +116,23 @@ export const LiveTranscript = () => {
   const onScroll = () => {
     const el = scrollRef.current
     if (!el) return
-    const atBottom = isAtBottom(el)
-    stickRef.current = atBottom
-    if (atBottom) {
-      setDetached(false)
-      setUnseen(0)
-    } else {
+    const movingDown = el.scrollTop >= lastScrollTopRef.current
+    lastScrollTopRef.current = el.scrollTop
+    if (isAtBottom(el)) {
+      // Back at the tail (the reader scrolled down, or the pill's animation
+      // landed): follow again.
+      if (!stickRef.current && movingDown) {
+        stickRef.current = true
+        setDetached(false)
+        setUnseen(0)
+      }
+      return
+    }
+    const byUser =
+      draggingRef.current ||
+      Date.now() - lastGestureRef.current < USER_GESTURE_WINDOW_MS
+    if (byUser && !movingDown && stickRef.current) {
+      stickRef.current = false
       setDetached(true)
     }
   }
@@ -135,23 +152,6 @@ export const LiveTranscript = () => {
         .filter((c): c is LintoCaption => !!c && !!c.text.trim()),
     [byId, order]
   )
-
-  // Languages offered by the "displayed language" selector: the chosen targets
-  // UNIONed with whatever has actually arrived, sorted by localized name.
-  const availableLangs = useMemo(() => {
-    const set = new Set<string>(selectedTranslations.map(baseCode))
-    for (const entry of entries) {
-      if (entry.translations) {
-        for (const lang of Object.keys(entry.translations))
-          set.add(baseCode(lang))
-      }
-    }
-    return Array.from(set).sort((a, b) =>
-      languageName(a, i18n.language).localeCompare(
-        languageName(b, i18n.language)
-      )
-    )
-  }, [entries, selectedTranslations, i18n.language])
 
   // Catch-up: everything said BEFORE I joined is history, shown dimmed above a
   // "you joined at HH:MM" divider. The starter saw it all and gets neither.
@@ -221,25 +221,93 @@ export const LiveTranscript = () => {
     }
   }, [entries])
 
-  useEffect(() => {
-    const added = Math.max(0, entries.length - seenCountRef.current)
-    seenCountRef.current = entries.length
-    if (stickRef.current) {
-      // A partial refreshing in place also grows the tail: keep it in view.
-      scrollToBottom(true)
-    } else if (added > 0) {
-      setUnseen((n) => n + added)
+  // Before paint: stay on the tail while attached; otherwise count the NEW
+  // live lines for the pill (hydrated history inserted above is not "new").
+  useLayoutEffect(() => {
+    const previous = seenIdsRef.current
+    const current = new Set<string>()
+    let added = 0
+    for (const entry of entries) {
+      current.add(entry.id)
+      if (!previous.has(entry.id) && !entry.catchup) added += 1
     }
-  }, [entries, scrollToBottom])
+    seenIdsRef.current = current
+    if (stickRef.current) scrollToBottom(false)
+    else if (added > 0) setUnseen((n) => n + added)
+  }, [entries, effectiveDisplay, scrollToBottom])
 
-  // The displayed language is SHARED with the caption overlay (lintoStore).
-  const setDisplay = (value: string) => {
-    lintoStore.displayLanguage = value
-  }
-  const effectiveDisplay =
-    displayLanguage === ORIGINAL || availableLangs.includes(displayLanguage)
-      ? displayLanguage
-      : ORIGINAL
+  const hasEntries = entries.length > 0
+
+  // User gestures that scroll UP (wheel, touch, keyboard, scrollbar grab) mark
+  // the next scroll events as the reader's own; only those may detach.
+  useEffect(() => {
+    if (!hasEntries) return
+    const el = scrollRef.current
+    if (!el) return
+    let touchY: number | null = null
+    const markGesture = () => {
+      lastGestureRef.current = Date.now()
+    }
+    const onWheel = (e: WheelEvent) => {
+      if (e.deltaY < 0) markGesture()
+    }
+    const onTouchStart = (e: TouchEvent) => {
+      touchY = e.touches[0]?.clientY ?? null
+    }
+    const onTouchMove = (e: TouchEvent) => {
+      const y = e.touches[0]?.clientY
+      // Finger moving DOWN scrolls the content up (towards older lines).
+      if (y != null && touchY != null && y > touchY) markGesture()
+      touchY = y ?? null
+    }
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (SCROLL_UP_KEYS.has(e.key) || (e.key === ' ' && e.shiftKey)) {
+        markGesture()
+      }
+    }
+    // A press on the container itself (not a line) is a scrollbar grab: its
+    // scroll events count as the reader's until the pointer is released.
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.target === el) draggingRef.current = true
+    }
+    const release = () => {
+      draggingRef.current = false
+    }
+    const passive = { passive: true }
+    el.addEventListener('wheel', onWheel, passive)
+    el.addEventListener('touchstart', onTouchStart, passive)
+    el.addEventListener('touchmove', onTouchMove, passive)
+    el.addEventListener('keydown', onKeyDown)
+    el.addEventListener('pointerdown', onPointerDown)
+    window.addEventListener('pointerup', release)
+    window.addEventListener('pointercancel', release)
+    return () => {
+      el.removeEventListener('wheel', onWheel)
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchmove', onTouchMove)
+      el.removeEventListener('keydown', onKeyDown)
+      el.removeEventListener('pointerdown', onPointerDown)
+      window.removeEventListener('pointerup', release)
+      window.removeEventListener('pointercancel', release)
+      draggingRef.current = false
+    }
+  }, [hasEntries])
+
+  // Height changes that bring no new entry (a partial shrinking, a translation
+  // landing, the "finalized" animation, the catch-up block resizing the
+  // viewport) re-pin the tail while attached.
+  useEffect(() => {
+    if (!hasEntries) return
+    const el = scrollRef.current
+    const content = contentRef.current
+    if (!el || !content || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => {
+      if (stickRef.current) scrollToBottom(false)
+    })
+    observer.observe(content)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [hasEntries, scrollToBottom])
 
   return (
     <div
@@ -350,101 +418,110 @@ export const LiveTranscript = () => {
               minHeight: 0,
               overflowY: 'auto',
               overscrollBehavior: 'contain',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.125rem',
+              // Pinning is done by hand; the browser's own anchoring would
+              // fight it when history is inserted above.
+              overflowAnchor: 'none',
               paddingRight: '0.25rem',
             })}
           >
-            {entries.map((entry, index) => {
-              const showSpeaker =
-                index === 0 || entries[index - 1].locutor !== entry.locutor
-              const showTranslated = effectiveDisplay !== ORIGINAL
-              const translated = translationFor(
-                entry.translations,
-                effectiveDisplay
-              )
-              // When the chosen language hasn't arrived for THIS line yet, fall
-              // back to the original so it never blanks out mid-stream.
-              const body = showTranslated
-                ? (translated ?? entry.text)
-                : entry.text
-              const isTranslated = showTranslated && translated != null
-              const time = formatTime(entry.receivedAt, i18n.language)
-              // The animation starts when the id enters the set, i.e. the
-              // instant the line became final; it never restarts afterwards.
-              const isFresh = !entry.partial && flashIds.has(entry.id)
-              return (
-                <Fragment key={entry.id}>
-                  {index === markerIndex && joinedMarker}
-                  <div
-                    data-testid="linto-turn"
-                    data-speaker={entry.locutor}
-                    data-partial={entry.partial ? 'true' : 'false'}
-                    data-fresh={isFresh ? 'true' : 'false'}
-                    {...(entry.catchup ? { 'data-catchup': 'true' } : {})}
-                    className={css({
-                      width: '100%',
-                      marginTop: showSpeaker ? '0.5rem' : 0,
-                      opacity: entry.catchup ? 0.75 : 1,
-                      borderRadius: '4px',
-                      marginLeft: '-0.25rem',
-                      paddingLeft: '0.25rem',
-                      animation: isFresh
-                        ? 'linto_new_line 1.8s ease-out'
-                        : undefined,
-                    })}
-                  >
-                    {showSpeaker && (
-                      <Text
-                        variant="sm"
-                        className={css({
-                          fontWeight: 'semibold',
-                          color: 'primary.700',
-                        })}
-                      >
-                        {entry.locutor}
-                      </Text>
-                    )}
+            <div
+              ref={contentRef}
+              className={css({
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.125rem',
+              })}
+            >
+              {entries.map((entry, index) => {
+                const showSpeaker =
+                  index === 0 || entries[index - 1].locutor !== entry.locutor
+                const showTranslated = effectiveDisplay !== ORIGINAL
+                const translated = translationFor(
+                  entry.translations,
+                  effectiveDisplay
+                )
+                // When the chosen language hasn't arrived for THIS line yet, fall
+                // back to the original so it never blanks out mid-stream.
+                const body = showTranslated
+                  ? (translated ?? entry.text)
+                  : entry.text
+                const isTranslated = showTranslated && translated != null
+                const time = formatTime(entry.receivedAt, i18n.language)
+                // The animation starts when the id enters the set, i.e. the
+                // instant the line became final; it never restarts afterwards.
+                const isFresh = !entry.partial && flashIds.has(entry.id)
+                return (
+                  <Fragment key={entry.id}>
+                    {index === markerIndex && joinedMarker}
                     <div
+                      data-testid="linto-turn"
+                      data-speaker={entry.locutor}
+                      data-partial={entry.partial ? 'true' : 'false'}
+                      data-fresh={isFresh ? 'true' : 'false'}
+                      {...(entry.catchup ? { 'data-catchup': 'true' } : {})}
                       className={css({
-                        display: 'flex',
-                        gap: '0.5rem',
-                        alignItems: 'baseline',
-                        opacity: entry.partial ? 0.6 : 1,
-                        fontStyle: entry.partial ? 'italic' : 'normal',
+                        width: '100%',
+                        marginTop: showSpeaker ? '0.5rem' : 0,
+                        opacity: entry.catchup ? 0.75 : 1,
+                        borderRadius: '4px',
+                        marginLeft: '-0.25rem',
+                        paddingLeft: '0.25rem',
+                        animation: isFresh
+                          ? 'linto_new_line 1.8s ease-out'
+                          : undefined,
                       })}
                     >
-                      {time && (
-                        <span
-                          data-testid="linto-turn-time"
+                      {showSpeaker && (
+                        <Text
+                          variant="sm"
                           className={css({
-                            flexShrink: 0,
-                            fontVariantNumeric: 'tabular-nums',
-                            fontSize: '0.6875rem',
-                            color: 'greyscale.500',
-                            paddingTop: '0.15rem',
+                            fontWeight: 'semibold',
+                            color: 'primary.700',
                           })}
                         >
-                          {time}
-                        </span>
+                          {entry.locutor}
+                        </Text>
                       )}
-                      {isTranslated ? (
-                        <div
-                          data-testid="linto-translation"
-                          data-lang={effectiveDisplay}
-                        >
+                      <div
+                        className={css({
+                          display: 'flex',
+                          gap: '0.5rem',
+                          alignItems: 'baseline',
+                          opacity: entry.partial ? 0.6 : 1,
+                          fontStyle: entry.partial ? 'italic' : 'normal',
+                        })}
+                      >
+                        {time && (
+                          <span
+                            data-testid="linto-turn-time"
+                            className={css({
+                              flexShrink: 0,
+                              fontVariantNumeric: 'tabular-nums',
+                              fontSize: '0.6875rem',
+                              color: 'greyscale.500',
+                              paddingTop: '0.15rem',
+                            })}
+                          >
+                            {time}
+                          </span>
+                        )}
+                        {isTranslated ? (
+                          <div
+                            data-testid="linto-translation"
+                            data-lang={effectiveDisplay}
+                          >
+                            <Text variant="sm">{body}</Text>
+                          </div>
+                        ) : (
                           <Text variant="sm">{body}</Text>
-                        </div>
-                      ) : (
-                        <Text variant="sm">{body}</Text>
-                      )}
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </Fragment>
-              )
-            })}
-            {markerIndex === entries.length && joinedMarker}
+                  </Fragment>
+                )
+              })}
+              {markerIndex === entries.length && joinedMarker}
+            </div>
           </div>
           {detached && unseen > 0 && (
             <button

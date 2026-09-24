@@ -17,7 +17,15 @@ export const MenuList = <T extends string | number = string>({
 }: {
   onAction: (key: T) => void
   selectedItem?: T
-  items: Array<string | { value: T; label: ReactNode }>
+  items: Array<
+    | string
+    | {
+        value: T
+        label: ReactNode
+        // Extra DOM attributes for the item (e.g. `data-testid`, `data-*`).
+        itemProps?: Record<`data-${string}`, string>
+      }
+  >
 } & MenuProps<unknown> &
   RecipeVariantProps<typeof menuRecipe>) => {
   const [variantProps] = menuRecipe.splitVariantProps(menuProps)
@@ -37,8 +45,10 @@ export const MenuList = <T extends string | number = string>({
       {items.map((item) => {
         const value = typeof item === 'string' ? item : item.value
         const label = typeof item === 'string' ? item : item.label
+        const itemProps = typeof item === 'string' ? undefined : item.itemProps
         return (
           <MenuItem
+            {...itemProps}
             className={classes.item}
             key={value}
             id={value as string}

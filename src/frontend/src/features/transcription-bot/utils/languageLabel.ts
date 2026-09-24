@@ -44,3 +44,12 @@ export const languageLabel = (code: string, locale: string): string => {
     ? norm.toUpperCase()
     : `${name} (${norm})`
 }
+
+/** Display-language value meaning "the spoken language, untranslated". */
+export const ORIGINAL = 'original'
+
+/** Targets are requested as short codes ("en", "de") but a provider may echo a
+ *  region-tagged variant ("en-US"). Collapse to the base code so pickers have no
+ *  duplicates and a short-code pick still matches a tagged translation. */
+export const baseCode = (code: string): string =>
+  code.split('-')[0].toLowerCase()
