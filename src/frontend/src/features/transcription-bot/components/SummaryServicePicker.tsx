@@ -1,20 +1,26 @@
 import { useEffect, useMemo } from 'react'
-import { RadioGroup } from 'react-aria-components'
+import { Radio, RadioGroup } from 'react-aria-components'
 import { useTranslation } from 'react-i18next'
 import { useSnapshot } from 'valtio'
 import {
   RiArticleLine,
+  RiBookOpenLine,
   RiChat3Line,
+  RiCheckLine,
   RiFileListLine,
   RiFileTextLine,
+  RiFlashlightLine,
+  RiFocus3Line,
+  RiLightbulbLine,
   RiListCheck2,
+  RiPresentationLine,
   RiSparklingLine,
   RiStickyNoteLine,
+  RiTimeLine,
   RiTodoLine,
 } from '@remixicon/react'
 import { css } from '@/styled-system/css'
 import { Text } from '@/primitives'
-import { Radio } from '@/primitives/Radio'
 import { useRoomData } from '@/features/rooms/livekit/hooks/useRoomData'
 import { lintoStore } from '../store/lintoStore'
 import { useLintoSummaryServices } from '../api/lintoBotApi'
@@ -33,7 +39,64 @@ const ICONS: Record<string, typeof RiSparklingLine> = {
   chats: RiChat3Line,
   'chat-text': RiChat3Line,
   sparkle: RiSparklingLine,
+  clock: RiTimeLine,
+  lightning: RiFlashlightLine,
+  lightbulb: RiLightbulbLine,
+  'book-open': RiBookOpenLine,
+  'presentation-chart': RiPresentationLine,
+  target: RiFocus3Line,
 }
+
+// One selectable card per service: icon, name, description; the chosen one
+// is outlined and ticked.
+const cardClass = css({
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.75rem',
+  width: '100%',
+  padding: '0.625rem 0.75rem',
+  borderRadius: '8px',
+  border: '1px solid',
+  borderColor: 'control.border',
+  backgroundColor: 'white',
+  cursor: 'pointer',
+  transition: 'all 150ms',
+  '&[data-hovered]': { backgroundColor: 'gray.50' },
+  '&[data-focus-visible]': {
+    outline: '2px solid',
+    outlineColor: 'focusRing',
+    outlineOffset: '2px',
+  },
+  '&[data-selected]': {
+    borderColor: 'primary',
+    backgroundColor: 'primary.50',
+  },
+  '&[data-disabled]': { opacity: 0.6, cursor: 'default' },
+  '& .svc-icon': {
+    flexShrink: 0,
+    width: '2.25rem',
+    height: '2.25rem',
+    borderRadius: '999px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'primary.100',
+    color: 'primary.800',
+    transition: 'all 150ms',
+  },
+  '&[data-selected] .svc-icon': {
+    backgroundColor: 'primary',
+    color: 'white',
+  },
+  '& .svc-check': {
+    flexShrink: 0,
+    marginLeft: 'auto',
+    color: 'primary',
+    opacity: 0,
+    transition: 'opacity 150ms',
+  },
+  '&[data-selected] .svc-check': { opacity: 1 },
+})
 
 const summaryServiceIcon = (icon: string | null | undefined) =>
   (icon && ICONS[icon]) || RiSparklingLine
@@ -112,7 +175,7 @@ export const SummaryServicePicker = ({
         className={css({
           display: 'flex',
           flexDirection: 'column',
-          gap: '0.375rem',
+          gap: '0.5rem',
           marginTop: '0.375rem',
         })}
       >
@@ -128,27 +191,25 @@ export const SummaryServicePicker = ({
               key={service.route}
               value={service.route}
               data-testid={`linto-summary-service-${service.route}`}
+              className={cardClass}
             >
+              <span className="svc-icon" aria-hidden="true">
+                <Icon size={18} />
+              </span>
               <span
                 className={css({
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
+                  display: 'flex',
+                  flexDirection: 'column',
                   minWidth: 0,
+                  gap: '0.125rem',
                 })}
               >
-                <Icon size={18} aria-hidden="true" />
-                <span
-                  className={css({
-                    display: 'flex',
-                    flexDirection: 'column',
-                    minWidth: 0,
-                  })}
-                >
-                  <Text variant="sm">{service.name}</Text>
-                  {description && <Text variant="xsNote">{description}</Text>}
-                </span>
+                <Text variant="sm" className={css({ fontWeight: 'semibold' })}>
+                  {service.name}
+                </Text>
+                {description && <Text variant="xsNote">{description}</Text>}
               </span>
+              <RiCheckLine size={18} className="svc-check" aria-hidden="true" />
             </Radio>
           )
         })}

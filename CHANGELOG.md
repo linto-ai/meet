@@ -36,6 +36,7 @@ and this project adheres to
 - 🔥(backend) LINTO_HIDE_LEGACY_TOOLS is gone: both transcription tools always show
 - 💄(frontend) opening the meeting tools during a run lands on the running tool's panel
 - 💄(frontend) shorter wording of the two transcription tools
+- 💄(frontend) the summary type is picked on cards (icon, name, description)
 
 ### Fixed
 
