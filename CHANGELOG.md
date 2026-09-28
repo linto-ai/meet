@@ -59,6 +59,7 @@ and this project adheres to
 - 🐛(backend) the deferred transcription authenticates like the live flow (service account first)
 - 🐛(frontend) the transcript journal and the caption overlay keep following the live tail
 - 🐛(frontend) the caption overlay takes the speaker of a final that reassigns it
+- 🐛(frontend) a transcribed video recording no longer forces French on LinTO
 
 ## [1.37.0] - 2026-11-01
 

@@ -10,6 +10,7 @@ import {
 } from '@/features/recording'
 import { useEffect, useState } from 'react'
 import { useLintoCapabilities } from '@/features/transcription-bot/hooks/useLintoCapabilities'
+import { useLintoConfig } from '@/features/transcription-bot/hooks/useLintoConfig'
 import { useLintoStatus } from '@/features/transcription-bot/hooks/useLintoStatus'
 import { useTranslation } from 'react-i18next'
 
@@ -24,12 +25,11 @@ import { ControlsButton } from './ControlsButton'
 import { RowWrapper } from './RowWrapper'
 import { VStack } from '@/styled-system/jsx'
 import { Checkbox } from '@/primitives/Checkbox'
-import {
-  SettingsDialogExtendedKey,
-  useTranscriptionLanguage,
-} from '@/features/settings'
+import { SettingsDialogExtendedKey } from '@/features/settings'
 import { useMutateRecording } from '../hooks/useMutateRecording'
 import { useRecordingEncoding } from '../hooks/useRecordingEncoding'
+import { useRecordingLanguage } from '../hooks/useRecordingLanguage'
+import { LintoLanguageSelect } from './LintoLanguageSelect'
 import { openSettingsDialog } from '@/stores/settings'
 import { useSidePanel } from '@/features/rooms/livekit/hooks/useSidePanel'
 import { useIsAdminOrOwner } from '@/features/rooms/livekit/hooks/useIsAdminOrOwner'
@@ -49,6 +49,7 @@ export const ScreenRecordingSidePanel = () => {
   // "Transcribe this recording" is a LinTO feature (deferred transcription):
   // offered only to a participant whose capabilities grant it.
   const { async: canTranscribeAsync } = useLintoCapabilities()
+  const { enabled: isLintoEnabled } = useLintoConfig()
   useEffect(() => {
     if (!canTranscribeAsync && includeTranscript) setIncludeTranscript(false)
   }, [canTranscribeAsync, includeTranscript])
@@ -74,8 +75,9 @@ export const ScreenRecordingSidePanel = () => {
     FeatureFlags.Transcript
   )
   const { notifyParticipants } = useNotifyParticipants()
-  const { selectedLanguageKey, isLanguageSetToAuto } =
-    useTranscriptionLanguage()
+  // With LinTO, the language of "Transcribe after the meeting" (automatic by
+  // default), not the upstream setting, which defaults to French.
+  const language = useRecordingLanguage()
 
   const { encoding, isCustomEncodingEnabled } = useRecordingEncoding()
 
@@ -119,9 +121,7 @@ export const ScreenRecordingSidePanel = () => {
         )
       } else {
         const recordingOptions = {
-          ...(!isLanguageSetToAuto && {
-            language: selectedLanguageKey,
-          }),
+          ...(language && { language }),
           ...(includeTranscript && hasTranscriptAccess && { transcribe: true }),
           ...(encoding && { encoding }),
         }
@@ -137,7 +137,7 @@ export const ScreenRecordingSidePanel = () => {
         })
         captureEvent('screen-recording-started', {
           includeTranscript: includeTranscript,
-          language: selectedLanguageKey,
+          language: language ?? 'auto',
           resolution: encoding?.resolution,
           profile: encoding?.profile,
         })
@@ -269,6 +269,14 @@ export const ScreenRecordingSidePanel = () => {
               >
                 <Text variant="sm">{t('details.transcription')}</Text>
               </Checkbox>
+              {includeTranscript && isLintoEnabled && (
+                <div className={css({ marginTop: '0.75rem' })}>
+                  <LintoLanguageSelect
+                    isDisabled={statuses.isActive || isPendingToStart}
+                    testId="recording-language"
+                  />
+                </div>
+              )}
             </div>
           </>
         )}
