@@ -52,7 +52,13 @@ from core.services.twake_drive import (
 )
 from core.tasks._base import NotificationTask
 from core.tasks._errors import TransientError, classify_external
-from core.tasks._state import ensure_state, mark_done, save_state, step_done
+from core.tasks._state import (
+    ensure_state,
+    mark_done,
+    save_state,
+    step_done,
+    step_result,
+)
 from core.tasks._task import task
 
 logger = logging.getLogger(__name__)
@@ -182,29 +188,36 @@ _RETRY_KWARGS = {
 class _StepCheckpoint:
     """Generic idempotent step-checkpoint over a backing store.
 
-    ``is_done`` is a sync ``(name) -> bool``; ``mark`` is an async ``(name)``
-    that records the step as done and persists it. This lets the same delivery
-    helpers checkpoint against a ``Recording`` OR a ``Room`` config dict.
+    ``get`` is a sync ``(name) -> value`` returning what the step stored when it
+    completed: ``True``, or a result a resumed task still needs (the Twake Drive
+    link); falsy when not done. ``mark`` is an async ``(name, value)`` that
+    stores it and persists it. This lets the same delivery helpers checkpoint
+    against a ``Recording`` OR a ``Room`` config dict.
     """
 
-    def __init__(self, *, is_done, mark):
-        self._is_done = is_done
+    def __init__(self, *, get, mark):
+        self._get = get
         self._mark = mark
 
     def done(self, name) -> bool:
         """Return whether the named step has already been checkpointed."""
-        return bool(self._is_done(name))
+        return bool(self._get(name))
 
-    async def mark(self, name):
-        """Record the named step as done and persist it."""
-        await self._mark(name)
+    def result(self, name):
+        """What the named step stored beyond "done", or None."""
+        value = self._get(name)
+        return None if isinstance(value, bool) else value
+
+    async def mark(self, name, value=True):
+        """Record the named step as done (with its result) and persist it."""
+        await self._mark(name, value)
 
 
 def _recording_checkpoint(recording):
     """Checkpoint backed by ``recording.linto_state`` (core.tasks._state)."""
     return _StepCheckpoint(
-        is_done=lambda name: step_done(recording, name),
-        mark=lambda name: mark_done(recording, name),
+        get=lambda name: step_result(recording, name),
+        mark=lambda name, value: mark_done(recording, name, value),
     )
 
 
@@ -506,15 +519,17 @@ async def _deliver_to_twake(  # noqa: PLR0913 - delivery needs the full context
     folder and file names follow it. ``extra_files_provider`` is an optional
     async callable returning a list of ``(filename, content, content_type)`` for
     the original-media bytes (the recording flow uploads the mp4/ogg; the live
-    flow passes ``None`` — text only). Returns the Twake Drive folder link, or
-    ``None`` when Twake is not configured, the step is already checkpointed, or
-    the upload failed.
+    flow passes ``None`` — text only). Returns the Twake Drive folder link (on
+    a resume, the one a previous attempt checkpointed, so the email still links
+    the files), or ``None`` when Twake is not configured or the upload failed.
     """
     twake_configured = getattr(settings, "CLOUDERY_URL", None) and getattr(
         settings, "CLOUDERY_TOKEN", None
     )
-    if not twake_configured or checkpoint.done("twake"):
+    if not twake_configured:
         return None
+    if checkpoint.done("twake"):
+        return checkpoint.result("twake")
 
     twake_drive_link = None
     try:
@@ -596,7 +611,7 @@ async def _deliver_to_twake(  # noqa: PLR0913 - delivery needs the full context
             logger.info(
                 "Files uploaded to Twake Drive for %s: %s", log_id, twake_drive_link
             )
-            await checkpoint.mark("twake")
+            await checkpoint.mark("twake", twake_drive_link)
         else:
             logger.warning(
                 "No room owner with sub found for %s, skipping Twake Drive", log_id
@@ -1049,15 +1064,15 @@ def _clear_linto_summary(room):
 def _room_summary_checkpoint(room):
     """Checkpoint backed by ``room.configuration["linto_summary"]["steps"]``."""
 
-    def _is_done(name):
+    def _get(name):
         payload = (room.configuration or {}).get("linto_summary") or {}
-        return bool((payload.get("steps") or {}).get(name))
+        return (payload.get("steps") or {}).get(name)
 
-    async def _mark(name):
-        room.configuration["linto_summary"].setdefault("steps", {})[name] = True
+    async def _mark(name, value):
+        room.configuration["linto_summary"].setdefault("steps", {})[name] = value
         await _save_room_config(room)
 
-    return _StepCheckpoint(is_done=_is_done, mark=_mark)
+    return _StepCheckpoint(get=_get, mark=_mark)
 
 
 async def _resolve_summary_recipient(payload, room, service):

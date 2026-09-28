@@ -8,8 +8,9 @@ The state shape is generic and step-name driven::
 
     {"conversation_id": None, "steps": {"twake": True, ...}, "attempts": 0}
 
-``steps`` starts EMPTY: a step name is only added (set to ``True``) once the
-step has completed, so ``step_done`` is simply "is this name present and true".
+``steps`` starts EMPTY: a step name is only added (set to ``True``, or to a
+result a resumed task still needs, e.g. the Twake Drive link) once the step has
+completed, so ``step_done`` is simply "is this name present and truthy".
 No step ordering is encoded here.
 """
 
@@ -38,12 +39,18 @@ def save_state(recording):
 
 def step_done(recording, name) -> bool:
     """Return whether the named step has been checkpointed as done."""
-    return bool((recording.linto_state.get("steps") or {}).get(name))
+    return bool(step_result(recording, name))
 
 
-async def mark_done(recording, name):
-    """Mark the named step as done and persist the state."""
-    recording.linto_state.setdefault("steps", {})[name] = True
+def step_result(recording, name):
+    """Return what the named step stored when done (``True``, or a result a
+    resumed task still needs such as the Twake Drive link), else ``None``."""
+    return (recording.linto_state.get("steps") or {}).get(name)
+
+
+async def mark_done(recording, name, value=True):
+    """Mark the named step as done, storing ``value``, and persist the state."""
+    recording.linto_state.setdefault("steps", {})[name] = value
     await save_state(recording)
 
 
@@ -61,6 +68,7 @@ __all__ = (
     "ensure_state",
     "save_state",
     "step_done",
+    "step_result",
     "mark_done",
     "get_conversation_id",
     "set_conversation_id",
