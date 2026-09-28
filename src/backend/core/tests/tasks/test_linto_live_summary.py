@@ -137,9 +137,9 @@ def _spy_checkpoints(stack):
     marked = []
     original = linto_task._StepCheckpoint.mark
 
-    async def _mark(self, name):
+    async def _mark(self, name, value=True):
         marked.append(name)
-        await original(self, name)
+        await original(self, name, value)
 
     stack.enter_context(mock.patch.object(linto_task._StepCheckpoint, "mark", _mark))
     return marked
