@@ -23,6 +23,7 @@ a Celery retry.
 
 import asyncio
 import logging
+import re
 import smtplib
 from datetime import datetime
 from types import SimpleNamespace
@@ -79,6 +80,18 @@ _SUMMARY_HTML_TAGS = [
     "a",
 ]
 _SUMMARY_HTML_ATTRS = {"a": ["href", "title"]}
+
+# A code fence around the WHOLE answer (LLMs often reply ```markdown … ```),
+# closing fence optional (a cut answer). Same rule as the LLM Gateway applies
+# to its own documents.
+_WRAPPING_FENCE = re.compile(r"\A\s*```[^\n]*\n(.*?)(?:\n```)?\s*\Z", re.DOTALL)
+
+
+def _strip_wrapping_fence(text):
+    """Drop a code fence wrapping the whole summary, so it renders as Markdown
+    instead of one code block. Code blocks inside the text are kept."""
+    match = _WRAPPING_FENCE.match(text)
+    return match.group(1) if match else text
 
 
 def _render_summary_html(text):
@@ -217,9 +230,9 @@ def _extract_summary_preview(summary_result):
     if summary_result.get("content"):
         content = summary_result["content"]
         if isinstance(content, dict):
-            return content.get("text") or content.get("content") or str(content)
+            content = content.get("text") or content.get("content") or str(content)
         if isinstance(content, str):
-            return content
+            return _strip_wrapping_fence(content)
     return None
 
 
