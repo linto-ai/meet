@@ -29,12 +29,6 @@
             The transcription and summary of "{{room_name}}" on {{recording_date}} at {{recording_time}} are now available.
             {% endblocktrans %}
           </mj-text>
-          {% if summary_preview_html %}
-          <mj-text>
-            <p><strong>{% trans "Summary preview:" %}</strong></p>
-            <div>{{ summary_preview_html|safe }}</div>
-          </mj-text>
-          {% endif %}
           <mj-raw>{% if twake_drive_link %}</mj-raw>
           <mj-text>
             {% blocktrans %}
@@ -54,6 +48,12 @@
             {% blocktrans %}
             A PDF summary is attached to this email.
             {% endblocktrans %}
+          </mj-text>
+          <mj-raw>{% endif %}</mj-raw>
+          <mj-raw>{% if summary_preview_html %}</mj-raw>
+          <mj-text>
+            <p><strong>{% trans "Summary preview:" %}</strong></p>
+            <div>{{ summary_preview_html|safe }}</div>
           </mj-text>
           <mj-raw>{% endif %}</mj-raw>
           <mj-text>
