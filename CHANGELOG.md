@@ -60,6 +60,7 @@ and this project adheres to
 - 🐛(frontend) the transcript journal and the caption overlay keep following the live tail
 - 🐛(frontend) the caption overlay takes the speaker of a final that reassigns it
 - 🐛(frontend) a transcribed video recording no longer forces French on LinTO
+- 🐛(backend) the recap email renders a summary wrapped in a code fence as Markdown
 
 ## [1.37.0] - 2026-11-01
 
