@@ -29,6 +29,7 @@ and this project adheres to
 
 ### Fixed
 
+- 🐛(frontend) a transcribed video recording no longer forces French on LinTO
 - 🐛(frontend) the transcript journal and the caption overlay keep following the live tail
 - 🐛(frontend) the caption overlay takes the speaker of a final that reassigns it
 - 🐛(backend) the deferred transcription authenticates like the live flow (service account first)

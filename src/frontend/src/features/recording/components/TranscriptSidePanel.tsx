@@ -33,28 +33,18 @@ import { useMutateRecording } from '../hooks/useMutateRecording'
 import { useIsMetadataCollectorEnabled } from '../hooks/useMetadataCollectorEnabled'
 import { useSidePanel } from '@/features/rooms/livekit/hooks/useSidePanel'
 import { useIsAdminOrOwner } from '@/features/rooms/livekit/hooks/useIsAdminOrOwner'
-import { useRoomData } from '@/features/rooms/livekit/hooks/useRoomData'
 import { LimitDescription } from './LimitDescription'
 import { openSettingsDialog } from '@/stores/settings'
-import { LINTO_LANGUAGE_AUTO, recordingStore } from '@/stores/recording'
+import { recordingStore } from '@/stores/recording'
 import { captureEvent, reportError } from '@/features/analytics/telemetry'
 import {
   SummaryServicePicker,
   useLintoCapabilities,
   useLintoConfig,
   useLintoStatus,
-  useLintoTranscriptionLanguages,
 } from '@/features/transcription-bot'
-import { languageName } from '@/features/transcription-bot/utils/languageLabel'
-
-const selectClass = css({
-  width: '100%',
-  padding: '0.4rem',
-  borderRadius: '4px',
-  border: '1px solid',
-  borderColor: 'control.border',
-  backgroundColor: 'white',
-})
+import { useRecordingLanguage } from '../hooks/useRecordingLanguage'
+import { LintoLanguageSelect } from './LintoLanguageSelect'
 
 /**
  * "Transcribe after the meeting": the meeting is recorded (audio, or video
@@ -75,8 +65,8 @@ export const TranscriptSidePanel = () => {
   const [includeScreenRecording, setIncludeScreenRecording] = useState(false)
 
   const { notifyParticipants } = useNotifyParticipants()
-  const { selectedLanguageKey, selectedLanguageLabel, isLanguageSetToAuto } =
-    useTranscriptionLanguage()
+  const { selectedLanguageLabel } = useTranscriptionLanguage()
+  const language = useRecordingLanguage()
 
   // LinTO (fork): the deferred transcription is a LinTO feature with its own
   // language list, summary options and per-user capability.
@@ -85,19 +75,7 @@ export const TranscriptSidePanel = () => {
     useLintoCapabilities()
   const { active: isLintoActive } = useLintoStatus()
   const { openLinto } = useSidePanel()
-  const apiRoomData = useRoomData()
-  const { data: lintoLanguages } = useLintoTranscriptionLanguages(
-    apiRoomData?.livekit?.room,
-    apiRoomData?.livekit?.token
-  )
-  const { lintoLanguage, lintoSummary, lintoSummaryService } =
-    useSnapshot(recordingStore)
-  const { i18n } = useTranslation()
-  // The ASR languages without the automatic one, named in the UI language.
-  const languageOptions = (lintoLanguages ?? [])
-    .filter((code) => code !== '*')
-    .map((code) => ({ code, label: languageName(code, i18n.language) }))
-    .sort((a, b) => a.label.localeCompare(b.label, i18n.language))
+  const { lintoSummary, lintoSummaryService } = useSnapshot(recordingStore)
 
   const hasTranscriptAccess = useHasRecordingAccess(
     RecordingMode.Transcript,
@@ -152,15 +130,7 @@ export const TranscriptSidePanel = () => {
           ? RecordingMode.ScreenRecording
           : RecordingMode.Transcript
 
-        // LinTO: the language is an ASR code ('auto' = detected); the summary
-        // choice rides along for the offline pipeline.
-        const language = isLintoEnabled
-          ? lintoLanguage !== LINTO_LANGUAGE_AUTO
-            ? lintoLanguage
-            : undefined
-          : !isLanguageSetToAuto
-            ? selectedLanguageKey
-            : undefined
+        // LinTO: the summary choice rides along for the offline pipeline.
         const recordingOptions = {
           ...(language && { language }),
           ...(includeScreenRecording && {
@@ -349,29 +319,10 @@ export const TranscriptSidePanel = () => {
             alignItems="start"
             className={css({ width: '100%', marginBottom: '0.75rem' })}
           >
-            <label className={css({ width: '100%' })}>
-              <Text variant="sm" as="span">
-                {tLinto('language')}
-              </Text>
-              <select
-                data-testid="transcript-language"
-                className={selectClass}
-                value={lintoLanguage}
-                disabled={controlsDisabled}
-                onChange={(e) => {
-                  recordingStore.lintoLanguage = e.target.value
-                }}
-              >
-                <option value={LINTO_LANGUAGE_AUTO}>
-                  {tLinto('languageAuto')}
-                </option>
-                {languageOptions.map((option) => (
-                  <option key={option.code} value={option.code}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <LintoLanguageSelect
+              isDisabled={controlsDisabled}
+              testId="transcript-language"
+            />
             <Checkbox
               size="sm"
               data-testid="transcript-mode-summary"
