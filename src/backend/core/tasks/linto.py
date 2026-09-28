@@ -92,12 +92,32 @@ _SUMMARY_HTML_ATTRS = {"a": ["href", "title"]}
 # to its own documents.
 _WRAPPING_FENCE = re.compile(r"\A\s*```[^\n]*\n(.*?)(?:\n```)?\s*\Z", re.DOTALL)
 
+# The email carries a preview of the summary, not the whole report (the full
+# document is in Twake Drive or attached): a long report would bury the rest.
+SUMMARY_PREVIEW_MAX_CHARS = 1500
+
 
 def _strip_wrapping_fence(text):
     """Drop a code fence wrapping the whole summary, so it renders as Markdown
     instead of one code block. Code blocks inside the text are kept."""
     match = _WRAPPING_FENCE.match(text)
     return match.group(1) if match else text
+
+
+def _truncate_summary(text, limit=SUMMARY_PREVIEW_MAX_CHARS):
+    """The first whole lines of the summary up to ``limit`` characters, then an
+    ellipsis. A first line longer than the limit is cut on a word boundary."""
+    if not text or len(text) <= limit:
+        return text
+    kept, size = [], 0
+    for line in text.splitlines():
+        if size + len(line) > limit:
+            break
+        kept.append(line)
+        size += len(line) + 1
+    if not kept:
+        kept = [text[:limit].rsplit(" ", 1)[0]]
+    return "\n".join(kept).rstrip() + "\n\n…"
 
 
 def _render_summary_html(text):
@@ -665,7 +685,9 @@ async def _send_recap_emails(  # noqa: PLR0913 - recap email needs the full cont
                             "%H:%M"
                         ),
                         "summary_preview": summary_preview,
-                        "summary_preview_html": _render_summary_html(summary_preview),
+                        "summary_preview_html": _render_summary_html(
+                            _truncate_summary(summary_preview)
+                        ),
                         "twake_drive_link": twake_drive_link,
                         "has_pdf_attachment": (
                             pdf_content is not None and not twake_drive_link

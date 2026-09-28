@@ -29,6 +29,7 @@ and this project adheres to
 
 ### Fixed
 
+- 🐛(mail) Twake Drive link above a bounded summary preview in the recap email
 - 🐛(backend) a resumed LinTO task still links the Twake Drive folder in the email
 - 🐛(backend) the recap email renders a summary wrapped in a code fence as Markdown
 - 🐛(frontend) a transcribed video recording no longer forces French on LinTO

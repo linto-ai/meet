@@ -1,9 +1,12 @@
 """Tests for the LinTO recap delivery helpers of core.tasks.linto."""
 
-# pylint: disable=protected-access
+# pylint: disable=protected-access,no-member
 
 import contextlib
+from datetime import datetime, timezone
 from unittest import mock
+
+from django.core import mail
 
 import pytest
 from asgiref.sync import async_to_sync
@@ -61,6 +64,70 @@ class TestSummaryPreview:
         """The export content can come as ``{"text": ...}``."""
         content = {"text": f"```markdown\n{REPORT}\n```"}
         assert linto_task._extract_summary_preview({"content": content}) == REPORT
+
+    def test_a_short_summary_is_not_truncated(self):
+        """Under the limit the preview is the whole summary."""
+        assert linto_task._truncate_summary(REPORT) == REPORT
+
+    def test_a_long_summary_is_cut_on_a_line(self):
+        """Whole lines up to the limit, then an ellipsis."""
+        lines = [f"- point {i} " + "x" * 40 for i in range(100)]
+        preview = linto_task._truncate_summary("\n".join(lines), limit=500)
+        body, ellipsis = preview.rsplit("\n\n", 1)
+        assert ellipsis == "…"
+        assert len(body) <= 500
+        assert all(line in lines for line in body.splitlines())
+
+    def test_a_single_long_line_is_cut_on_a_word(self):
+        """A first line over the limit is cut between two words."""
+        preview = linto_task._truncate_summary("word " * 200, limit=52)
+        assert preview == " ".join(["word"] * 10) + "\n\n…"
+
+
+class TestRecapEmail:
+    """The recap email puts the Drive link before a bounded summary preview."""
+
+    def _send(self, **kwargs):
+        user = factories.UserFactory(email="owner@example.com", language="en-us")
+        params = {
+            "recipient_users": [user],
+            "room_name": "okr-mcwr-mqk",
+            "meeting_dt": datetime(2026, 9, 24, 14, 32, tzinfo=timezone.utc),
+            "summary_preview": REPORT,
+            "twake_drive_link": "https://owner-drive.example.com/#/folder/dir-1",
+            "pdf_content": None,
+            "pub_filename": "summary.pdf",
+            "pub_mime": "application/pdf",
+            "log_id": "rec-1",
+            "checkpoint": _MemoryCheckpoint(),
+        }
+        params.update(kwargs)
+        async_to_sync(linto_task._send_recap_emails)(**params)
+        assert len(mail.outbox) == 1
+        return mail.outbox[0]
+
+    def test_the_drive_link_comes_before_the_summary(self):
+        """A long summary can no longer push the link out of sight."""
+        message = self._send()
+        html = message.alternatives[0][0]
+        link = html.index("https://owner-drive.example.com/#/folder/dir-1")
+        assert link < html.index("Analytical Report")
+        assert message.body.index("owner-drive") < message.body.index("Analytical")
+
+    def test_the_html_preview_is_bounded(self):
+        """The email shows the start of a long report, not all of it."""
+        report = REPORT + "".join(f"\n\n## Topic {i}\n\nDetail {i}" for i in range(400))
+        message = self._send(summary_preview=report)
+        html = message.alternatives[0][0]
+        assert "Topic 1<" in html
+        assert "Topic 399" not in html
+        assert "…" in html
+
+    def test_no_summary_no_preview_heading(self):
+        """Without a summary the email does not announce a preview."""
+        message = self._send(summary_preview=None)
+        assert "Summary preview" not in message.alternatives[0][0]
+        assert "Summary preview" not in message.body
 
 
 class TestTwakeLinkOnResume:
