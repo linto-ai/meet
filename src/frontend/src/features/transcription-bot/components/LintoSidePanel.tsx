@@ -170,11 +170,11 @@ export const LintoSidePanel = () => {
         roomSlug,
         lintoConfig,
         config: {
-          // The summary is a feature of its own: without the capability the
-          // option is hidden and the run carries none.
+          // The summaries are a feature of their own: without the capability
+          // both options are hidden and the run carries none.
           summary: canSummarize && summary,
           summaryService,
-          catchup,
+          catchup: canSummarize && catchup,
           record: hasScreenRecordingAccess ? record : false,
           translations: [...lintoStore.selectedTranslations],
         },
@@ -331,25 +331,28 @@ export const LintoSidePanel = () => {
             className={css({ width: '100%' })}
           >
             <TranslationPicker isDisabled={controlsDisabled} />
-            <Checkbox
-              size="sm"
-              data-testid="linto-mode-catchup"
-              isSelected={catchup}
-              onChange={(value) => {
-                lintoStore.catchup = value
-              }}
-              isDisabled={controlsDisabled}
-            >
-              <Text variant="sm">{t('options.catchup')}</Text>
-            </Checkbox>
-            <Text
-              variant="smNote"
-              className={css({ paddingLeft: '1.625rem', marginTop: '-0.5rem' })}
-            >
-              {t('options.catchupHint')}
-            </Text>
             {canSummarize && (
               <>
+                <Checkbox
+                  size="sm"
+                  data-testid="linto-mode-catchup"
+                  isSelected={catchup}
+                  onChange={(value) => {
+                    lintoStore.catchup = value
+                  }}
+                  isDisabled={controlsDisabled}
+                >
+                  <Text variant="sm">{t('options.catchup')}</Text>
+                </Checkbox>
+                <Text
+                  variant="smNote"
+                  className={css({
+                    paddingLeft: '1.625rem',
+                    marginTop: '-0.5rem',
+                  })}
+                >
+                  {t('options.catchupHint')}
+                </Text>
                 <Checkbox
                   size="sm"
                   data-testid="linto-mode-summary"

@@ -65,6 +65,7 @@ and this project adheres to
 - 🐛(mail) Twake Drive link above a bounded summary preview in the recap email
 - 🐛(backend) a live run's end-of-meeting summary needs the summary capability
 - 🐛(backend) a deferred transcription is summarized only for an owner holding the summary capability
+- 🐛(backend) the late joiners' catch-up summary also needs the summary capability
 
 ## [1.37.0] - 2026-11-01
 

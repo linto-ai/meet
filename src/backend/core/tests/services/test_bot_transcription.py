@@ -117,6 +117,8 @@ class TestMarkStarted:
             )
 
     def test_persists_state_and_lights_banner(self, studio_settings):
+        # Service account: every capability granted, the defaults apply.
+        studio_settings.LINTO_ENTITLEMENTS_ENABLED = False
         room, owner = _owner_room()
         data = {
             "session_id": "sess-1",
@@ -222,6 +224,28 @@ class TestMarkStarted:
         room.refresh_from_db()
         assert "linto_summary" not in room.configuration
 
+    def test_catchup_dropped_without_the_summary_capability(self, studio_settings):
+        """The late joiners' summary is a summary too: off without `summary`,
+        and advertised as off to the room."""
+        studio_settings.LINTO_FEATURE_ENABLED = True
+        studio_settings.LINTO_ENTITLEMENTS_ENABLED = True
+        room, owner = _owner_room()
+        data = {"session_id": "s", "channel_id": "c", "summary": False}
+        with mock.patch(
+            "core.entitlements.capabilities.user_linto_capabilities",
+            return_value={"transcription": {"live": True}},
+        ):
+            result = BotTranscriptionService().mark_started(room, data, user=owner)
+        assert result["catchup"] is False
+        linto = self.banner.call_args.kwargs["linto"]
+        assert linto["catchup"] is False
+        with mock.patch(
+            "core.entitlements.capabilities.user_linto_capabilities",
+            return_value={"transcription": {"live": True}, "summary": True},
+        ):
+            result = BotTranscriptionService().mark_started(room, data, user=owner)
+        assert result["catchup"] is True
+
     def test_summary_kept_with_the_summary_capability(self, studio_settings):
         studio_settings.LINTO_FEATURE_ENABLED = True
         studio_settings.LINTO_ENTITLEMENTS_ENABLED = True
@@ -256,6 +280,7 @@ class TestMarkStarted:
             )
         capabilities.assert_not_called()
         assert on["summary"] is True
+        assert on["catchup"] is True
         assert off["summary"] is False
 
 
@@ -269,6 +294,8 @@ class TestBannerMetadata:
     """
 
     def test_active_publishes_the_session_identity(self, studio_settings):
+        # Service account: every capability granted, the defaults apply.
+        studio_settings.LINTO_ENTITLEMENTS_ENABLED = False
         room, owner = _owner_room()
         data = {
             "session_id": "sess-1",

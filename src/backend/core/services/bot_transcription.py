@@ -395,8 +395,8 @@ class BotTranscriptionService:
         (``summary`` default True, ``summary_service`` the chosen summary
         service route, ``record`` default False, ``catchup`` default True = a
         late joiner gets the "before you arrived" summary). Re-checks the
-        transcript permission (defence in depth), drops the summary without the
-        ``summary`` capability, starts the optional video egress when allowed,
+        transcript permission (defence in depth), drops both summaries without
+        the ``summary`` capability, starts the optional video egress when allowed,
         persists ``room.configuration["linto"]`` and sets the banner. Returns the
         persisted state.
         """
@@ -409,13 +409,15 @@ class BotTranscriptionService:
         summary = bool(data.get("summary", True))
         catchup = bool(data.get("catchup", True))
         record = bool(data.get("record", False))
-        if summary and not summary_entitled(user):
+        # Both summaries — at stop, and the late joiners' catch-up — are LLM
+        # summaries: neither runs without the `summary` capability.
+        if (summary or catchup) and not summary_entitled(user):
             logger.warning(
-                "LinTO: summary requested without the summary capability for "
-                "room %s — dropping it",
+                "LinTO: summaries requested without the summary capability for "
+                "room %s — dropping them",
                 room.id,
             )
-            summary = False
+            summary = catchup = False
         if record and not self._has_recording_permission(
             room, user, models.RecordingModeChoices.SCREEN_RECORDING
         ):
