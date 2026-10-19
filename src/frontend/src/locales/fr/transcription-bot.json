@@ -55,7 +55,9 @@
   },
   "stopToast": {
     "ownEmail": "Le compte rendu vous sera envoyé à <recipient>{{email}}</recipient>",
-    "generic": "Le compte rendu sera envoyé à l'organisateur de la réunion."
+    "generic": "Le compte rendu sera envoyé à l'organisateur de la réunion.",
+    "ownEmailTranscript": "La transcription vous sera envoyée à <recipient>{{email}}</recipient>",
+    "genericTranscript": "La transcription sera envoyée à l'organisateur de la réunion."
   },
   "catchupToast": {
     "body": "Le résumé de ce qui s'est dit avant votre arrivée est prêt.",

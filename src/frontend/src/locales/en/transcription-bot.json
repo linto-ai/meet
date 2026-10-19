@@ -55,7 +55,9 @@
   },
   "stopToast": {
     "ownEmail": "The summary will be sent to <recipient>{{email}}</recipient>",
-    "generic": "The summary will be sent to the meeting organizer."
+    "generic": "The summary will be sent to the meeting organizer.",
+    "ownEmailTranscript": "The transcript will be sent to <recipient>{{email}}</recipient>",
+    "genericTranscript": "The transcript will be sent to the meeting organizer."
   },
   "catchupToast": {
     "body": "The summary of what was said before you arrived is ready.",

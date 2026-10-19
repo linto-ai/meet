@@ -24,6 +24,16 @@ export function ToastLintoSummary({ state, ...props }: Readonly<ToastProps>) {
     typeof props.toast.content.email === 'string'
       ? props.toast.content.email
       : undefined
+  // Without a summary the recap carries the transcript alone: say so.
+  const withSummary = props.toast.content.summary !== false
+  const components = {
+    recipient: (
+      <strong
+        data-testid="linto-recipient"
+        className={css({ fontWeight: 'bold' })}
+      />
+    ),
+  }
 
   return (
     <StyledToastContainer {...toastProps} ref={ref}>
@@ -45,21 +55,25 @@ export function ToastLintoSummary({ state, ...props }: Readonly<ToastProps>) {
           })}
         >
           {startedByMe && email ? (
-            <Trans
-              t={t}
-              i18nKey="ownEmail"
-              values={{ email }}
-              components={{
-                recipient: (
-                  <strong
-                    data-testid="linto-recipient"
-                    className={css({ fontWeight: 'bold' })}
-                  />
-                ),
-              }}
-            />
-          ) : (
+            withSummary ? (
+              <Trans
+                t={t}
+                i18nKey="ownEmail"
+                values={{ email }}
+                components={components}
+              />
+            ) : (
+              <Trans
+                t={t}
+                i18nKey="ownEmailTranscript"
+                values={{ email }}
+                components={components}
+              />
+            )
+          ) : withSummary ? (
             t('generic')
+          ) : (
+            t('genericTranscript')
           )}
         </Text>
       </HStack>

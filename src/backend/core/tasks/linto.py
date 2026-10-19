@@ -1180,12 +1180,32 @@ async def _resolve_live_conversation_id(service, payload, room_id):
     )
 
 
+async def _summarize_live_run(linto, conversation_id, room_id, checkpoint, payload):
+    """The live run's summary when its payload asks for one (the starter left
+    it on and held the capability, checked at start), else ``{}``: the
+    delivery then carries the transcript alone. A payload written before
+    ``summary`` was carried only existed with the summary on."""
+    if not payload.get("summary", True):
+        logger.info("Summary off for room %s, delivering the transcript", room_id)
+        return {}
+    return await _summarize_conversation(
+        linto,
+        conversation_id,
+        room_id,
+        checkpoint,
+        service_route=payload.get("summary_service"),
+    )
+
+
 @task(**_RETRY_KWARGS)
 def process_bot_live_summary(self, room_id):
     """Summarize + deliver a LinTO bot's OWN live-transcription conversation.
 
-    Enqueued by ``BotTranscriptionService.stop_bot`` when the panel requested a
-    summary. It is INDEPENDENT of the recording pipeline / ``Recording`` model:
+    Enqueued by ``BotTranscriptionService.mark_stopped`` for every run with a
+    session; the LLM summary step runs only when the payload's ``summary`` is
+    true (the starter's choice, gated by the ``summary`` capability), the
+    document, Twake Drive and recap email always go out. It is INDEPENDENT of
+    the recording pipeline / ``Recording`` model:
     it resolves the Studio conversation that the quickMeeting DELETE finalized,
     then reuses the shared tag/summary/export/share/Twake/email delivery helpers
     (text-only — no original audio bytes for the live path).
@@ -1269,12 +1289,8 @@ async def _process_bot_live_summary_sync(room_id):
 
     # 4. Tag + move + summarize + document (recipient-independent).
     await _tag_and_move(linto, conversation_id, room_id, checkpoint)
-    summary_result = await _summarize_conversation(
-        linto,
-        conversation_id,
-        room_id,
-        checkpoint,
-        service_route=payload.get("summary_service"),
+    summary_result = await _summarize_live_run(
+        linto, conversation_id, room_id, checkpoint, payload
     )
     pdf_content, pub_format = await _generate_document(
         linto, conversation_id, summary_result, room_id, checkpoint

@@ -78,20 +78,23 @@ export const notifyRecordingSaveInProgress = (
 }
 
 /**
- * LinTO "the summary is on its way" toast (fork). Carries everything the
+ * LinTO "the recap is on its way" toast (fork). Carries everything the
  * renderer needs: `startedByMe` decides whether the email recipient is "me"
- * (my own address, bold) or the generic organizer wording. Triggered from the
- * LinTO panel's stop handler when the summary add-on was ON.
+ * (my own address, bold) or the generic organizer wording, `summary` whether
+ * the recap holds a summary or the transcript alone. Triggered from the LinTO
+ * panel's stop handler: every run is delivered.
  */
 export const notifyLintoSummarySaving = (
   startedByMe: boolean,
-  email?: string
+  email?: string,
+  summary = true
 ) => {
   toastQueue.add(
     {
       type: NotificationType.LintoSummarySaving,
       startedByMe,
       email,
+      summary,
     },
     { timeout: NotificationDuration.RECORDING_SAVING }
   )

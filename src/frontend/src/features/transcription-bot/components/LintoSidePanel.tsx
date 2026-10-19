@@ -191,8 +191,8 @@ export const LintoSidePanel = () => {
       console.warn('LinTO: missing room id or token')
       return
     }
-    // Snapshot the summary intent BEFORE stopping — the toast only fires when a
-    // summary email is actually on its way.
+    // Snapshot the summary intent BEFORE stopping: the recap email always goes
+    // out, the toast says whether it holds a summary or the transcript alone.
     const summaryWasOn = canSummarize && lintoStore.summary
     const startedByMe = lintoStore.startedByMe
     lintoStore.localActionUntil = Date.now() + LOCAL_ACTION_GUARD_MS
@@ -207,9 +207,7 @@ export const LintoSidePanel = () => {
           organizationId: lintoStore.orgId,
         },
       })
-      if (summaryWasOn) {
-        notifyLintoSummarySaving(startedByMe, user?.email)
-      }
+      notifyLintoSummarySaving(startedByMe, user?.email, summaryWasOn)
     } catch (err) {
       console.error('Failed to stop LinTO transcription:', err)
     }

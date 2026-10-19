@@ -217,12 +217,12 @@ class TestMarkStarted:
             assert result["summary"] is False
             room.refresh_from_db()
             assert room.configuration["linto"]["summary"] is False
-        # Nothing is summarized at stop.
+        # The run is still delivered at stop, without the summary step.
         with mock.patch.object(BotTranscriptionService, "_enqueue_summary") as enqueue:
             BotTranscriptionService().mark_stopped(room, {}, user=owner)
-        enqueue.assert_not_called()
+        enqueue.assert_called_once_with(room)
         room.refresh_from_db()
-        assert "linto_summary" not in room.configuration
+        assert room.configuration["linto_summary"]["summary"] is False
 
     def test_catchup_dropped_without_the_summary_capability(self, studio_settings):
         """The late joiners' summary is a summary too: off without `summary`,
@@ -260,6 +260,8 @@ class TestMarkStarted:
         with mock.patch.object(BotTranscriptionService, "_enqueue_summary") as enqueue:
             BotTranscriptionService().mark_stopped(room, {}, user=owner)
         enqueue.assert_called_once_with(room)
+        room.refresh_from_db()
+        assert room.configuration["linto_summary"]["summary"] is True
 
     def test_summary_untouched_with_the_kill_switch_off(self, studio_settings):
         """LINTO_ENTITLEMENTS_ENABLED=False: no lookup, the browser's choice
@@ -428,7 +430,40 @@ class TestMarkStopped:
         assert summary["conversation_name"] == "linto-x"
         assert summary["session_id"] == "sess-1"
         assert summary["summary_service"] == "minutes"
+        assert summary["summary"] is True
         self.enqueue.assert_called_once_with(room)
+
+    def test_a_run_without_summary_is_still_delivered(self, studio_settings):
+        """Summary off: the document, Twake Drive and email still go out, the
+        task is told to skip the LLM step."""
+        room = RoomFactory()
+        starter = UserFactory()
+        room.configuration = {
+            "linto": {
+                "user_id": str(starter.id),
+                "org_id": "org-1",
+                "session_id": "sess-1",
+                "summary": False,
+            }
+        }
+        room.save()
+        BotTranscriptionService().mark_stopped(
+            room, {"conversation_name": "linto-x"}, user=starter
+        )
+        room.refresh_from_db()
+        assert room.configuration["linto_summary"]["summary"] is False
+        assert room.configuration["linto_summary"]["conversation_name"] == "linto-x"
+        self.enqueue.assert_called_once_with(room)
+
+    def test_a_run_without_a_session_is_not_delivered(self, studio_settings):
+        room = RoomFactory()
+        starter = UserFactory()
+        room.configuration = {"linto": {"user_id": str(starter.id), "summary": True}}
+        room.save()
+        BotTranscriptionService().mark_stopped(room, {}, user=starter)
+        room.refresh_from_db()
+        assert "linto_summary" not in room.configuration
+        self.enqueue.assert_not_called()
 
     def test_admin_stopping_others_run_deletes_studio_session(self, studio_settings):
         # An admin who did NOT start the run has no browser-side SDK session, so
@@ -519,9 +554,12 @@ class TestTeardown:
             json={"success": True},
             status=200,
         )
-        with mock.patch(
-            "core.services.bot_transcription.RoomManagement"
-        ) as room_management:
+        with (
+            mock.patch(
+                "core.services.bot_transcription.RoomManagement"
+            ) as room_management,
+            mock.patch.object(BotTranscriptionService, "_enqueue_summary"),
+        ):
             BotTranscriptionService().teardown(room)
         args = room_management.return_value.update_metadata.call_args[0]
         assert args[1] == {}

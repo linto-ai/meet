@@ -55,7 +55,9 @@
   },
   "stopToast": {
     "ownEmail": "Das Protokoll wird dir an <recipient>{{email}}</recipient> gesendet",
-    "generic": "Das Protokoll wird an die organisierende Person des Meetings gesendet."
+    "generic": "Das Protokoll wird an die organisierende Person des Meetings gesendet.",
+    "ownEmailTranscript": "Das Transkript wird dir an <recipient>{{email}}</recipient> gesendet",
+    "genericTranscript": "Das Transkript wird an die organisierende Person des Meetings gesendet."
   },
   "catchupToast": {
     "body": "Die Zusammenfassung dessen, was vor deiner Ankunft gesagt wurde, ist fertig.",

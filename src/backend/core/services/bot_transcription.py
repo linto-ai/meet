@@ -482,7 +482,7 @@ class BotTranscriptionService:
         enforce_permission=True,
         force_studio_delete=False,
     ):
-        """Clear a run: banner off, stop egress, enqueue the summary, drop state.
+        """Clear a run: banner off, stop egress, enqueue the delivery, drop state.
 
         The STARTER's browser has already stopped the bot + quick session via the
         SDK (and passes the ``conversation_name`` it used on the DELETE). When the
@@ -525,13 +525,16 @@ class BotTranscriptionService:
         # did not, so stop the Studio bot + session under the service account.
         if force_studio_delete or not is_starter:
             self._delete_studio_session(linto, conversation_name)
+        # The delivery (document, Twake Drive, recap email) follows every run
+        # with a session; `summary` only says whether the LLM step runs in it.
         summary_payload = None
-        if summary and org_id and session_id:
+        if org_id and session_id:
             summary_payload = {
                 "org_id": org_id,
                 "session_id": session_id,
                 "conversation_name": conversation_name,
                 "recipient_user_id": linto.get("user_id"),
+                "summary": summary,
                 "summary_service": linto.get("summary_service"),
                 "record": bool(linto.get("record", False)),
                 "steps": {},

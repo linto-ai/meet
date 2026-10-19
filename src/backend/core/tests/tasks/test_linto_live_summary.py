@@ -20,6 +20,7 @@ import aiohttp
 import pytest
 
 from core import factories, models
+from core.services.bot_transcription import BotTranscriptionService
 from core.services.twake_drive import (
     build_linto_shortcut_filename,
     build_recording_filename,
@@ -515,3 +516,146 @@ class TestTwakeTextOnly:
         assert "http://drive.test/dir-1" in mail.outbox[0].body
         room.refresh_from_db()
         assert "linto_summary" not in room.configuration
+
+
+class TestDeliveryWithoutSummary:
+    """A live run is delivered whether or not it carries a summary: from the
+    start of the run to the recap email, only the LLM step depends on it."""
+
+    TWAKE_PLAN = {"transcription": {"live": True, "async": True}, "recording": True}
+
+    def _start_and_stop(self, starter, data):
+        """Start then stop a run as the panel does; return the room."""
+        room = factories.RoomFactory()
+        factories.UserResourceAccessFactory(
+            resource=room, user=starter, role=models.RoleChoices.OWNER
+        )
+        service = BotTranscriptionService()
+        with (
+            mock.patch.object(BotTranscriptionService, "_set_banner"),
+            mock.patch.object(BotTranscriptionService, "_enqueue_summary") as enqueue,
+        ):
+            service.mark_started(
+                room,
+                {"session_id": "sess-1", "channel_id": "c", "org_id": "org-1", **data},
+                user=starter,
+            )
+            service.mark_stopped(
+                room, {"conversation_name": "linto-room-123"}, user=starter
+            )
+        enqueue.assert_called_once_with(room)
+        room.refresh_from_db()
+        return room
+
+    def _deliver(self, settings, room):
+        """Run the delivery task with Twake Drive on and an LLM service
+        available; return the SDK mock and the Drive file names."""
+        settings.CLOUDERY_URL = "http://cloudery.test"
+        settings.CLOUDERY_TOKEN = "tok"
+        with contextlib.ExitStack() as stack:
+            sdk = _patch_sdk(
+                stack, summary={"content": "## Key points\n- one", "jobId": "job-1"}
+            )
+            _patch_service(stack)
+            stack.enter_context(
+                mock.patch(
+                    "core.services.twake_drive.get_drive_token",
+                    mock.AsyncMock(return_value="drive-token"),
+                )
+            )
+            stack.enter_context(
+                mock.patch(
+                    "core.services.twake_drive.ensure_meeting_directory",
+                    mock.AsyncMock(return_value="dir-1"),
+                )
+            )
+            save_file = stack.enter_context(
+                mock.patch("core.services.twake_drive.save_file", mock.AsyncMock())
+            )
+            stack.enter_context(
+                mock.patch(
+                    "core.services.twake_drive.build_drive_link",
+                    return_value="http://drive.test/dir-1",
+                )
+            )
+            linto_task._process_bot_live_summary_sync(str(room.id))
+        filenames = [c.kwargs["filename"] for c in save_file.await_args_list]
+        room.refresh_from_db()
+        assert "linto_summary" not in room.configuration
+        return sdk, filenames
+
+    def _assert_transcript_only(self, sdk, filenames):
+        """No LLM call; the transcript note and the transcript document reach
+        Twake Drive; the email links them and promises no summary."""
+        sdk.list_llm_services.assert_not_called()
+        sdk.summarize.assert_not_called()
+        sdk.export_with_template.assert_not_called()
+        sdk.download_conversation.assert_awaited_once()
+        assert any(name.endswith(" - Transcript.docx") for name in filenames)
+        assert any(name.endswith(" - Transcript.cozy-note") for name in filenames)
+        assert not any("Summary" in name for name in filenames), filenames
+        assert len(mail.outbox) == 1
+        body = mail.outbox[0].body
+        assert "The transcription of" in body
+        assert "http://drive.test/dir-1" in body
+        assert "summary" not in body.lower()
+
+    def test_not_entitled_the_transcript_is_delivered(self, no_twake, fast_resolve):
+        no_twake.LINTO_FEATURE_ENABLED = True
+        no_twake.LINTO_ENTITLEMENTS_ENABLED = True
+        starter = factories.UserFactory(
+            sub="starter-sub", email="starter@example.com", language="en-us"
+        )
+        with mock.patch(
+            "core.entitlements.capabilities.user_linto_capabilities",
+            return_value=self.TWAKE_PLAN,
+        ):
+            room = self._start_and_stop(starter, {"summary": True})
+        assert room.configuration["linto_summary"]["summary"] is False
+        sdk, filenames = self._deliver(no_twake, room)
+        self._assert_transcript_only(sdk, filenames)
+
+    def test_turned_off_with_the_kill_switch_the_transcript_is_delivered(
+        self, no_twake, fast_resolve
+    ):
+        no_twake.LINTO_FEATURE_ENABLED = True
+        no_twake.LINTO_ENTITLEMENTS_ENABLED = False
+        starter = factories.UserFactory(
+            sub="starter-sub", email="starter@example.com", language="en-us"
+        )
+        room = self._start_and_stop(starter, {"summary": False})
+        assert room.configuration["linto_summary"]["summary"] is False
+        sdk, filenames = self._deliver(no_twake, room)
+        self._assert_transcript_only(sdk, filenames)
+
+    def test_entitled_the_summary_is_delivered_as_before(self, no_twake, fast_resolve):
+        no_twake.LINTO_FEATURE_ENABLED = True
+        no_twake.LINTO_ENTITLEMENTS_ENABLED = True
+        starter = factories.UserFactory(
+            sub="starter-sub", email="starter@example.com", language="en-us"
+        )
+        with mock.patch(
+            "core.entitlements.capabilities.user_linto_capabilities",
+            return_value={**self.TWAKE_PLAN, "summary": True},
+        ):
+            room = self._start_and_stop(starter, {})
+        assert room.configuration["linto_summary"]["summary"] is True
+        sdk, filenames = self._deliver(no_twake, room)
+        sdk.summarize.assert_awaited_once_with("conv-1", "llm")
+        sdk.export_with_template.assert_awaited_once()
+        sdk.download_conversation.assert_not_called()
+        assert any(name.endswith(" - Summary.pdf") for name in filenames), filenames
+        body = mail.outbox[0].body
+        assert "The transcription and summary of" in body
+        assert "Key points" in body
+
+    def test_a_payload_without_the_flag_is_summarized(self, no_twake, fast_resolve):
+        """A delivery queued before the flag existed only had the summary on."""
+        recipient = factories.UserFactory(email="starter@example.com")
+        room = _make_room(recipient=recipient)
+        assert "summary" not in room.configuration["linto_summary"]
+        with contextlib.ExitStack() as stack:
+            sdk = _patch_sdk(stack, summary={"content": "## K", "jobId": "job-1"})
+            _patch_service(stack)
+            linto_task._process_bot_live_summary_sync(str(room.id))
+        sdk.summarize.assert_awaited_once()

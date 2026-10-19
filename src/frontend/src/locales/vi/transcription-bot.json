@@ -55,7 +55,9 @@
   },
   "stopToast": {
     "ownEmail": "Biên bản sẽ được gửi cho bạn tại <recipient>{{email}}</recipient>",
-    "generic": "Biên bản sẽ được gửi cho người tổ chức cuộc họp."
+    "generic": "Biên bản sẽ được gửi cho người tổ chức cuộc họp.",
+    "ownEmailTranscript": "Bản chép lời sẽ được gửi cho bạn tại <recipient>{{email}}</recipient>",
+    "genericTranscript": "Bản chép lời sẽ được gửi cho người tổ chức cuộc họp."
   },
   "catchupToast": {
     "body": "Bản tóm tắt những gì đã nói trước khi bạn tham gia đã sẵn sàng.",

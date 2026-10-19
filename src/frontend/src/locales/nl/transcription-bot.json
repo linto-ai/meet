@@ -55,7 +55,9 @@
   },
   "stopToast": {
     "ownEmail": "Het verslag wordt naar je verzonden op <recipient>{{email}}</recipient>",
-    "generic": "Het verslag wordt naar de organisator van de vergadering verzonden."
+    "generic": "Het verslag wordt naar de organisator van de vergadering verzonden.",
+    "ownEmailTranscript": "Het transcript wordt naar je verzonden op <recipient>{{email}}</recipient>",
+    "genericTranscript": "Het transcript wordt naar de organisator van de vergadering verzonden."
   },
   "catchupToast": {
     "body": "De samenvatting van wat er is gezegd voordat je erbij kwam, is klaar.",
