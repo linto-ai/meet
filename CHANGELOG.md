@@ -64,6 +64,7 @@ and this project adheres to
 - 🐛(backend) a resumed LinTO task still links the Twake Drive folder in the email
 - 🐛(mail) Twake Drive link above a bounded summary preview in the recap email
 - 🐛(backend) a live run's end-of-meeting summary needs the summary capability
+- 🐛(backend) a deferred transcription is summarized only for an owner holding the summary capability
 
 ## [1.37.0] - 2026-11-01
 

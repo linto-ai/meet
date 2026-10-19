@@ -42,6 +42,7 @@ import markdown as markdown_lib
 from asgiref.sync import async_to_sync, sync_to_async
 
 from core import models
+from core.entitlements.capabilities import summary_entitled
 from core.recording.enums import FileExtension
 from core.services.audio_extract import extract_audio_from_video
 from core.services.twake_drive import (
@@ -780,6 +781,20 @@ async def _resolve_speaker_collection_ids(linto, recording_id):
     return None
 
 
+async def _summary_wanted(options, owner, recording_id):
+    """Does the deferred pipeline ask for an LLM summary? Not when the panel
+    turned it off, nor when the owner of the recording does not hold the
+    ``summary`` capability — read when the summary is produced, so a right
+    withdrawn during the meeting applies."""
+    if options.get("summary") is False:
+        logger.info("Summary turned off for %s, skipping", recording_id)
+        return False
+    if not await sync_to_async(summary_entitled)(owner):
+        logger.info("No summary capability for the owner of %s, skipping", recording_id)
+        return False
+    return True
+
+
 @async_to_sync
 async def _process_linto_transcription_sync(recording_id):  # noqa: PLR0915
     """Async implementation using LinTO SDK (idempotent / resumable)."""
@@ -946,13 +961,19 @@ async def _process_linto_transcription_sync(recording_id):  # noqa: PLR0915
     # 5.1 / 5.2 Tag + move (soft-fail)
     await _tag_and_move(linto, conversation_id, recording_id, checkpoint)
 
-    # 5.5 LLM summary (soft-fail) — unless the panel turned it off; the
-    # service is the one picked there (None = the instance default).
+    # The user who triggered the recording (RecordingAccess role=OWNER is
+    # created for the trigger user in start_room_recording — not necessarily a
+    # room admin): the summary follows their capability, the conversation is
+    # shared with them and the delivery goes to them.
+    owner_access = await sync_to_async(
+        lambda: recording.accesses.filter(role="owner").select_related("user").first()
+    )()
+    recipient_user = owner_access.user if owner_access else None
+
+    # 5.5 LLM summary (soft-fail) — when wanted; the service is the one
+    # picked in the panel (None = the instance default).
     options = recording.options or {}
-    if options.get("summary") is False:
-        logger.info("Summary turned off for %s, skipping", recording_id)
-        summary_result = {}
-    else:
+    if await _summary_wanted(options, recipient_user, recording_id):
         summary_result = await _summarize_conversation(
             linto,
             conversation_id,
@@ -960,6 +981,8 @@ async def _process_linto_transcription_sync(recording_id):  # noqa: PLR0915
             checkpoint,
             service_route=options.get("summary_service") or None,
         )
+    else:
+        summary_result = {}
 
     # 5.6 Document attachment (soft-fail)
     pdf_content, pub_format = await _generate_document(
@@ -971,13 +994,7 @@ async def _process_linto_transcription_sync(recording_id):  # noqa: PLR0915
     pub_mime = _publication_mime(pub_format)
     summary_preview = _extract_summary_preview(summary_result)
 
-    # 5.8 Share conversation with the user who triggered the recording
-    # (RecordingAccess role=OWNER is created for the trigger user in
-    # start_room_recording — not necessarily a room admin).
-    owner_access = await sync_to_async(
-        lambda: recording.accesses.filter(role="owner").select_related("user").first()
-    )()
-    recipient_user = owner_access.user if owner_access else None
+    # 5.8 Share conversation with the user who triggered the recording.
     # Folder and file names on Twake Drive follow the owner's language.
     owner_language = recipient_user.language if recipient_user else None
     pub_filename = build_summary_filename(recording, pub_format, owner_language)

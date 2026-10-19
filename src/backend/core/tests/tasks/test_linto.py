@@ -346,3 +346,102 @@ class TestSpeakerIdentification:
         sdk.upload.assert_called_once()
         _, kwargs = sdk.upload.call_args
         assert kwargs["speaker_collection_ids"] is None
+
+
+class TestSummaryCapability:
+    """The deferred pipeline summarizes only for an owner holding the
+    `summary` capability, read when the task reaches the summary step."""
+
+    TWAKE_PLAN = {"transcription": {"live": True, "async": True}, "recording": True}
+
+    def _run_until_document(self, settings, options=None):
+        """Resume a transcribed recording and halt right after the summary
+        step; return the summarize and document mocks and the recording."""
+        settings.CLOUDERY_URL = None
+        settings.CLOUDERY_TOKEN = None
+        rec = _make_recording(
+            models.RecordingModeChoices.TRANSCRIPT,
+            linto_state={
+                "conversation_id": "conv-1",
+                "steps": {"transcription": True},
+                "attempts": 1,
+            },
+        )
+        if options is not None:
+            rec.options = options
+            rec.save(update_fields=["options"])
+        with contextlib.ExitStack() as stack:
+            _patch_storage(stack, b"OggS raw")
+            sdk = _patch_sdk(stack)
+            sdk.get_media = mock.AsyncMock(return_value=mock.Mock())
+            stack.enter_context(
+                mock.patch.object(linto_task, "_tag_and_move", mock.AsyncMock())
+            )
+            summarize = stack.enter_context(
+                mock.patch.object(
+                    linto_task,
+                    "_summarize_conversation",
+                    mock.AsyncMock(return_value={"summary": "done"}),
+                )
+            )
+            document = stack.enter_context(
+                mock.patch.object(
+                    linto_task,
+                    "_generate_document",
+                    mock.AsyncMock(side_effect=RuntimeError("stop-doc")),
+                )
+            )
+            with pytest.raises(RuntimeError, match="stop-doc"):
+                linto_task._process_linto_transcription_sync(str(rec.id))
+        return summarize, document, rec
+
+    def test_no_summary_without_the_capability(self, settings):
+        settings.LINTO_STUDIO_ENABLED = True
+        settings.LINTO_ENTITLEMENTS_ENABLED = True
+        with mock.patch(
+            "core.entitlements.capabilities.user_linto_capabilities",
+            return_value=self.TWAKE_PLAN,
+        ) as capabilities:
+            summarize, document, rec = self._run_until_document(
+                settings, options={"summary": True}
+            )
+        summarize.assert_not_called()
+        assert document.call_args.args[2] == {}
+        # The capability is the recording owner's.
+        owner = rec.accesses.get(role=models.RoleChoices.OWNER).user
+        assert capabilities.call_args.args[0] == owner
+
+    def test_summary_with_the_capability(self, settings):
+        settings.LINTO_STUDIO_ENABLED = True
+        settings.LINTO_ENTITLEMENTS_ENABLED = True
+        with mock.patch(
+            "core.entitlements.capabilities.user_linto_capabilities",
+            return_value={**self.TWAKE_PLAN, "summary": True},
+        ):
+            summarize, document, _rec = self._run_until_document(
+                settings, options={"summary_service": "minutes"}
+            )
+        summarize.assert_awaited_once()
+        assert summarize.call_args.kwargs["service_route"] == "minutes"
+        assert document.call_args.args[2] == {"summary": "done"}
+
+    def test_summary_turned_off_in_the_panel_stays_off(self, settings):
+        settings.LINTO_ENTITLEMENTS_ENABLED = True
+        with mock.patch(
+            "core.entitlements.capabilities.user_linto_capabilities",
+            return_value={"summary": True},
+        ):
+            summarize, _document, _rec = self._run_until_document(
+                settings, options={"summary": False}
+            )
+        summarize.assert_not_called()
+
+    def test_kill_switch_off_summarizes_as_before(self, settings):
+        """LINTO_ENTITLEMENTS_ENABLED=False: no lookup, summary by default."""
+        settings.LINTO_ENTITLEMENTS_ENABLED = False
+        with mock.patch(
+            "core.entitlements.capabilities.user_linto_capabilities"
+        ) as capabilities:
+            summarize, _document, _rec = self._run_until_document(settings)
+        capabilities.assert_not_called()
+        summarize.assert_awaited_once()

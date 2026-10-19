@@ -73,8 +73,11 @@ export const TranscriptSidePanel = () => {
   // LinTO (fork): the deferred transcription is a LinTO feature with its own
   // language list, summary options and per-user capability.
   const { enabled: isLintoEnabled } = useLintoConfig()
-  const { loading: capabilitiesLoading, async: canTranscribeAsync } =
-    useLintoCapabilities()
+  const {
+    loading: capabilitiesLoading,
+    async: canTranscribeAsync,
+    summary: canSummarize,
+  } = useLintoCapabilities()
   const { active: isLintoActive } = useLintoStatus()
   const { openLinto } = useSidePanel()
   const { lintoSummary, lintoSummaryService } = useSnapshot(recordingStore)
@@ -144,7 +147,9 @@ export const TranscriptSidePanel = () => {
           ? RecordingMode.ScreenRecording
           : RecordingMode.Transcript
 
-        // LinTO: the summary choice rides along for the offline pipeline.
+        // LinTO: the summary choice rides along for the offline pipeline
+        // (none without the summary capability: the option is hidden).
+        const withSummary = canSummarize && lintoSummary
         const recordingOptions = {
           ...(language && { language }),
           ...(withScreenRecording && {
@@ -153,8 +158,8 @@ export const TranscriptSidePanel = () => {
             ...(encoding && { encoding }),
           }),
           ...(isLintoEnabled && {
-            summary: lintoSummary,
-            ...(lintoSummary &&
+            summary: withSummary,
+            ...(withSummary &&
               lintoSummaryService && {
                 summary_service: lintoSummaryService,
               }),
@@ -338,25 +343,29 @@ export const TranscriptSidePanel = () => {
               isDisabled={controlsDisabled}
               testId="transcript-language"
             />
-            <Checkbox
-              size="sm"
-              data-testid="transcript-mode-summary"
-              isSelected={lintoSummary}
-              onChange={(value) => {
-                recordingStore.lintoSummary = value
-              }}
-              isDisabled={controlsDisabled}
-            >
-              <Text variant="sm">{tLinto('summary')}</Text>
-            </Checkbox>
-            {lintoSummary && (
-              <SummaryServicePicker
-                isDisabled={controlsDisabled}
-                value={lintoSummaryService}
-                onChange={(route) => {
-                  recordingStore.lintoSummaryService = route
-                }}
-              />
+            {canSummarize && (
+              <>
+                <Checkbox
+                  size="sm"
+                  data-testid="transcript-mode-summary"
+                  isSelected={lintoSummary}
+                  onChange={(value) => {
+                    recordingStore.lintoSummary = value
+                  }}
+                  isDisabled={controlsDisabled}
+                >
+                  <Text variant="sm">{tLinto('summary')}</Text>
+                </Checkbox>
+                {lintoSummary && (
+                  <SummaryServicePicker
+                    isDisabled={controlsDisabled}
+                    value={lintoSummaryService}
+                    onChange={(route) => {
+                      recordingStore.lintoSummaryService = route
+                    }}
+                  />
+                )}
+              </>
             )}
           </VStack>
         )}
