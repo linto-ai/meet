@@ -34,7 +34,7 @@ import requests
 
 from core import models
 from core.api.permissions import get_recording_permission_level
-from core.entitlements.capabilities import recording_entitled
+from core.entitlements.capabilities import recording_entitled, summary_entitled
 from core.recording.worker.factories import get_worker_service
 from core.recording.worker.mediator import WorkerServiceMediator
 from core.services.room_management import RoomManagement
@@ -395,9 +395,10 @@ class BotTranscriptionService:
         (``summary`` default True, ``summary_service`` the chosen summary
         service route, ``record`` default False, ``catchup`` default True = a
         late joiner gets the "before you arrived" summary). Re-checks the
-        transcript permission (defence in depth), starts the optional video
-        egress when allowed, persists ``room.configuration["linto"]`` and sets the
-        banner. Returns the persisted state.
+        transcript permission (defence in depth), drops the summary without the
+        ``summary`` capability, starts the optional video egress when allowed,
+        persists ``room.configuration["linto"]`` and sets the banner. Returns the
+        persisted state.
         """
         if not self._has_recording_permission(
             room, user, models.RecordingModeChoices.TRANSCRIPT
@@ -408,6 +409,13 @@ class BotTranscriptionService:
         summary = bool(data.get("summary", True))
         catchup = bool(data.get("catchup", True))
         record = bool(data.get("record", False))
+        if summary and not summary_entitled(user):
+            logger.warning(
+                "LinTO: summary requested without the summary capability for "
+                "room %s — dropping it",
+                room.id,
+            )
+            summary = False
         if record and not self._has_recording_permission(
             room, user, models.RecordingModeChoices.SCREEN_RECORDING
         ):

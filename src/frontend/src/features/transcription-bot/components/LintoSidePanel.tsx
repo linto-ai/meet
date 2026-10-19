@@ -71,8 +71,11 @@ export const LintoSidePanel = () => {
   const token = apiRoomData?.livekit?.token
 
   const { user } = useUser()
-  const { loading: capabilitiesLoading, live: canTranscribeLive } =
-    useLintoCapabilities()
+  const {
+    loading: capabilitiesLoading,
+    live: canTranscribeLive,
+    summary: canSummarize,
+  } = useLintoCapabilities()
   const { data: configData } = useConfig()
   const lintoConfig = configData?.linto
   const isAdminOrOwner = useIsAdminOrOwner()
@@ -167,7 +170,9 @@ export const LintoSidePanel = () => {
         roomSlug,
         lintoConfig,
         config: {
-          summary,
+          // The summary is a feature of its own: without the capability the
+          // option is hidden and the run carries none.
+          summary: canSummarize && summary,
           summaryService,
           catchup,
           record: hasScreenRecordingAccess ? record : false,
@@ -188,7 +193,7 @@ export const LintoSidePanel = () => {
     }
     // Snapshot the summary intent BEFORE stopping — the toast only fires when a
     // summary email is actually on its way.
-    const summaryWasOn = lintoStore.summary
+    const summaryWasOn = canSummarize && lintoStore.summary
     const startedByMe = lintoStore.startedByMe
     lintoStore.localActionUntil = Date.now() + LOCAL_ACTION_GUARD_MS
     try {
@@ -343,18 +348,24 @@ export const LintoSidePanel = () => {
             >
               {t('options.catchupHint')}
             </Text>
-            <Checkbox
-              size="sm"
-              data-testid="linto-mode-summary"
-              isSelected={summary}
-              onChange={(value) => {
-                lintoStore.summary = value
-              }}
-              isDisabled={controlsDisabled}
-            >
-              <Text variant="sm">{t('options.summary')}</Text>
-            </Checkbox>
-            {summary && <SummaryServicePicker isDisabled={controlsDisabled} />}
+            {canSummarize && (
+              <>
+                <Checkbox
+                  size="sm"
+                  data-testid="linto-mode-summary"
+                  isSelected={summary}
+                  onChange={(value) => {
+                    lintoStore.summary = value
+                  }}
+                  isDisabled={controlsDisabled}
+                >
+                  <Text variant="sm">{t('options.summary')}</Text>
+                </Checkbox>
+                {summary && (
+                  <SummaryServicePicker isDisabled={controlsDisabled} />
+                )}
+              </>
+            )}
             {hasScreenRecordingAccess && (
               <Checkbox
                 size="sm"

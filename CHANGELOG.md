@@ -63,6 +63,7 @@ and this project adheres to
 - 🐛(backend) the recap email renders a summary wrapped in a code fence as Markdown
 - 🐛(backend) a resumed LinTO task still links the Twake Drive folder in the email
 - 🐛(mail) Twake Drive link above a bounded summary preview in the recap email
+- 🐛(backend) a live run's end-of-meeting summary needs the summary capability
 
 ## [1.37.0] - 2026-11-01
 

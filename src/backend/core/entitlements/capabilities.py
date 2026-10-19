@@ -112,3 +112,13 @@ def recording_entitled(user):
     if not settings.LINTO_RECORDING_ENTITLEMENT_ENABLED:
         return True
     return has_linto_capability(user, "recording")
+
+
+def summary_entitled(user):
+    """May a transcription of ``user`` be summarized by the LLM? Always when
+    the per-user feature system is off (``LINTO_ENTITLEMENTS_ENABLED=False``,
+    the service account does it all), else the ``summary`` capability is
+    required — absent means no summary."""
+    if not settings.LINTO_ENTITLEMENTS_ENABLED:
+        return True
+    return has_linto_capability(user, "summary")

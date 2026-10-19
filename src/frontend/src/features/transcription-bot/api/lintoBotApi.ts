@@ -112,8 +112,9 @@ export function useLintoSummaryServices(
   token: string | undefined
 ) {
   const { config } = useStudioClient()
-  // Both transcription tools offer the summary: live and deferred.
-  const { live, async: deferred } = useLintoCapabilities()
+  // Both transcription tools offer the summary (live and deferred), to whoever
+  // holds the summary capability.
+  const { live, async: deferred, summary } = useLintoCapabilities()
   return useQuery<LintoSummaryService[], ApiError>({
     queryKey: ['lintoSummaryServices', roomId],
     queryFn: async () => {
@@ -123,7 +124,8 @@ export function useLintoSummaryServices(
       )
       return res.services ?? []
     },
-    enabled: !!roomId && !!token && !!config?.enabled && (live || deferred),
+    enabled:
+      !!roomId && !!token && !!config?.enabled && summary && (live || deferred),
     staleTime: 5 * 60 * 1000,
   })
 }

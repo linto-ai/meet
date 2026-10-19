@@ -196,6 +196,68 @@ class TestMarkStarted:
         assert result["record"] is True
         self.rec.assert_called_once()
 
+    def test_summary_dropped_without_the_summary_capability(self, studio_settings):
+        """Per-user gating on: the end-of-meeting summary needs `summary`,
+        whatever the browser sends; absent counts as not granted."""
+        studio_settings.LINTO_FEATURE_ENABLED = True
+        studio_settings.LINTO_ENTITLEMENTS_ENABLED = True
+        room, owner = _owner_room()
+        data = {"session_id": "s", "channel_id": "c", "org_id": "o", "summary": True}
+        for capabilities in (
+            {"transcription": {"live": True, "async": True}, "recording": True},
+            {"transcription": {"live": True}, "summary": False},
+        ):
+            with mock.patch(
+                "core.entitlements.capabilities.user_linto_capabilities",
+                return_value=capabilities,
+            ):
+                result = BotTranscriptionService().mark_started(room, data, user=owner)
+            assert result["summary"] is False
+            room.refresh_from_db()
+            assert room.configuration["linto"]["summary"] is False
+        # Nothing is summarized at stop.
+        with mock.patch.object(BotTranscriptionService, "_enqueue_summary") as enqueue:
+            BotTranscriptionService().mark_stopped(room, {}, user=owner)
+        enqueue.assert_not_called()
+        room.refresh_from_db()
+        assert "linto_summary" not in room.configuration
+
+    def test_summary_kept_with_the_summary_capability(self, studio_settings):
+        studio_settings.LINTO_FEATURE_ENABLED = True
+        studio_settings.LINTO_ENTITLEMENTS_ENABLED = True
+        room, owner = _owner_room()
+        data = {"session_id": "s", "channel_id": "c", "org_id": "o"}
+        with mock.patch(
+            "core.entitlements.capabilities.user_linto_capabilities",
+            return_value={"transcription": {"live": True}, "summary": True},
+        ):
+            result = BotTranscriptionService().mark_started(room, data, user=owner)
+        assert result["summary"] is True
+        with mock.patch.object(BotTranscriptionService, "_enqueue_summary") as enqueue:
+            BotTranscriptionService().mark_stopped(room, {}, user=owner)
+        enqueue.assert_called_once_with(room)
+
+    def test_summary_untouched_with_the_kill_switch_off(self, studio_settings):
+        """LINTO_ENTITLEMENTS_ENABLED=False: no lookup, the browser's choice
+        stands as before."""
+        studio_settings.LINTO_FEATURE_ENABLED = True
+        studio_settings.LINTO_ENTITLEMENTS_ENABLED = False
+        room, owner = _owner_room()
+        with mock.patch(
+            "core.entitlements.capabilities.user_linto_capabilities"
+        ) as capabilities:
+            on = BotTranscriptionService().mark_started(
+                room, {"session_id": "s", "channel_id": "c"}, user=owner
+            )
+            off = BotTranscriptionService().mark_started(
+                room,
+                {"session_id": "s", "channel_id": "c", "summary": False},
+                user=owner,
+            )
+        capabilities.assert_not_called()
+        assert on["summary"] is True
+        assert off["summary"] is False
+
 
 class TestBannerMetadata:
     """_set_banner: the room-metadata contract read by EVERY participant.

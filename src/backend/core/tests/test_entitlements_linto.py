@@ -20,6 +20,7 @@ from core.entitlements.capabilities import (
     has_linto_capability,
     no_capabilities,
     normalize_capabilities,
+    summary_entitled,
     user_linto_capabilities,
 )
 from core.entitlements.factory import get_entitlements_backend
@@ -347,3 +348,42 @@ def test_config_exposes_the_recording_gate(settings):
     settings.LINTO_RECORDING_ENTITLEMENT_ENABLED = True
     data = APIClient().get("/api/v1.0/config/").json()
     assert data["linto"]["recording_entitlement_enabled"] is True
+
+
+# -- summary gate: the LLM summary needs `summary` --
+
+# What Twake declares today: the transcriptions and the recording, no summary.
+TWAKE_PLAN = {"transcription": {"live": True, "async": True}, "recording": True}
+
+
+@responses.activate
+def test_summary_needs_the_summary_capability(linto_settings):
+    user = factories.UserFactory(sub="twake-user")
+    responses.add(
+        responses.POST,
+        RESOLVE,
+        json={"organizationId": "o", "capabilities": TWAKE_PLAN},
+    )
+    assert not summary_entitled(user)
+    other = factories.UserFactory(sub="summary-user")
+    responses.replace(
+        responses.POST,
+        RESOLVE,
+        json={"organizationId": "o", "capabilities": {**TWAKE_PLAN, "summary": True}},
+    )
+    assert summary_entitled(other)
+
+
+def test_summary_needs_an_identity(linto_settings):
+    from django.contrib.auth.models import AnonymousUser  # noqa: PLC0415
+
+    assert not summary_entitled(AnonymousUser())
+    assert not summary_entitled(None)
+
+
+@responses.activate
+def test_summary_is_granted_with_the_kill_switch_off(linto_settings):
+    linto_settings.LINTO_ENTITLEMENTS_ENABLED = False
+    assert summary_entitled(factories.UserFactory())
+    assert summary_entitled(None)
+    assert not responses.calls
