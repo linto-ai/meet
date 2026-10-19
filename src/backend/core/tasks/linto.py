@@ -49,6 +49,7 @@ from core.services.twake_drive import (
     build_linto_shortcut_filename,
     build_recording_filename,
     build_summary_filename,
+    build_transcript_document_filename,
     build_transcript_filename,
 )
 from core.tasks._base import NotificationTask
@@ -259,6 +260,20 @@ def _publication_mime(pub_format):
     return mime_types.get(pub_format, "application/octet-stream")
 
 
+def _has_summary(summary_result):
+    """Did the summary step produce a report? Then the published document is
+    the summary (export through a template), else the plain transcript."""
+    return bool(summary_result.get("success") and summary_result.get("job_id"))
+
+
+def _document_filename(meeting, pub_format, language, summary_result):
+    """The published document's name says what it is: the summary, or the
+    transcript when there is no summary."""
+    if _has_summary(summary_result):
+        return build_summary_filename(meeting, pub_format, language)
+    return build_transcript_document_filename(meeting, pub_format, language)
+
+
 def _extract_summary_preview(summary_result):
     """Extract the human-readable summary text from the SDK summary result."""
     if summary_result.get("content"):
@@ -415,7 +430,7 @@ async def _generate_document(
     if checkpoint.done("document"):
         return pdf_content, pub_format
 
-    if summary_result.get("success") and summary_result.get("job_id"):
+    if _has_summary(summary_result):
         # Summary available: export via publication template
         try:
             job_id = summary_result["job_id"]
@@ -647,6 +662,7 @@ async def _send_recap_emails(  # noqa: PLR0913 - recap email needs the full cont
     recipient_users,
     room_name,
     meeting_dt,
+    with_summary,
     summary_preview,
     twake_drive_link,
     pdf_content,
@@ -657,8 +673,10 @@ async def _send_recap_emails(  # noqa: PLR0913 - recap email needs the full cont
 ):
     """Send the recap email to each recipient with an email address.
 
-    The ``email`` step is checkpointed only when EVERY send succeeded, so a
-    retry re-sends to all recipients after any SMTP failure.
+    ``with_summary`` says whether a summary was produced: without one, the
+    email announces the transcript alone. The ``email`` step is checkpointed
+    only when EVERY send succeeded, so a retry re-sends to all recipients after
+    any SMTP failure.
     """
     if checkpoint.done("email"):
         logger.info("Email already sent for %s, skipping", log_id)
@@ -685,6 +703,7 @@ async def _send_recap_emails(  # noqa: PLR0913 - recap email needs the full cont
                         "recording_time": meeting_dt.astimezone(user.timezone).strftime(
                             "%H:%M"
                         ),
+                        "with_summary": with_summary,
                         "summary_preview": summary_preview,
                         "summary_preview_html": _render_summary_html(
                             _truncate_summary(summary_preview)
@@ -997,7 +1016,9 @@ async def _process_linto_transcription_sync(recording_id):  # noqa: PLR0915
     # 5.8 Share conversation with the user who triggered the recording.
     # Folder and file names on Twake Drive follow the owner's language.
     owner_language = recipient_user.language if recipient_user else None
-    pub_filename = build_summary_filename(recording, pub_format, owner_language)
+    pub_filename = _document_filename(
+        recording, pub_format, owner_language, summary_result
+    )
 
     await _share_conversation(
         linto, conversation_id, recipient_user, recording_id, checkpoint
@@ -1068,6 +1089,7 @@ async def _process_linto_transcription_sync(recording_id):  # noqa: PLR0915
         recipient_users=[access.user for access in accesses],
         room_name=room_name,
         meeting_dt=recording.created_at,
+        with_summary=_has_summary(summary_result),
         summary_preview=summary_preview,
         twake_drive_link=twake_drive_link,
         pdf_content=pdf_content,
@@ -1265,7 +1287,7 @@ async def _process_bot_live_summary_sync(room_id):
     meeting = SimpleNamespace(created_at=meeting_dt, room_id=room.id)
     language = recipient_user.language if recipient_user else None
     pub_mime = _publication_mime(pub_format)
-    pub_filename = build_summary_filename(meeting, pub_format, language)
+    pub_filename = _document_filename(meeting, pub_format, language, summary_result)
     summary_preview = _extract_summary_preview(summary_result)
 
     # 5. Share + Twake + email. Live path is TEXT-ONLY: no original audio bytes
@@ -1297,6 +1319,7 @@ async def _process_bot_live_summary_sync(room_id):
         recipient_users=recipient_users,
         room_name=room_name,
         meeting_dt=meeting_dt,
+        with_summary=_has_summary(summary_result),
         summary_preview=summary_preview,
         twake_drive_link=twake_drive_link,
         pdf_content=pdf_content,

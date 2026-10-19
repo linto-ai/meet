@@ -100,6 +100,14 @@ def build_summary_filename(recording, extension, language=None):
     return f"{meeting_date(recording)} - {get_labels(language)['summary']}.{extension}"
 
 
+def build_transcript_document_filename(recording, extension, language=None):
+    """Name of the document published without a summary (the transcript
+    itself): `{date} - Transcript.{extension}`."""
+    return (
+        f"{meeting_date(recording)} - {get_labels(language)['transcript']}.{extension}"
+    )
+
+
 def build_transcript_filename(recording, language=None):
     """Name of the raw transcript note: `{date} - Transcript.cozy-note`."""
     return f"{meeting_date(recording)} - {get_labels(language)['transcript']}.cozy-note"

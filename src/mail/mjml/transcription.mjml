@@ -24,11 +24,19 @@
             <h1>{% trans "Your meeting transcription is ready!"%}</h1>
           </mj-text>
           <!-- Main Message -->
+          <mj-raw>{% if with_summary %}</mj-raw>
           <mj-text>
             {% blocktrans %}
             The transcription and summary of "{{room_name}}" on {{recording_date}} at {{recording_time}} are now available.
             {% endblocktrans %}
           </mj-text>
+          <mj-raw>{% else %}</mj-raw>
+          <mj-text>
+            {% blocktrans %}
+            The transcription of "{{room_name}}" on {{recording_date}} at {{recording_time}} is now available.
+            {% endblocktrans %}
+          </mj-text>
+          <mj-raw>{% endif %}</mj-raw>
           <mj-raw>{% if twake_drive_link %}</mj-raw>
           <mj-text>
             {% blocktrans %}
@@ -43,10 +51,16 @@
           >
             {% trans "Open in Twake Drive" %}
           </mj-button>
-          <mj-raw>{% elif has_pdf_attachment %}</mj-raw>
+          <mj-raw>{% elif has_pdf_attachment and with_summary %}</mj-raw>
           <mj-text>
             {% blocktrans %}
             A PDF summary is attached to this email.
+            {% endblocktrans %}
+          </mj-text>
+          <mj-raw>{% elif has_pdf_attachment %}</mj-raw>
+          <mj-text>
+            {% blocktrans %}
+            The transcription document is attached to this email.
             {% endblocktrans %}
           </mj-text>
           <mj-raw>{% endif %}</mj-raw>

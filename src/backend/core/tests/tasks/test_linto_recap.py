@@ -93,6 +93,7 @@ class TestRecapEmail:
             "recipient_users": [user],
             "room_name": "okr-mcwr-mqk",
             "meeting_dt": datetime(2026, 9, 24, 14, 32, tzinfo=timezone.utc),
+            "with_summary": True,
             "summary_preview": REPORT,
             "twake_drive_link": "https://owner-drive.example.com/#/folder/dir-1",
             "pdf_content": None,
@@ -128,6 +129,59 @@ class TestRecapEmail:
         message = self._send(summary_preview=None)
         assert "Summary preview" not in message.alternatives[0][0]
         assert "Summary preview" not in message.body
+
+    def test_with_a_summary_the_email_announces_it(self):
+        message = self._send(twake_drive_link=None, pdf_content=b"%PDF")
+        for text in (message.body, message.alternatives[0][0]):
+            assert "The transcription and summary of" in text
+            assert "A PDF summary is attached" in text
+            assert "The transcription document is attached" not in text
+
+    def test_without_a_summary_the_email_announces_the_transcript_alone(self):
+        """No summary (not entitled, or turned off): the email stands on the
+        transcript — no summary promised, no empty preview, the attachment
+        named for what it is."""
+        message = self._send(
+            with_summary=False,
+            summary_preview=None,
+            twake_drive_link=None,
+            pdf_content=b"docx bytes",
+            pub_filename="2026 09 24 - Transcript.docx",
+            pub_mime="application/vnd.openxmlformats-officedocument"
+            ".wordprocessingml.document",
+        )
+        for text in (message.body, message.alternatives[0][0]):
+            assert "The transcription of" in text
+            assert "is now available" in text
+            assert "summary" not in text.lower()
+            assert "The transcription document is attached to this email." in text
+        assert message.attachments[0][0] == "2026 09 24 - Transcript.docx"
+
+    def test_without_a_summary_the_drive_link_stays(self):
+        message = self._send(with_summary=False, summary_preview=None)
+        assert "The transcription of" in message.body
+        assert "owner-drive.example.com" in message.body
+        assert "summary" not in message.body.lower()
+
+
+class TestDocumentName:
+    """The published document is named for what it holds."""
+
+    def test_the_summary_report(self):
+        recording = factories.RecordingFactory()
+        name = linto_task._document_filename(
+            recording, "pdf", "fr-fr", {"success": True, "job_id": "job-1"}
+        )
+        assert name.endswith(" - Résumé.pdf")
+
+    def test_the_transcript_without_a_summary(self):
+        recording = factories.RecordingFactory()
+        assert linto_task._document_filename(recording, "docx", "fr-fr", {}).endswith(
+            " - Transcription.docx"
+        )
+        assert linto_task._document_filename(
+            recording, "docx", "en", {"success": False}
+        ).endswith(" - Transcript.docx")
 
 
 class TestTwakeLinkOnResume:

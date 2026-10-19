@@ -24,6 +24,7 @@ from core.services.twake_drive import (
     build_linto_shortcut_filename,
     build_recording_filename,
     build_summary_filename,
+    build_transcript_document_filename,
     build_transcript_filename,
 )
 from core.tasks import linto as linto_task
@@ -499,9 +500,9 @@ class TestTwakeTextOnly:
         filenames = [c.kwargs["filename"] for c in save_file.await_args_list]
         assert build_transcript_filename(meeting, lang) in filenames
         assert build_linto_shortcut_filename(lang) in filenames
-        assert (
-            build_summary_filename(meeting, "docx", lang) in filenames
-        )  # LINTO_PUBLICATION_FORMAT default
+        # No LLM service here: the document is the transcript, named so.
+        assert build_transcript_document_filename(meeting, "docx", lang) in filenames
+        assert build_summary_filename(meeting, "docx", lang) not in filenames
         assert build_recording_filename(meeting, "mp4", lang) not in filenames
         assert build_recording_filename(meeting, "ogg", lang) not in filenames
         assert not any(f.endswith((".mp4", ".ogg")) for f in filenames)

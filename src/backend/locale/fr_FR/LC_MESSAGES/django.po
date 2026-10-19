@@ -746,6 +746,16 @@ msgstr ""
 " La transcription et le résumé de \"%(room_name)s\" du %(recording_date)s à "
 "%(recording_time)s sont maintenant disponibles. "
 
+#: core/templates/mail/html/transcription.html:190
+#: core/templates/mail/text/transcription.txt:12
+#, python-format
+msgid ""
+" The transcription of \"%(room_name)s\" on %(recording_date)s at "
+"%(recording_time)s is now available. "
+msgstr ""
+" La transcription de \"%(room_name)s\" du %(recording_date)s à "
+"%(recording_time)s est maintenant disponible. "
+
 #: core/templates/mail/html/transcription.html:201
 #: core/templates/mail/text/transcription.txt:10
 msgid "Summary preview:"
@@ -760,3 +770,8 @@ msgstr " Les fichiers de la réunion sont disponibles dans votre Twake Drive. "
 #: core/templates/mail/text/transcription.txt:20
 msgid " A PDF summary is attached to this email. "
 msgstr " Un résumé PDF est joint à cet e-mail. "
+
+#: core/templates/mail/html/transcription.html:215
+#: core/templates/mail/text/transcription.txt:22
+msgid " The transcription document is attached to this email. "
+msgstr " Le document de transcription est joint à cet e-mail. "
