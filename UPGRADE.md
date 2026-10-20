@@ -57,6 +57,21 @@ the page is enough) or the token expires (six hours by default). The proof is
 keyed by `DJANGO_SECRET_KEY`: all backend replicas must share it, and a
 rotation has the same effect as the upgrade on the tokens already minted.
 
+### Twake Drive instance from an OIDC claim
+
+Twake Drive deliveries no longer build the instance as `{sub}.{TWAKE_INSTANCE_DOMAIN}`
+when the `sub` holds an `@` or a dot. Such users get their instance from an
+OIDC claim, stored at each sign-in. To set it up:
+
+- Have the IdP return the claim at the userinfo endpoint of Meet's client.
+  Meet reads userinfo only, not the ID token.
+- The claim is `workplaceFqdn` by default. Set
+  `OIDC_USERINFO_TWAKE_INSTANCE_FIELD` if your IdP names it differently.
+
+Existing users get their instance at their next sign-in. Until then, for up to
+`SESSION_COOKIE_AGE` (12 hours by default) after the upgrade, their uploads are
+skipped with a warning.
+
 ## v1.37.0
 
 ### Crisp support chat replaced by the La Suite support form

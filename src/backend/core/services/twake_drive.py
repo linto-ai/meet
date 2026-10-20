@@ -8,6 +8,10 @@ import json
 import logging
 from urllib.parse import quote
 
+from django.conf import settings
+from django.core import validators
+from django.core.exceptions import ValidationError
+
 import aiohttp
 
 logger = logging.getLogger(__name__)
@@ -110,6 +114,36 @@ def build_recording_filename(recording, extension, language=None):
 def build_linto_shortcut_filename(language=None):
     """Name of the shortcut to the LinTO Studio conversation."""
     return f"{get_labels(language)['linto_shortcut']}.url"
+
+
+def clean_instance(value):
+    """`value` as a bare lowercase hostname, or None when it is not one."""
+    if not isinstance(value, str):
+        return None
+    value = value.strip().rstrip(".").lower()
+    try:
+        validators.DomainNameValidator(accept_idna=False)(value)
+    except ValidationError:
+        return None
+    return value
+
+
+def resolve_instance(user):
+    """The Twake instance where the files of `user` go, or None when unknown.
+
+    The instance is never derived from an email: `bob@x` is not always `bob.x`,
+    and a wrong guess would put the files in someone else's Drive.
+    """
+    if settings.TWAKE_DEV_INSTANCE_OVERRIDE:
+        return settings.TWAKE_DEV_INSTANCE_OVERRIDE
+    if user.twake_instance:
+        return user.twake_instance
+    if user.sub and not any(c in user.sub for c in "@."):
+        instance = clean_instance(f"{user.sub}.{settings.TWAKE_INSTANCE_DOMAIN}")
+        if instance:
+            return instance
+    logger.warning("No Twake instance known for user %s", user.id)
+    return None
 
 
 async def get_drive_token(cloudery_url, cloudery_token, instance):

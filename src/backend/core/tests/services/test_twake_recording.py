@@ -128,15 +128,24 @@ class TestUploadRecordingFiles:
         # Nothing at INFO or above: this branch is a legitimate no-op.
         assert not caplog.records
 
-    def test_warns_when_owner_has_no_oidc_sub(self, configured, owner_access, caplog):
-        owner_access.user.sub = None
+    def test_uploads_to_the_instance_of_the_owner(
+        self, configured, settings, drive, owner_access
+    ):
+        settings.TWAKE_DEV_INSTANCE_OVERRIDE = None
+        owner_access.user.sub = "bob@example.com"
+        owner_access.user.twake_instance = "bob.example.com"
+        drive.return_value = True
 
-        with caplog.at_level("INFO", logger=twake_recording.logger.name):
-            link = upload(owner_access)
+        upload(owner_access)
 
-        assert link is None
-        assert any(
-            "Owner has no OIDC sub" in r.getMessage()
-            for r in caplog.records
-            if r.levelname == "WARNING"
-        )
+        assert {c.args[0] for c in drive.call_args_list} == {"bob.example.com"}
+
+    def test_skips_the_upload_when_no_instance_is_known(
+        self, configured, settings, drive, owner_access
+    ):
+        settings.TWAKE_DEV_INSTANCE_OVERRIDE = None
+        owner_access.user.sub = "bob@example.com"
+        owner_access.user.twake_instance = None
+
+        assert upload(owner_access) is None
+        drive.assert_not_called()

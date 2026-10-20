@@ -168,6 +168,80 @@ class TestResume:
             storage.connection.meta.client.get_object.assert_not_called()
 
 
+class TestTwakeInstance:
+    """The Drive delivery goes to the instance stored at sign-in, never one
+    built from an email sub."""
+
+    def _deliver(self, settings, **owner):
+        settings.CLOUDERY_URL = "http://cloudery.test"
+        settings.CLOUDERY_TOKEN = "tok"
+        settings.TWAKE_DEV_INSTANCE_OVERRIDE = None
+        rec = factories.RecordingFactory(mode=models.RecordingModeChoices.TRANSCRIPT)
+        user = factories.UserFactory(**{"sub": "owner-sub", **owner})
+        factories.UserRecordingAccessFactory(
+            recording=rec, user=user, role=models.RoleChoices.OWNER
+        )
+        # Resume after every step but Twake; the email step is done so the
+        # task returns right after the Twake block.
+        rec.linto_state = {
+            "conversation_id": "conv-1",
+            "steps": dict.fromkeys(
+                (
+                    "transcription",
+                    "tag",
+                    "move",
+                    "summary",
+                    "document",
+                    "share",
+                    "email",
+                ),
+                True,
+            ),
+            "attempts": 1,
+        }
+        rec.save(update_fields=["linto_state"])
+
+        with contextlib.ExitStack() as stack:
+            _patch_storage(stack, b"OggS raw")
+            sdk = _patch_sdk(stack)
+            sdk.get_media = mock.AsyncMock(return_value=mock.Mock(full_text="hello"))
+            token = stack.enter_context(
+                mock.patch(
+                    "core.services.twake_drive.get_drive_token",
+                    new=mock.AsyncMock(return_value="drive-tok"),
+                )
+            )
+            stack.enter_context(
+                mock.patch(
+                    "core.services.twake_drive.ensure_meeting_directory",
+                    new=mock.AsyncMock(return_value="dir-1"),
+                )
+            )
+            stack.enter_context(
+                mock.patch("core.services.twake_drive.save_file", new=mock.AsyncMock())
+            )
+            stack.enter_context(
+                mock.patch(
+                    "core.services.twake_drive.build_drive_link",
+                    return_value="https://drive.test/#/folder/dir-1",
+                )
+            )
+            linto_task._process_linto_transcription_sync(str(rec.id))
+        return token
+
+    def test_an_email_sub_uploads_to_the_stored_instance(self, settings):
+        """The token is asked for the instance stored at sign-in."""
+        token = self._deliver(
+            settings, sub="bob@example.com", twake_instance="bob-ws.twake.app"
+        )
+        assert token.await_args.kwargs["instance"] == "bob-ws.twake.app"
+
+    def test_an_email_sub_without_instance_skips_the_drive(self, settings):
+        """No stored instance and an email sub: no instance is guessed."""
+        token = self._deliver(settings, sub="bob@example.com", twake_instance=None)
+        token.assert_not_called()
+
+
 class TestSpeakerIdentification:
     """Org-level speaker identification is opt-in and always soft-fails."""
 

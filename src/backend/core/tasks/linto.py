@@ -586,19 +586,12 @@ async def _process_linto_transcription_sync(recording_id):
                 build_drive_link,
                 ensure_meeting_directory,
                 get_drive_token,
+                resolve_instance,
                 save_file,
             )
 
-            if owner_access and owner_access.user.sub:
-                sub = owner_access.user.sub
-                domain = getattr(
-                    settings, "TWAKE_INSTANCE_DOMAIN", "twake.linagora.com"
-                )
-                instance = (
-                    getattr(settings, "TWAKE_DEV_INSTANCE_OVERRIDE", None)
-                    or f"{sub}.{domain}"
-                )
-
+            instance = resolve_instance(owner_access.user) if owner_access else None
+            if instance:
                 drive_token = await get_drive_token(
                     cloudery_url=settings.CLOUDERY_URL,
                     cloudery_token=settings.CLOUDERY_TOKEN,
@@ -695,7 +688,7 @@ async def _process_linto_transcription_sync(recording_id):
                 await mark_done(recording, "twake")
             else:
                 logger.warning(
-                    "No room owner with sub found for %s, skipping Twake Drive",
+                    "No Twake instance for the owner of %s, skipping Twake Drive",
                     recording_id,
                 )
         except Exception:

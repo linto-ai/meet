@@ -41,6 +41,7 @@ and this project adheres to
 - 🐛(mail) load i18n tags in transcription email so it renders
 - 🐛(backend) make linto_state migration idempotent to self-heal history desync
 - 🐛(backend) a LiveKit room token names a user only through a proof signed by Meet
+- 🐛(backend) Twake Drive uploads go to the instance named by an OIDC claim, not one built from an email sub
 
 ## [1.37.0] - 2026-11-01
 

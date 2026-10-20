@@ -1,5 +1,7 @@
 """Authentication Backends for the Meet core app."""
 
+import logging
+
 from django.conf import settings
 from django.core.exceptions import (
     SuspiciousOperation,
@@ -14,7 +16,10 @@ from lasuite.oidc_login.backends import (
 from rest_framework.authentication import SessionAuthentication
 
 from core.models import User
+from core.services.twake_drive import clean_instance
 from core.validators import sub_validator
+
+logger = logging.getLogger(__name__)
 
 
 class OIDCAuthenticationBackend(LaSuiteOIDCAuthenticationBackend):
@@ -35,11 +40,20 @@ class OIDCAuthenticationBackend(LaSuiteOIDCAuthenticationBackend):
           dict: A dictionary of extra claims.
 
         """
-        return {
+        claims = {
             # Get user's full name from OIDC fields defined in settings
             "full_name": self.compute_full_name(user_info),
             "short_name": user_info.get(settings.OIDC_USERINFO_SHORTNAME_FIELD),
         }
+        if settings.OIDC_USERINFO_TWAKE_INSTANCE_FIELD:
+            claim = user_info.get(settings.OIDC_USERINFO_TWAKE_INSTANCE_FIELD)
+            instance = clean_instance(claim)
+            if instance:
+                claims["twake_instance"] = instance
+            elif claim is not None:
+                # Saving it would fail the sign-in: only the deliveries go without it
+                logger.warning("Twake instance claim refused: %r", claim)
+        return claims
 
     def post_get_or_create_user(self, user, claims, is_new_user):
         """
