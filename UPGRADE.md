@@ -45,6 +45,18 @@ parse as a UUID, yet to normalize to an existing room's id, matched no registere
 unregistered one. The token minted for that unregistered room was valid for the registered room: anyone could join a
 trusted or restricted room without being admitted through the lobby.
 
+### LiveKit room tokens name a user only through a signed proof
+
+The endpoints authenticated by a LiveKit room token (LinTO `studio-token`,
+`prepare`, `started`, `stopped`, and the others) no longer take the user from
+the token identity: Meet now sets a `user_id` attribute and its
+`user_id_proof` in the token of every authenticated user, and only that proof
+names a user. A token minted before the upgrade has no proof, so on these
+endpoints its holder is anonymous until they join the room again (reloading
+the page is enough) or the token expires (six hours by default). The proof is
+keyed by `DJANGO_SECRET_KEY`: all backend replicas must share it, and a
+rotation has the same effect as the upgrade on the tokens already minted.
+
 ## v1.37.0
 
 ### Crisp support chat replaced by the La Suite support form
