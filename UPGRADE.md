@@ -30,6 +30,19 @@ The lobby cookie (`LOBBY_COOKIE_NAME`) is now kept only when it is a UUID that
 is not the `sub` of a user. A participant who carries another value gets a new
 identifier: one waiting in a lobby at upgrade time enters the queue again.
 
+Twake Drive deliveries no longer build the instance as `{sub}.{TWAKE_INSTANCE_DOMAIN}`
+when the `sub` holds an `@` or a dot. Such users get their instance from an
+OIDC claim, stored at each sign-in. To set it up:
+
+- Have the IdP return the claim at the userinfo endpoint of Meet's client.
+  Meet reads userinfo only, not the ID token.
+- The claim is `workplaceFqdn` by default. Set
+  `OIDC_USERINFO_TWAKE_INSTANCE_FIELD` if your IdP names it differently.
+
+Existing users get their instance at their next sign-in. Until then, for up to
+`SESSION_COOKIE_AGE` (12 hours by default) after the upgrade, their uploads are
+skipped with a warning.
+
 ## v1.23.0
 
 As part of the 1.23.0 release, the legacy `api/v1` implementation has been removed from the _experimental_ Summary service and Meet has been migrated to the new `api/v2`.

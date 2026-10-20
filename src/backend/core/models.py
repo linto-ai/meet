@@ -178,6 +178,18 @@ class User(AbstractBaseUser, BaseModel, auth_models.PermissionsMixin):
     short_name = models.CharField(
         _("short name"), max_length=100, null=True, blank=True
     )
+    twake_instance = models.CharField(
+        _("Twake instance"),
+        max_length=255,
+        null=True,
+        blank=True,
+        # Goes into the Cloudery path and the Drive host: a bare hostname only
+        validators=[validators.DomainNameValidator(accept_idna=False)],
+        help_text=_(
+            "Address of the user's Twake Workplace instance, where recordings "
+            "and transcripts are saved."
+        ),
+    )
     language = models.CharField(
         max_length=10,
         choices=settings.LANGUAGES,

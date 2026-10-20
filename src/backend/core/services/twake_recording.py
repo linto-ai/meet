@@ -8,6 +8,7 @@ from core.services.twake_drive import (
     build_drive_link,
     ensure_meeting_directory,
     get_drive_token,
+    resolve_instance,
     save_file,
 )
 
@@ -19,7 +20,8 @@ async def upload_recording_files(recording, owner_access, files):
 
     Each file in `files` is a dict with keys: "filename", "content", "content_type".
     Returns the Twake Drive link if at least one file was uploaded successfully,
-    else None. Returns None if Twake is not configured or the owner has no sub.
+    else None. Returns None if Twake is not configured or the owner's instance
+    is unknown.
     """
     cloudery_url = getattr(settings, "CLOUDERY_URL", None)
     cloudery_token = getattr(settings, "CLOUDERY_TOKEN", None)
@@ -28,15 +30,12 @@ async def upload_recording_files(recording, owner_access, files):
         return None
 
     user = getattr(owner_access, "user", None)
-    sub = getattr(user, "sub", None) if user else None
-    if not sub:
-        logger.warning("Owner has no OIDC sub, skipping Twake upload")
+    if not user:
+        logger.warning("No user owns recording %s, skipping Twake Drive", recording.id)
         return None
-
-    domain = getattr(settings, "TWAKE_INSTANCE_DOMAIN", "twake.linagora.com")
-    instance = (
-        getattr(settings, "TWAKE_DEV_INSTANCE_OVERRIDE", None) or f"{sub}.{domain}"
-    )
+    instance = resolve_instance(user)
+    if not instance:
+        return None
 
     drive_token = await get_drive_token(cloudery_url, cloudery_token, instance)
 

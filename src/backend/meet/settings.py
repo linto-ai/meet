@@ -606,6 +606,11 @@ class Base(Configuration):
         environ_name="OIDC_USERINFO_SHORTNAME_FIELD",
         environ_prefix=None,
     )
+    OIDC_USERINFO_TWAKE_INSTANCE_FIELD = values.Value(
+        default="workplaceFqdn",
+        environ_name="OIDC_USERINFO_TWAKE_INSTANCE_FIELD",
+        environ_prefix=None,
+    )
     OIDC_USERINFO_ESSENTIAL_CLAIMS = values.ListValue(
         default=[],
         environ_name="OIDC_USERINFO_ESSENTIAL_CLAIMS",

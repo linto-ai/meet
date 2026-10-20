@@ -29,6 +29,7 @@ and this project adheres to
 
 ### Fixed
 
+- 🐛(backend) Twake Drive uploads go to the instance named by an OIDC claim, not one built from an email sub
 - 🐛(backend) the lobby participant id is kept from its cookie only when it is a UUID, and never a user's sub
 - 🐛(backend) a LiveKit room token names a user only through a proof signed by Meet
 - 🐛(backend) a live run without a summary is still delivered (document, Twake Drive, recap email)
