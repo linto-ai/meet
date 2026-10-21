@@ -86,12 +86,13 @@ def meeting_date(recording):
 
 
 def build_meeting_dirname(recording, language=None):
-    """Name of the per-meeting folder: `Meeting - {date} {time} - {room id}`.
+    """Name of the per-meeting folder: `Meeting - {date} {time} - {room slug}`.
 
     The time keeps two recordings of the same room on the same day apart.
     """
     started_at = recording.created_at.strftime(MEETING_DATETIME_FORMAT)
-    return f"{get_labels(language)['meeting']} - {started_at} - {recording.room_id}"
+    room_ref = recording.room.slug or recording.room.id
+    return f"{get_labels(language)['meeting']} - {started_at} - {room_ref}"
 
 
 def build_summary_filename(recording, extension, language=None):
