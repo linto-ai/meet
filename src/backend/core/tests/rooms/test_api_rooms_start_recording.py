@@ -9,6 +9,7 @@ from unittest import mock
 import pytest
 from rest_framework.test import APIClient
 
+from ... import utils
 from ...factories import RoomFactory, UserFactory
 from ...models import Recording
 from ...recording.worker.exceptions import RecordingStartError
@@ -39,6 +40,81 @@ def mock_worker_manager(mock_worker_service):
         mock_mediator = mock.Mock()
         mock_mediator_class.return_value = mock_mediator
         yield mock_mediator
+
+
+def livekit_token_for(user, room):
+    """The LiveKit token Meet mints for the user of an application."""
+    return utils.generate_token(
+        room=str(room.id),
+        user=user,
+        identity=f"@{user.sub}:localhost:DEVICE",
+    )
+
+
+def test_start_recording_with_the_livekit_token_of_the_call(
+    settings, mock_worker_service_factory, mock_worker_manager
+):
+    """A participant without a Meet session records with the token of the call,
+    when the room lets any authenticated participant record."""
+    settings.RECORDING_ENABLE = True
+    user = UserFactory()
+    room = RoomFactory(configuration={"screen_recording_permission": "authenticated"})
+    client = APIClient()
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {livekit_token_for(user, room)}")
+
+    response = client.post(
+        f"/api/v1.0/rooms/{room.id}/start-recording/",
+        {"mode": "screen_recording"},
+        format="json",
+    )
+
+    assert response.status_code == 201
+    assert Recording.objects.filter(room=room).count() == 1
+    mock_worker_manager.start.assert_called_once()
+
+
+def test_start_recording_with_a_livekit_token_of_another_room(settings):
+    """A token of room X must not record room Y."""
+    settings.RECORDING_ENABLE = True
+    user = UserFactory()
+    other = RoomFactory(configuration={"screen_recording_permission": "authenticated"})
+    room = RoomFactory(configuration={"screen_recording_permission": "authenticated"})
+    client = APIClient()
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {livekit_token_for(user, other)}")
+
+    response = client.post(
+        f"/api/v1.0/rooms/{room.id}/start-recording/",
+        {"mode": "screen_recording"},
+        format="json",
+    )
+
+    assert response.status_code == 403
+    assert Recording.objects.count() == 0
+
+
+def test_start_recording_does_not_trust_the_role_of_the_token(settings):
+    """The token says « owner »; the room lets its owners and administrators
+    record, and the user is none of them: refused."""
+    settings.RECORDING_ENABLE = True
+    user = UserFactory()
+    room = RoomFactory(configuration={"screen_recording_permission": "admin_owner"})
+    token = utils.generate_token(
+        room=str(room.id),
+        user=user,
+        role="owner",
+        identity=f"@{user.sub}:localhost:DEVICE",
+    )
+    client = APIClient()
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+
+    response = client.post(
+        f"/api/v1.0/rooms/{room.id}/start-recording/",
+        {"mode": "screen_recording"},
+        format="json",
+    )
+
+    assert response.status_code == 403
+    assert Recording.objects.count() == 0
 
 
 def test_start_recording_anonymous():

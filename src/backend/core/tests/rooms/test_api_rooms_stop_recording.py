@@ -9,6 +9,7 @@ from unittest import mock
 import pytest
 from rest_framework.test import APIClient
 
+from ... import utils
 from ...factories import RecordingFactory, RoomFactory, UserFactory
 from ...models import Recording, RecordingStatusChoices
 from ...recording.worker.exceptions import RecordingStopError
@@ -39,6 +40,49 @@ def mock_worker_manager(mock_worker_service):
         mock_mediator = mock.Mock()
         mock_mediator_class.return_value = mock_mediator
         yield mock_mediator
+
+
+def livekit_token_for(user, room):
+    """The LiveKit token Meet mints for the user of an application."""
+    return utils.generate_token(
+        room=str(room.id),
+        user=user,
+        identity=f"@{user.sub}:localhost:DEVICE",
+    )
+
+
+def test_stop_recording_with_the_livekit_token_of_the_call(
+    settings, mock_worker_service_factory, mock_worker_manager
+):
+    """A participant without a Meet session stops the recording with the token
+    of the call, when the room lets any authenticated participant record."""
+    settings.RECORDING_ENABLE = True
+    user = UserFactory()
+    room = RoomFactory(configuration={"screen_recording_permission": "authenticated"})
+    RecordingFactory(room=room, status=RecordingStatusChoices.ACTIVE)
+    client = APIClient()
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {livekit_token_for(user, room)}")
+
+    response = client.post(f"/api/v1.0/rooms/{room.id}/stop-recording/")
+
+    assert response.status_code == 200
+    mock_worker_manager.stop.assert_called_once()
+
+
+def test_stop_recording_with_a_livekit_token_of_another_room(settings):
+    """A token of room X must not stop the recording of room Y."""
+    settings.RECORDING_ENABLE = True
+    user = UserFactory()
+    other = RoomFactory(configuration={"screen_recording_permission": "authenticated"})
+    room = RoomFactory(configuration={"screen_recording_permission": "authenticated"})
+    RecordingFactory(room=room, status=RecordingStatusChoices.ACTIVE)
+    client = APIClient()
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {livekit_token_for(user, other)}")
+
+    response = client.post(f"/api/v1.0/rooms/{room.id}/stop-recording/")
+
+    assert response.status_code == 403
+    assert Recording.objects.filter(status=RecordingStatusChoices.ACTIVE).count() == 1
 
 
 def test_stop_recording_anonymous():

@@ -16,6 +16,10 @@ the following command inside your docker container:
 
 ## [Unreleased]
 
+The external API `POST /external-api/v1.0/rooms/{id}/livekit-token` now needs
+the `rooms:livekit_token` scope (it needed `rooms:retrieve`). No migration grants
+it: give it by hand to each application that mints LiveKit tokens.
+
 The endpoints authenticated by a LiveKit room token (LinTO `studio-token`,
 `prepare`, `started`, `stopped`, and the others) no longer take the user from
 the token identity: Meet now sets a `user_id` attribute and its
