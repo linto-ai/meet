@@ -18,6 +18,7 @@ from core.services import twake_drive
 
 RECORDING_ID = "4c3d9f1e-1234-4abc-9def-000000000001"
 ROOM_ID = "9a8b7c6d-0000-4000-8000-000000000002"
+ROOM_SLUG = "mgz-hhlw-ljo"
 
 
 def _directory(dir_id, path, created_at):
@@ -37,7 +38,7 @@ def recording():
     """A recording of a room, created on 2026-09-08."""
     return mock.Mock(
         id=RECORDING_ID,
-        room_id=ROOM_ID,
+        room=mock.Mock(id=ROOM_ID, slug=ROOM_SLUG),
         created_at=datetime(2026, 9, 8, 14, 30, tzinfo=timezone.utc),
     )
 
@@ -75,9 +76,18 @@ def test_pick_live_directory_returns_none_when_nothing_matches():
     assert twake_drive.pick_live_directory(trashed) is None
 
 
-def test_build_meeting_dirname_uses_date_time_and_room_id(recording):
-    """Folder name is `Meeting - {YYYY MM DD HHMM} - {room id}`."""
+def test_build_meeting_dirname_uses_date_time_and_room_slug(recording):
+    """Folder name is `Meeting - {YYYY MM DD HHMM} - {room slug}`."""
     assert twake_drive.meeting_date(recording) == "2026 09 08"
+    assert (
+        twake_drive.build_meeting_dirname(recording)
+        == f"Meeting - 2026 09 08 1430 - {ROOM_SLUG}"
+    )
+
+
+def test_build_meeting_dirname_falls_back_to_room_id(recording):
+    """A room without slug is named after its id."""
+    recording.room.slug = None
     assert (
         twake_drive.build_meeting_dirname(recording)
         == f"Meeting - 2026 09 08 1430 - {ROOM_ID}"
@@ -242,6 +252,6 @@ def test_ensure_meeting_directory_nests_under_the_meetings_folder(drive, recordi
     drive["ensure_directory"].assert_awaited_once_with(
         "instance.test",
         "token",
-        f"/Perso/Réunions/Réunion - 2026 09 08 1430 - {ROOM_ID}",
+        f"/Perso/Réunions/Réunion - 2026 09 08 1430 - {ROOM_SLUG}",
         "root-id",
     )

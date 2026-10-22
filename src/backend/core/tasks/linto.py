@@ -550,7 +550,7 @@ async def _deliver_to_twake(  # noqa: PLR0913 - delivery needs the full context
 ):
     """Upload transcript/media/shortcut/document to Twake Drive (soft-fail).
 
-    ``meeting`` is what the Drive naming reads (``created_at``, ``room_id``): the
+    ``meeting`` is what the Drive naming reads (``created_at``, ``room``): the
     Recording, or a stand-in for the live flow; ``language`` is the owner's, the
     folder and file names follow it. ``extra_files_provider`` is an optional
     async callable returning a list of ``(filename, content, content_type)`` for
@@ -1295,7 +1295,7 @@ async def _process_bot_live_summary_sync(room_id):
     meeting_dt = datetime.fromisoformat(payload["stopped_at"])
     # What the Twake Drive naming needs from a "recording": the live flow has
     # none, so the meeting stands in (date/time of the stop, room).
-    meeting = SimpleNamespace(created_at=meeting_dt, room_id=room.id)
+    meeting = SimpleNamespace(created_at=meeting_dt, room=room)
     language = recipient_user.language if recipient_user else None
     pub_mime = _publication_mime(pub_format)
     pub_filename = _document_filename(meeting, pub_format, language, summary_result)
