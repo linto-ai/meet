@@ -13,6 +13,10 @@ from ... import utils
 from ...factories import RoomFactory, UserFactory
 from ...models import Recording
 from ...recording.worker.exceptions import RecordingStartError
+from ...services.participants_management import (
+    ParticipantNotFoundException,
+    ParticipantsManagementException,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -42,6 +46,14 @@ def mock_worker_manager(mock_worker_service):
         yield mock_mediator
 
 
+@pytest.fixture
+def mock_presence():
+    """LiveKit's answer to « is this identity in the call? »."""
+    with mock.patch("core.api.permissions.ParticipantsManagement") as pm:
+        pm.return_value.check_if_in_meeting.return_value = True
+        yield pm.return_value.check_if_in_meeting
+
+
 def livekit_token_for(user, room):
     """The LiveKit token Meet mints for the user of an application."""
     return utils.generate_token(
@@ -52,7 +64,7 @@ def livekit_token_for(user, room):
 
 
 def test_start_recording_with_the_livekit_token_of_the_call(
-    settings, mock_worker_service_factory, mock_worker_manager
+    settings, mock_worker_service_factory, mock_worker_manager, mock_presence
 ):
     """A participant without a Meet session records with the token of the call,
     when the room lets any authenticated participant record."""
@@ -90,6 +102,39 @@ def test_start_recording_with_a_livekit_token_of_another_room(settings):
 
     assert response.status_code == 403
     assert Recording.objects.count() == 0
+
+
+@pytest.mark.parametrize(
+    "presence",
+    [False, ParticipantNotFoundException(), ParticipantsManagementException()],
+)
+def test_start_recording_with_a_livekit_token_out_of_the_call(
+    settings, mock_worker_manager, mock_presence, presence
+):
+    """A token outlives a member the application removed: its holder must be
+    in the call to record; a LiveKit error refuses too."""
+    settings.RECORDING_ENABLE = True
+    if isinstance(presence, Exception):
+        mock_presence.side_effect = presence
+    else:
+        mock_presence.return_value = presence
+    user = UserFactory()
+    room = RoomFactory(configuration={"screen_recording_permission": "authenticated"})
+    client = APIClient()
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {livekit_token_for(user, room)}")
+
+    response = client.post(
+        f"/api/v1.0/rooms/{room.id}/start-recording/",
+        {"mode": "screen_recording"},
+        format="json",
+    )
+
+    assert response.status_code == 403
+    assert Recording.objects.count() == 0
+    mock_presence.assert_called_once_with(
+        room_name=str(room.pk), identity=f"@{user.sub}:localhost:DEVICE"
+    )
+    mock_worker_manager.start.assert_not_called()
 
 
 def test_start_recording_does_not_trust_the_role_of_the_token(settings):
