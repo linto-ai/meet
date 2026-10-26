@@ -5,15 +5,23 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('core', '0025_alter_application_scopes'),
+        ("core", "0025_alter_application_scopes"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='room',
-            name='created_by_application',
-            field=models.ForeignKey(blank=True, editable=False, help_text='Set when the room was created through the external API.', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='rooms', to='core.application', verbose_name='Application that created the room'),
+            model_name="room",
+            name="created_by_application",
+            field=models.ForeignKey(
+                blank=True,
+                editable=False,
+                help_text="Set when the room was created through the external API.",
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                related_name="rooms",
+                to="core.application",
+                verbose_name="Application that created the room",
+            ),
         ),
     ]
