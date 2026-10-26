@@ -19,6 +19,9 @@ the following command inside your docker container:
 The external API `POST /external-api/v1.0/rooms/{id}/livekit-token` now needs
 the `rooms:livekit_token` scope (it needed `rooms:retrieve`). No migration grants
 it: give it by hand to each application that mints LiveKit tokens.
+Its tokens live one hour (`APPLICATION_LIVEKIT_TOKEN_TTL_SECONDS`), and
+`start-recording` / `stop-recording` with a LiveKit token now need its holder
+in the call.
 
 The endpoints authenticated by a LiveKit room token (LinTO `studio-token`,
 `prepare`, `started`, `stopped`, and the others) no longer take the user from

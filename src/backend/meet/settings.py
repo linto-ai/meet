@@ -1255,11 +1255,11 @@ class Base(Configuration):
         environ_prefix=None,
     )
     # Lifetime of the LiveKit tokens minted for an application. A participant
-    # the application no longer vouches for keeps the token that long. Six
-    # hours is the default of the LiveKit SDK: a client that does not renew
-    # its token needs it to outlive the call.
+    # the application no longer vouches for keeps the token that long: the
+    # client asks the application for a fresh one before a Meet action, and
+    # LiveKit refreshes the token of a connected participant itself.
     APPLICATION_LIVEKIT_TOKEN_TTL_SECONDS = values.PositiveIntegerValue(
-        21600,
+        3600,
         environ_name="APPLICATION_LIVEKIT_TOKEN_TTL_SECONDS",
         environ_prefix=None,
     )
