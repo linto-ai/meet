@@ -47,8 +47,8 @@ trusted or restricted room without being admitted through the lobby.
 
 ### LiveKit room tokens name a user only through a signed proof
 
-The endpoints authenticated by a LiveKit room token (LinTO `studio-token`,
-`prepare`, `started`, `stopped`, and the others) no longer take the user from
+The endpoints authenticated by a LiveKit room token (`start-subtitle`,
+`mute-participant`, `toggle-hand`, `rename`) no longer take the user from
 the token identity: Meet now sets a `user_id` attribute and its
 `user_id_proof` in the token of every authenticated user, and only that proof
 names a user. A token minted before the upgrade has no proof, so on these
