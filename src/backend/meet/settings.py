@@ -1118,6 +1118,15 @@ class Base(Configuration):
         environ_name="APPLICATION_JWT_EXPIRATION_SECONDS",
         environ_prefix=None,
     )
+    # Lifetime of the LiveKit tokens minted for an application. A participant
+    # the application no longer vouches for keeps the token that long: the
+    # client asks the application for a fresh one before a Meet action, and
+    # LiveKit refreshes the token of a connected participant itself.
+    APPLICATION_LIVEKIT_TOKEN_TTL_SECONDS = values.PositiveIntegerValue(
+        3600,
+        environ_name="APPLICATION_LIVEKIT_TOKEN_TTL_SECONDS",
+        environ_prefix=None,
+    )
     APPLICATION_JWT_TOKEN_TYPE = values.Value(
         "Bearer",
         environ_name="APPLICATION_JWT_TOKEN_TYPE",

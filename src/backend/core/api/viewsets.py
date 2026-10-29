@@ -395,8 +395,15 @@ class RoomViewSet(
         detail=True,
         methods=["post"],
         url_path="start-recording",
+        # A client without a Meet session records with the LiveKit token of
+        # the call; the token must then be for this room
+        authentication_classes=[
+            *api_settings.DEFAULT_AUTHENTICATION_CLASSES,
+            LiveKitTokenAuthentication,
+        ],
         permission_classes=[
-            permissions.HasRecordingPermission,
+            permissions.HasRecordingPermission
+            & permissions.HasLiveKitRoomAccessWhenToken,
         ],
     )
     @FeatureFlag.require("recording")
@@ -468,8 +475,13 @@ class RoomViewSet(
         detail=True,
         methods=["post"],
         url_path="stop-recording",
+        authentication_classes=[
+            *api_settings.DEFAULT_AUTHENTICATION_CLASSES,
+            LiveKitTokenAuthentication,
+        ],
         permission_classes=[
-            permissions.HasRecordingPermission,
+            permissions.HasRecordingPermission
+            & permissions.HasLiveKitRoomAccessWhenToken,
         ],
     )
     @FeatureFlag.require("recording")
