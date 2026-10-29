@@ -128,7 +128,10 @@ class HasRecordingPermission(permissions.BasePermission):
 
     def has_object_permission(self, request, view, obj):
         """Check object-level permissions based on recording mode."""
-        if not (request.auth or request.user.is_authenticated):
+        # A LiveKit token is accepted when it names a user (signed proof): the
+        # token of an anonymous participant records nothing, the recording
+        # accesses need a user
+        if not request.user.is_authenticated:
             return False
 
         mode = request.data.get("mode")
@@ -157,6 +160,25 @@ class HasLiveKitRoomAccess(permissions.BasePermission):
         if not request.auth or not hasattr(request.auth, "video"):
             return False
         return request.auth.video.room == str(obj.id)
+
+
+class HasLiveKitRoomAccessWhenToken(permissions.BasePermission):
+    """On a route that takes a session or a LiveKit token: a token must be for
+    this room (a token of room X must not act on room Y) and its holder in the
+    call, since a token outlives a member the application removed; a session
+    passes. Fails closed on LiveKit errors."""
+
+    def has_object_permission(self, request, view, obj):
+        if not request.auth or not hasattr(request.auth, "video"):
+            return True
+        if request.auth.video.room != str(obj.id):
+            return False
+        try:
+            return ParticipantsManagement().check_if_in_meeting(
+                room_name=str(obj.pk), identity=str(request.auth.identity)
+            )
+        except (ParticipantNotFoundException, ParticipantsManagementException):
+            return False
 
 
 class FilePermission(IsAuthenticated):
@@ -292,4 +314,3 @@ class CanManageLobby(ParticipantCapability):
     Public rooms have no lobby: the endpoints short-circuit there, so opening
     them to participants exposes nothing.
     """
-

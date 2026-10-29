@@ -9,6 +9,7 @@ from unittest import mock
 from django.core import signing
 from django.core.cache import cache
 
+import jwt
 import pytest
 from freezegun import freeze_time
 from rest_framework.test import APIClient
@@ -345,6 +346,31 @@ def test_request_entry_waiting_participant_public_room(settings):
 
     assert not cache.keys(f"mocked-cache-prefix_{room.id}_*")
     assert not LobbyService()._index_members(room.id)
+
+
+def test_request_entry_authenticated_user_keeps_its_sub_as_identity(settings):
+    """The LiveKit identity of a signed in user is its sub, not the lobby id:
+    the roles of the participants are found by it."""
+    room = RoomFactory(access_level=RoomAccessLevel.PUBLIC)
+    user = UserFactory()
+    client = APIClient()
+    client.force_login(user)
+
+    with mock.patch.object(utils, "notify_participants", return_value=None):
+        response = client.post(
+            f"/api/v1.0/rooms/{room.id}/request-entry/",
+            {"username": "test_user"},
+        )
+
+    assert response.status_code == 200
+    claims = jwt.decode(
+        response.json()["livekit"]["token"],
+        settings.LIVEKIT_CONFIGURATION["api_secret"],
+        algorithms=["HS256"],
+    )
+    assert claims["sub"] == str(user.sub)
+    assert claims["sub"] != response.json()["id"]
+    assert claims["attributes"]["user_id"] == str(user.pk)
 
 
 def test_request_entry_invalid_data():

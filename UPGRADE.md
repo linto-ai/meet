@@ -45,6 +45,15 @@ parse as a UUID, yet to normalize to an existing room's id, matched no registere
 unregistered one. The token minted for that unregistered room was valid for the registered room: anyone could join a
 trusted or restricted room without being admitted through the lobby.
 
+### LiveKit tokens for delegated users
+
+The external API `POST /external-api/v1.0/rooms/{id}/livekit-token` now needs
+the `rooms:livekit_token` scope (it needed `rooms:retrieve`). No migration grants
+it: give it by hand to each application that mints LiveKit tokens.
+Its tokens live one hour (`APPLICATION_LIVEKIT_TOKEN_TTL_SECONDS`), and
+`start-recording` / `stop-recording` with a LiveKit token now need its holder
+in the call.
+
 ### LiveKit room tokens name a user only through a signed proof
 
 The endpoints authenticated by a LiveKit room token (`start-subtitle`,
