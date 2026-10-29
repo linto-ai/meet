@@ -61,6 +61,19 @@ def test_user_of_a_token_meet_minted_for_them():
     assert user == alice
 
 
+def test_user_behind_an_imposed_identity():
+    """An imposed identity (`user:device`) names nobody: the `user_id`
+    attribute does, even for a user without a sub."""
+    alice = UserFactory(sub=None)
+
+    user, claims = authenticate(
+        generate_token(room="room", user=alice, identity="@alice:localhost:DEVICE")
+    )
+
+    assert claims.identity == "@alice:localhost:DEVICE"
+    assert user == alice
+
+
 def test_no_user_for_an_anonymous_participant_with_the_sub_of_a_user():
     """The identity of an anonymous participant comes from the client: being
     equal to the sub of a user does not make the token theirs."""
