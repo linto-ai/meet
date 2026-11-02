@@ -16,6 +16,14 @@ the following command inside your docker container:
 
 ## [Unreleased]
 
+### OIDC access tokens on the core API, for native apps
+
+The core API (`/api/v1.0/`) can now authenticate OIDC access tokens sent as
+`Authorization: Bearer`, for native apps that cannot hold the session cookie.
+It is off by default: nothing changes until `OIDC_RS_CORE_API_ENABLED` is set,
+and then only for the clients listed in `OIDC_RS_CORE_API_ALLOWED_AUDIENCES`.
+See "Native apps" in `docs/features/authentication.md`.
+
 
 ### LinTO fork: a cap on the live translation languages
 

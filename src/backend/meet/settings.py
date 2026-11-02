@@ -402,6 +402,8 @@ class Base(Configuration):
         "DEFAULT_AUTHENTICATION_CLASSES": (
             "core.authentication.backends.SessionAuthenticationWith401",
             "core.authentication.user_token.UserAccessJWTAuthentication",
+            # Inert unless OIDC_RS_CORE_API_ENABLED: see core.authentication.resource_server
+            "core.authentication.resource_server.CoreAPIResourceServerAuthentication",
         ),
         "DEFAULT_PARSER_CLASSES": [
             "rest_framework.parsers.JSONParser",
@@ -770,6 +772,17 @@ class Base(Configuration):
     )
     OIDC_RS_SCOPES_PREFIX = values.Value(
         default=None, environ_name="OIDC_RS_SCOPES_PREFIX", environ_prefix=None
+    )
+    # Accept OIDC access tokens on the core API (/api/v1.0/), for native apps
+    # that cannot hold the session cookie. Reuses the OIDC_RS_* settings above
+    # for introspection; only tokens issued to the listed client ids are taken.
+    OIDC_RS_CORE_API_ENABLED = values.BooleanValue(
+        default=False, environ_name="OIDC_RS_CORE_API_ENABLED", environ_prefix=None
+    )
+    OIDC_RS_CORE_API_ALLOWED_AUDIENCES = values.ListValue(
+        default=[],
+        environ_name="OIDC_RS_CORE_API_ALLOWED_AUDIENCES",
+        environ_prefix=None,
     )
 
     # Menshen, La Suite's OAuth 2.0 token exchange server
@@ -1937,6 +1950,14 @@ class Base(Configuration):
 
         if cls.LIVEKIT_API_TIMEOUT_SECONDS < 1:
             raise ValueError("LIVEKIT_API_TIMEOUT_SECONDS must be at least 1")
+
+        if cls.OIDC_RS_CORE_API_ENABLED and not cls.OIDC_RS_CORE_API_ALLOWED_AUDIENCES:
+            warnings.warn(
+                "OIDC_RS_CORE_API_ENABLED is set but OIDC_RS_CORE_API_ALLOWED_AUDIENCES "
+                "is empty: no access token will be accepted on the core API.",
+                UserWarning,
+                stacklevel=2,
+            )
 
         if (
             cls.SUMMARY_SERVICE_VERSION == 1

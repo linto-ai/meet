@@ -21,6 +21,7 @@ and this project adheres to
 - ✨(frontend) caption language picked from a chevron menu next to the CC button
 - ✨(backend) option to email the summary to the signed-in participants
 - ✨(frontend) "share with the participants" option of both transcription tools
+- ✨(backend) accept OIDC access tokens on the core API for native apps, opt-in and per client
 
 ### Changed
 
