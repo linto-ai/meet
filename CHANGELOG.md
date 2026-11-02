@@ -8,6 +8,10 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- ✨(frontend) serve the OIDC return page of the Twake Visio mobile app at /auth/mobile-callback
+
 ### Changed
 
 - 📝(backend) log the outcome of every Twake Drive recording upload

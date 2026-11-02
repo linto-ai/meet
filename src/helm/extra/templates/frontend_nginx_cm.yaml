@@ -73,6 +73,20 @@ data:
             sub_filter_once off;
         }
 
+        # OIDC return page of the Twake Visio mobile app (native app, RFC 8252).
+        # The app registers https://<this host>/auth/mobile-callback as its redirect
+        # URI; this page hands the code and state over to the app's own scheme.
+        # Chrome on Android does not dispatch a redirect to a custom scheme when it
+        # answers the POST of the SSO login form, but does dispatch a navigation
+        # started from a loaded HTTPS document. Must stay outside the SPA catch-all,
+        # which would answer 200 with the web app instead.
+        location ~ ^/auth/mobile-callback/?$ {
+            default_type text/html;
+            add_header Cache-Control "no-store" always;
+            add_header Referrer-Policy "no-referrer" always;
+            return 200 '<!doctype html><meta charset="utf-8"><title>Twake Visio</title><script>location.replace("twakevisio://callback" + location.search);</script><p>Ouverture de Twake Visio...</p><p><a href="twakevisio://callback">Ouvrir manuellement</a></p>';
+        }
+
         location ^~ /assets/mediapipe/wasm/ {
             expires 30d;
             add_header Cache-Control "public, max-age=2592000";
