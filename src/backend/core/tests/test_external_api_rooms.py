@@ -2063,6 +2063,7 @@ def test_resource_server_creates_user_on_first_authentication(settings):
     settings.OIDC_PROXY = None
     settings.OIDC_OP_JWKS_ENDPOINT = "https://oidc.example.com/jwks"
     settings.OIDC_OP_INTROSPECTION_ENDPOINT = "https://oidc.example.com/introspect"
+    settings.OIDC_OP_USER_ENDPOINT = "https://oidc.example.com/userinfo"
 
     responses.add(
         responses.POST,
@@ -2076,6 +2077,11 @@ def test_resource_server_creates_user_on_first_authentication(settings):
             "active": True,
         },
     )
+    responses.add(
+        responses.GET,
+        "https://oidc.example.com/userinfo",
+        json={"sub": "very-specific-sub", "email": "very-specific@example.com"},
+    )
 
     client = APIClient()
     client.credentials(HTTP_AUTHORIZATION="Bearer some_token")
@@ -2088,7 +2094,7 @@ def test_resource_server_creates_user_on_first_authentication(settings):
 
     db_user = User.objects.get(sub="very-specific-sub")
     assert db_user is not None
-    assert db_user.email is None
+    assert db_user.email == "very-specific@example.com"
 
 
 @responses.activate
@@ -2300,6 +2306,12 @@ def test_resource_server_denies_access_with_insufficient_scopes(settings):
             "scope": "openid lasuite_meet",  # missing rooms:list scope
             "active": True,
         },
+    )
+    settings.OIDC_OP_USER_ENDPOINT = "https://oidc.example.com/userinfo"
+    responses.add(
+        responses.GET,
+        "https://oidc.example.com/userinfo",
+        json={"sub": "very-specific-sub"},
     )
 
     client = APIClient()
@@ -3113,6 +3125,12 @@ def test_api_rooms_resource_server_user_creation_is_audited(audit_events, settin
             "scope": "openid lasuite_meet lasuite_meet:rooms:list",
             "active": True,
         },
+    )
+    settings.OIDC_OP_USER_ENDPOINT = "https://oidc.example.com/userinfo"
+    responses.add(
+        responses.GET,
+        "https://oidc.example.com/userinfo",
+        json={"sub": "very-specific-sub"},
     )
 
     client = APIClient()

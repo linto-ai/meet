@@ -18,6 +18,7 @@ from menshen_client.exceptions import ResponseParsingError
 from rest_framework import authentication, exceptions
 
 from core import audit, auditing
+from core.authentication.backends import OIDCAuthenticationBackend
 from core.models import Application, ApplicationScope
 from core.services import jwt_token
 from core.validators import sub_validator
@@ -476,7 +477,11 @@ class ResourceServerBackend(LaSuiteBackend):
 
         Despite the LaSuiteBackend's method name suggesting "get_or_create",
         its implementation only performs a GET operation.
-        Create new user from the sub claim.
+
+        A sub seen for the first time goes through the sign-in of the web
+        frontend, with the userinfo of the token: the user an application
+        provisioned by email is found instead of duplicated, and a new user
+        gets their email and names.
 
         Args:
             access_token: The access token string
@@ -497,6 +502,57 @@ class ResourceServerBackend(LaSuiteBackend):
             logger.debug(message)
             raise SuspiciousOperation(message)
 
-        return get_or_create_user_by_sub(
-            sub, auth_method="resource_server", client_id=payload.get("client_id")
-        )
+        try:
+            sub_validator(str(sub))
+        except ValidationError as err:
+            raise SuspiciousOperation(
+                "User info contained an invalid sub claim"
+            ) from err
+
+        user = self.get_user(access_token, id_token, payload)
+
+        if user is None:
+            return UserinfoSignInBackend(
+                sub, client_id=payload.get("client_id")
+            ).get_or_create_user(access_token, None, None)
+
+        if not user.is_active:
+            logger.warning("Inactive user attempted authentication: %s", user.pk)
+            raise SuspiciousOperation("User account is disabled.")
+
+        return user
+
+
+class UserinfoSignInBackend(OIDCAuthenticationBackend):
+    """The sign-in of the web frontend, for the bearer of an access token.
+
+    The sub stays the one of the introspection: the provider computes it for
+    the client that introspects, Meet's own, while userinfo gives the one of
+    the client the token was issued to.
+    """
+
+    def __init__(self, sub, *, client_id=None):
+        super().__init__()
+        self._sub = sub
+        self._client_id = client_id
+
+    def get_userinfo(self, access_token, id_token, payload):
+        try:
+            user_info = super().get_userinfo(access_token, id_token, payload)
+        except requests.RequestException as exc:
+            raise SuspiciousOperation("Could not fetch userinfo") from exc
+        return {**user_info, "sub": self._sub}
+
+    def post_get_or_create_user(self, user, claims, is_new_user):
+        # None when OIDC_CREATE_USER is off: there is nobody to post-process
+        if user is None:
+            return
+        super().post_get_or_create_user(user, claims, is_new_user)
+        if is_new_user:
+            audit.log(
+                auditing.USER_PROVISION,
+                actor=None,
+                auth_method="resource_server",
+                client_id=self._client_id,
+                target=user,
+            )

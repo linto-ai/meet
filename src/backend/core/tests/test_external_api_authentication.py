@@ -40,10 +40,17 @@ def test_resource_server_backend_get_or_create_user_inactive():
         )
 
 
+@responses.activate
 def test_resource_server_backend_get_or_create_user_creates(settings):
     """An unknown sub should create an active user when OIDC_CREATE_USER is set."""
 
     settings.OIDC_CREATE_USER = True
+    settings.OIDC_OP_USER_ENDPOINT = "https://oidc.example.com/userinfo"
+    responses.add(
+        responses.GET,
+        "https://oidc.example.com/userinfo",
+        json={"sub": "new-sub", "email": "new@example.com"},
+    )
 
     result = ResourceServerBackend().get_or_create_user(
         access_token="token", id_token=None, payload=_payload("new-sub")
@@ -54,10 +61,17 @@ def test_resource_server_backend_get_or_create_user_creates(settings):
     assert User.objects.filter(sub="new-sub").exists()
 
 
+@responses.activate
 def test_resource_server_backend_get_or_create_user_no_creation(settings):
     """An unknown sub should return None when OIDC_CREATE_USER is unset."""
 
     settings.OIDC_CREATE_USER = False
+    settings.OIDC_OP_USER_ENDPOINT = "https://oidc.example.com/userinfo"
+    responses.add(
+        responses.GET,
+        "https://oidc.example.com/userinfo",
+        json={"sub": "new-sub", "email": "new@example.com"},
+    )
 
     result = ResourceServerBackend().get_or_create_user(
         access_token="token", id_token=None, payload=_payload("new-sub")

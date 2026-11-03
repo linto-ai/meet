@@ -80,6 +80,7 @@ It reuses the resource server settings, which must all be set:
 | OIDC_OP_URL                    | The provider's issuer, **exactly** as in its discovery document: an introspection response whose `iss` differs is refused               |
 | OIDC_RS_CLIENT_ID / _SECRET    | The credentials Meet introspects with, usually its own client (`OIDC_RP_CLIENT_ID`). The provider must let it introspect the app's tokens |
 | OIDC_RS_SCOPES                 | At least one scope the app requests, e.g. `openid`                                                                                      |
+| OIDC_OP_USER_ENDPOINT          | The provider's userinfo endpoint, with the other settings of the web sign-in: a user seen for the first time goes through it             |
 
 Example, for an app registered as `twake-visio` on a LemonLDAP::NG provider:
 
@@ -102,9 +103,18 @@ Behaviour worth knowing:
   `401`, including for an expired token, so that the app refreshes it.
 * Each such request costs one introspection call to the provider; responses
   are not cached.
-* With `OIDC_CREATE_USER`, a user who first signs in from the app is created
-  from the `sub` alone, as with the external API: email and names arrive at
-  their first sign-in on the web app.
-* The app must get the same `sub` as the web client, or the same person gets
-  two accounts: check that both clients use the same user attribute on the
-  provider.
+* A `sub` Meet does not know yet costs one more call, to the userinfo endpoint
+  (`OIDC_OP_USER_ENDPOINT`) with the app's token, then goes through the web
+  sign-in: the user an application provisioned by email is found
+  (`OIDC_FALLBACK_TO_EMAIL_FOR_IDENTIFICATION`), and a new user gets the email
+  and names of userinfo. The `sub` stays the one of the introspection. The
+  external API's resource server does the same.
+* The email and names are the claims the provider exports for the app's
+  client, not for Meet's: both clients must export `email` from the same
+  attribute.
+* The `sub` is the one the provider computes for the client Meet introspects
+  with (`OIDC_RS_CLIENT_ID`). When it differs from the `sub` of the web
+  sign-in, only the email fallback finds the same user: with
+  `OIDC_USER_SUB_FIELD_IMMUTABLE` the app's `sub` is never stored and userinfo
+  is called on each request, without it the two sign-ins overwrite each
+  other's `sub`.
