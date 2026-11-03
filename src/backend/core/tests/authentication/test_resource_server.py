@@ -16,13 +16,16 @@ from requests.exceptions import ConnectionError as RequestsConnectionError
 from rest_framework.test import APIClient
 
 from core import utils
+from core.authentication.backends import OIDCAuthenticationBackend
 from core.factories import RoomFactory, UserFactory
 from core.models import Recording, Room, User
+from core.services.provisional_user_service import ProvisionalUserService
 
 pytestmark = pytest.mark.django_db
 
 OP_URL = "https://oidc.example.com"
 INTROSPECTION_URL = f"{OP_URL}/introspect"
+USERINFO_URL = f"{OP_URL}/userinfo"
 MOBILE_CLIENT_ID = "twake-visio"
 TOKEN = "opaque-access-token-of-the-mobile-app"
 
@@ -37,6 +40,8 @@ def resource_server(settings):
     settings.OIDC_RS_SCOPES = ["openid"]
     settings.OIDC_OP_URL = OP_URL
     settings.OIDC_OP_INTROSPECTION_ENDPOINT = INTROSPECTION_URL
+    settings.OIDC_OP_USER_ENDPOINT = USERINFO_URL
+    settings.OIDC_OP_JWKS_ENDPOINT = f"{OP_URL}/jwks"
     return settings
 
 
@@ -53,6 +58,16 @@ def introspection(
         "sub": sub,
         "client_id": client_id,
         "scope": scope,
+    }
+
+
+def userinfo(sub):
+    """The userinfo response of a token with the scopes of the app."""
+    return {
+        "sub": sub,
+        "email": "alice@example.com",
+        "given_name": "Alice",
+        "family_name": "Liddell",
     }
 
 
@@ -111,14 +126,25 @@ def test_allowed_token_authenticates_its_user(resource_server):
 
 @responses.activate
 def test_allowed_token_creates_an_unknown_user(resource_server):
-    """A first sign-in from the app creates the user, as the external API does."""
+    """A first sign-in from the app creates the user with the email and names
+    of userinfo, asked once with the token of the app."""
     resource_server.OIDC_CREATE_USER = True
+    resource_server.OIDC_USERINFO_FULLNAME_FIELDS = ["given_name", "family_name"]
+    resource_server.OIDC_USERINFO_SHORTNAME_FIELD = "given_name"
     responses.add(responses.POST, INTROSPECTION_URL, json=introspection("new-sub"))
+    responses.add(responses.GET, USERINFO_URL, json=userinfo("new-sub"))
 
     response = bearer().get("/api/v1.0/users/me/")
+    bearer().get("/api/v1.0/users/me/")
 
     assert response.status_code == 200
-    assert response.json()["id"] == str(User.objects.get(sub="new-sub").id)
+    user = User.objects.get(sub="new-sub")
+    assert response.json()["id"] == str(user.id)
+    assert response.json()["email"] == "alice@example.com"
+    assert (user.full_name, user.short_name) == ("Alice Liddell", "Alice")
+    userinfo_calls = [c for c in responses.calls if c.request.url == USERINFO_URL]
+    assert len(userinfo_calls) == 1
+    assert userinfo_calls[0].request.headers["Authorization"] == f"Bearer {TOKEN}"
 
 
 @responses.activate
@@ -126,11 +152,130 @@ def test_allowed_token_does_not_create_a_user_when_creation_is_off(resource_serv
     """OIDC_CREATE_USER=False is honoured: an unknown sub is not authenticated."""
     resource_server.OIDC_CREATE_USER = False
     responses.add(responses.POST, INTROSPECTION_URL, json=introspection("new-sub"))
+    responses.add(responses.GET, USERINFO_URL, json=userinfo("new-sub"))
 
     response = bearer().get("/api/v1.0/users/me/")
 
     assert response.status_code == 401
     assert not User.objects.filter(sub="new-sub").exists()
+
+
+# ==============================
+# One account per person, whatever signs in first
+# ==============================
+
+
+def provisional_user(email="alice@example.com"):
+    """A user an application provisioned by email (Twake Chat, the calendar)."""
+    user = User(sub=None, email=email)
+    user.set_unusable_password()
+    user.save()
+    return user
+
+
+@pytest.fixture
+def email_fallback(resource_server):
+    """The settings the provisioning of users by email requires."""
+    resource_server.OIDC_FALLBACK_TO_EMAIL_FOR_IDENTIFICATION = True
+    resource_server.OIDC_USER_SUB_FIELD_IMMUTABLE = False
+    return resource_server
+
+
+@responses.activate
+def test_app_after_an_application_finds_the_provisional_user(email_fallback):
+    """The app signs in to the account an application provisioned by email,
+    with its rooms, and gives it its sub."""
+    user = provisional_user()
+    RoomFactory(users=[(user, "owner")])
+    responses.add(responses.POST, INTROSPECTION_URL, json=introspection("alice"))
+    responses.add(responses.GET, USERINFO_URL, json=userinfo("alice"))
+
+    me = bearer().get("/api/v1.0/users/me/")
+    rooms = bearer().get("/api/v1.0/rooms/")
+
+    assert me.json()["id"] == str(user.id)
+    assert rooms.json()["count"] == 1
+    user.refresh_from_db()
+    assert user.sub == "alice"
+    assert User.objects.count() == 1
+
+
+@responses.activate
+def test_web_after_the_app_finds_the_same_user(email_fallback):
+    """A web sign-in after the app finds the user of the app by its sub."""
+    responses.add(responses.POST, INTROSPECTION_URL, json=introspection("alice"))
+    responses.add(responses.GET, USERINFO_URL, json=userinfo("alice"))
+    bearer().get("/api/v1.0/users/me/")
+
+    with mock.patch.object(
+        OIDCAuthenticationBackend, "get_userinfo", return_value=userinfo("alice")
+    ):
+        web_user = OIDCAuthenticationBackend().get_or_create_user("a", "i", {})
+
+    assert web_user == User.objects.get()
+
+
+@responses.activate
+def test_application_after_the_app_finds_the_same_user(email_fallback):
+    """An application acting for the email of a user of the app finds that
+    user, instead of provisioning a second one."""
+    responses.add(responses.POST, INTROSPECTION_URL, json=introspection("alice"))
+    responses.add(responses.GET, USERINFO_URL, json=userinfo("alice"))
+    bearer().get("/api/v1.0/users/me/")
+
+    user, created = ProvisionalUserService().get_or_create(
+        "alice@example.com", client_id="twake-chat"
+    )
+
+    assert not created
+    assert user == User.objects.get(sub="alice")
+
+
+@responses.activate
+def test_sub_of_the_introspection_wins_over_userinfo(resource_server):
+    """The provider computes the sub for the client that asks: the introspection
+    one is Meet's, the userinfo one the app's."""
+    responses.add(responses.POST, INTROSPECTION_URL, json=introspection("alice"))
+    responses.add(responses.GET, USERINFO_URL, json=userinfo("alice@example.com"))
+
+    assert bearer().get("/api/v1.0/users/me/").status_code == 200
+    assert User.objects.get().sub == "alice"
+
+
+@responses.activate
+def test_userinfo_without_email_creates_the_user_from_its_sub(email_fallback):
+    """Without an email, nothing else can be matched: the user of the sub."""
+    provisional_user()
+    responses.add(responses.POST, INTROSPECTION_URL, json=introspection("alice"))
+    responses.add(responses.GET, USERINFO_URL, json={"sub": "alice"})
+
+    assert bearer().get("/api/v1.0/users/me/").status_code == 200
+    assert User.objects.get(sub="alice").email is None
+
+
+@responses.activate
+def test_two_users_with_the_email_answer_401(email_fallback):
+    """Users sharing the email: the web refuses the sign-in, so does the app."""
+    provisional_user()
+    UserFactory(sub="someone-else", email="alice@example.com")
+    responses.add(responses.POST, INTROSPECTION_URL, json=introspection("alice"))
+    responses.add(responses.GET, USERINFO_URL, json=userinfo("alice"))
+
+    assert bearer().get("/api/v1.0/users/me/").status_code == 401
+    assert not User.objects.filter(sub="alice").exists()
+
+
+@pytest.mark.parametrize(
+    "failure", [{"status": 500}, {"body": RequestsConnectionError("down")}]
+)
+@responses.activate
+def test_userinfo_failure_answers_401_and_creates_nobody(resource_server, failure):
+    """Without userinfo, no user is created from the sub alone."""
+    responses.add(responses.POST, INTROSPECTION_URL, json=introspection("alice"))
+    responses.add(responses.GET, USERINFO_URL, **failure)
+
+    assert bearer().get("/api/v1.0/users/me/").status_code == 401
+    assert not User.objects.exists()
 
 
 @responses.activate
