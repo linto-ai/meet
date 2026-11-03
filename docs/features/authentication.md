@@ -70,7 +70,7 @@ This is **off by default**.
 | Option                             | Description                                                                                                                                                                       | Default |
 |------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
 | OIDC_RS_CORE_API_ENABLED           | Accept OIDC access tokens on the core API                                                                                                                                         | `false` |
-| OIDC_RS_CORE_API_ALLOWED_AUDIENCES | Client ids whose tokens are accepted, read from the `OIDC_RS_AUDIENCE_CLAIM` of the introspection response (`client_id` by default). Checked before any user is looked up or created. Empty: no token is accepted | `[]`    |
+| OIDC_RS_CORE_API_ALLOWED_AUDIENCES | Client ids whose tokens are accepted, read from the `OIDC_RS_AUDIENCE_CLAIM` of the introspection response (`client_id` by default). Checked before any user is looked up or created. Empty: no token is accepted. Applies to the external API too while `OIDC_RS_CORE_API_ENABLED` is set: list there every client that uses it | `[]`    |
 
 It reuses the resource server settings, which must all be set:
 
