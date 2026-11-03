@@ -323,6 +323,53 @@ def test_token_of_another_client_is_refused_before_any_user_creation(resource_se
 
 
 @responses.activate
+def test_external_api_refuses_another_client_before_any_user_creation(
+    resource_server,
+):
+    """The external API takes the same resource server settings: a token of
+    another application gets nothing there either, whatever its scopes."""
+    resource_server.OIDC_CREATE_USER = True
+    user = UserFactory()
+    RoomFactory(users=[(user, "owner")])
+    scope = "openid rooms:list rooms:create"
+    responses.add(
+        responses.POST,
+        INTROSPECTION_URL,
+        json=introspection(user.sub, client_id="some-other-app", scope=scope),
+    )
+
+    assert bearer().get("/external-api/v1.0/rooms/").status_code == 401
+    assert bearer().post("/external-api/v1.0/rooms/", {}).status_code == 401
+    assert Room.objects.count() == 1
+
+    responses.replace(
+        responses.POST,
+        INTROSPECTION_URL,
+        json=introspection("unknown-sub", client_id="some-other-app", scope=scope),
+    )
+
+    assert bearer().get("/external-api/v1.0/rooms/").status_code == 401
+    assert not User.objects.filter(sub="unknown-sub").exists()
+
+
+@responses.activate
+def test_external_api_takes_an_allowed_client(resource_server):
+    """The listed clients keep the external API, within their scopes."""
+    user = UserFactory()
+    RoomFactory(users=[(user, "owner")])
+    responses.add(
+        responses.POST,
+        INTROSPECTION_URL,
+        json=introspection(user.sub, scope="openid rooms:list"),
+    )
+
+    response = bearer().get("/external-api/v1.0/rooms/")
+
+    assert response.status_code == 200
+    assert response.json()["count"] == 1
+
+
+@responses.activate
 def test_empty_allowlist_accepts_no_token(resource_server):
     """Enabled without an allowlist, nothing gets in."""
     resource_server.OIDC_RS_CORE_API_ALLOWED_AUDIENCES = []

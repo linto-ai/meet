@@ -280,6 +280,18 @@ class ResourceServerBackend(LaSuiteBackend):
             SuspiciousOperation: If user info validation fails
         """
 
+        # The settings that open the core API to the app also open the
+        # external API: there too, only the tokens of the listed clients
+        if (
+            settings.OIDC_RS_CORE_API_ENABLED
+            and self.token_origin_audience
+            not in settings.OIDC_RS_CORE_API_ALLOWED_AUDIENCES
+        ):
+            raise SuspiciousOperation(
+                f"Access token issued to {self.token_origin_audience!r} refused: "
+                "not in OIDC_RS_CORE_API_ALLOWED_AUDIENCES"
+            )
+
         sub = payload.get("sub")
 
         if sub is None:
