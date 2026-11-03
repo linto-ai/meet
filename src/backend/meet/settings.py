@@ -1342,6 +1342,19 @@ class Base(Configuration):
                 stacklevel=2,
             )
 
+        if cls.OIDC_RS_CORE_API_ENABLED and not (
+            cls.OIDC_RS_CLIENT_SECRET
+            and cls.OIDC_OP_URL
+            and cls.OIDC_OP_INTROSPECTION_ENDPOINT
+        ):
+            warnings.warn(
+                "OIDC_RS_CORE_API_ENABLED is set but OIDC_RS_CLIENT_SECRET, "
+                "OIDC_OP_URL or OIDC_OP_INTROSPECTION_ENDPOINT is missing: no access "
+                "token will be accepted on the core API.",
+                UserWarning,
+                stacklevel=2,
+            )
+
         if (
             cls.SUMMARY_SERVICE_VERSION == 1
             and cls.SUMMARY_SERVICE_ENDPOINT is not None
