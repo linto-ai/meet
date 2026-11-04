@@ -1355,6 +1355,14 @@ class Base(Configuration):
                 stacklevel=2,
             )
 
+        if cls.OIDC_RS_CORE_API_ENABLED and not cls.OIDC_OP_USER_ENDPOINT:
+            warnings.warn(
+                "OIDC_RS_CORE_API_ENABLED is set but OIDC_OP_USER_ENDPOINT is missing: "
+                "an access token of a user Meet does not know yet will be refused.",
+                UserWarning,
+                stacklevel=2,
+            )
+
         if (
             cls.SUMMARY_SERVICE_VERSION == 1
             and cls.SUMMARY_SERVICE_ENDPOINT is not None

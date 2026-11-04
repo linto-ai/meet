@@ -281,7 +281,8 @@ class ResourceServerBackend(LaSuiteBackend):
         """
 
         # The settings that open the core API to the app also open the
-        # external API: there too, only the tokens of the listed clients
+        # external API: there too, only the tokens of the listed clients are
+        # taken, checked before any user is looked up or created.
         if (
             settings.OIDC_RS_CORE_API_ENABLED
             and self.token_origin_audience
