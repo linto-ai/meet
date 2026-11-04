@@ -1,13 +1,8 @@
 """OIDC access token authentication on the core API, for native apps.
 
-The web frontend authenticates with the Django session cookie it gets from the
-server-side Authorization Code flow. A native app (e.g. the Twake Visio mobile
-app) cannot hold that cookie without embedding a WebView, which RFC 8252
-rules out. It runs its own Authorization Code + PKCE flow against the OIDC
-provider, as a public client, and sends the access token as a Bearer header.
-This backend introspects that token (RFC 7662) and authenticates its user, so
-the core API serves the native app exactly as it serves the web frontend: the
-same views, the same role-based permissions.
+A native app cannot hold the session cookie without a WebView, which RFC 8252
+rules out. It runs its own Authorization Code + PKCE flow and sends the access
+token as a Bearer header, which this backend introspects (RFC 7662).
 """
 
 import logging
@@ -25,29 +20,17 @@ logger = logging.getLogger(__name__)
 class CoreAPIResourceServerAuthentication(ResourceServerAuthentication):
     """Authenticate core API requests with an access token of the OIDC provider.
 
-    Inert unless OIDC_RS_CORE_API_ENABLED is True: it then returns None before
-    reading the Authorization header, deferring every request to the next
-    authentication backend.
-
-    Only tokens issued to a client listed in OIDC_RS_CORE_API_ALLOWED_AUDIENCES
-    are accepted, checked BEFORE any user is looked up or created. Without the
-    allowlist, any active token of the provider carrying one of OIDC_RS_SCOPES
+    Only tokens issued to a client in OIDC_RS_CORE_API_ALLOWED_AUDIENCES are
+    accepted: otherwise any token of the provider with one of OIDC_RS_SCOPES
     would open the core API, whichever application it was issued to.
 
-    A Bearer token that is not an active access token of an allowed client is
-    deferred to the next backend instead of failing the request. Some core API
-    endpoints also take a LiveKit room token as Bearer (start-recording,
-    stop-recording list it after the default backends): failing here would
-    refuse those tokens before LiveKitTokenAuthentication sees them. When no
-    backend authenticates, DRF still answers 401.
-
-    This also turns lasuite's SuspiciousOperation on an inactive or expired
-    token into that 401, where the parent class lets Django answer 400 — a
-    native app refreshes its token on 401, not on 400.
+    A refused Bearer token is deferred to the next backend, not failed:
+    start-recording and stop-recording also take a LiveKit room token as
+    Bearer. With no backend left, DRF answers 401, where lasuite would let
+    Django answer 400; a native app refreshes its token on 401 only.
     """
 
     def __init__(self):
-        """Build the lasuite backend only when the feature is enabled."""
         if not settings.OIDC_RS_CORE_API_ENABLED:
             self.backend = None
             return
@@ -85,10 +68,7 @@ class CoreAPIResourceServerAuthentication(ResourceServerAuthentication):
         return None
 
     def _allowed_user(self, access_token, user_info):
-        """The active user of a token issued to an allowed client, or None.
-
-        The backend refuses a client outside the allowlist before any user
-        lookup, so that a token of another application never creates a user."""
+        """The active user of a token issued to an allowed client, or None."""
         try:
             user = self.backend.get_or_create_user(access_token, None, user_info)
         except SuspiciousOperation as exc:
