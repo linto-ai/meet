@@ -87,17 +87,8 @@ class CoreAPIResourceServerAuthentication(ResourceServerAuthentication):
     def _allowed_user(self, access_token, user_info):
         """The active user of a token issued to an allowed client, or None.
 
-        The client is checked first, so that a token of another application
-        never creates a user."""
-        audience = self.backend.token_origin_audience
-        if audience not in settings.OIDC_RS_CORE_API_ALLOWED_AUDIENCES:
-            logger.warning(
-                "Access token issued to %r refused on the core API: "
-                "not in OIDC_RS_CORE_API_ALLOWED_AUDIENCES",
-                audience,
-            )
-            return None
-
+        The backend refuses a client outside the allowlist before any user
+        lookup, so that a token of another application never creates a user."""
         try:
             user = self.backend.get_or_create_user(access_token, None, user_info)
         except SuspiciousOperation as exc:
