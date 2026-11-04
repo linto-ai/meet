@@ -10,8 +10,10 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import SuspiciousOperation
 
 from lasuite.oidc_resource_server.backend import ResourceServerBackend as LaSuiteBackend
+from requests.exceptions import RequestException
 from rest_framework import authentication, exceptions
 
+from core.authentication.backends import OIDCAuthenticationBackend
 from core.models import Application
 from core.services import jwt_token
 
@@ -260,7 +262,11 @@ class ResourceServerBackend(LaSuiteBackend):
 
         Despite the LaSuiteBackend's method name suggesting "get_or_create",
         its implementation only performs a GET operation.
-        Create new user from the sub claim.
+
+        A sub seen for the first time goes through the sign-in of the web
+        frontend, with the userinfo of the token: the user an application
+        provisioned by email is found instead of duplicated, and a new user
+        gets their email and names.
 
         Args:
             access_token: The access token string
@@ -274,6 +280,19 @@ class ResourceServerBackend(LaSuiteBackend):
             SuspiciousOperation: If user info validation fails
         """
 
+        # The settings that open the core API to the app also open the
+        # external API: there too, only the tokens of the listed clients are
+        # taken, checked before any user is looked up or created.
+        if (
+            settings.OIDC_RS_CORE_API_ENABLED
+            and self.token_origin_audience
+            not in settings.OIDC_RS_CORE_API_ALLOWED_AUDIENCES
+        ):
+            raise SuspiciousOperation(
+                f"Access token issued to {self.token_origin_audience!r} refused: "
+                "not in OIDC_RS_CORE_API_ALLOWED_AUDIENCES"
+            )
+
         sub = payload.get("sub")
 
         if sub is None:
@@ -283,22 +302,29 @@ class ResourceServerBackend(LaSuiteBackend):
 
         user = self.get_user(access_token, id_token, payload)
 
-        if user is None and settings.OIDC_CREATE_USER:
-            user = self.create_user(sub)
+        if user is None:
+            user = UserinfoSignInBackend(sub).get_or_create_user(
+                access_token, None, None
+            )
 
         return user
 
-    def create_user(self, sub):
-        """Create new user from subject claim.
 
-        Args:
-            sub: Subject identifier from token
+class UserinfoSignInBackend(OIDCAuthenticationBackend):
+    """The sign-in of the web frontend, for the bearer of an access token.
 
-        Returns:
-            Newly created User instance
-        """
-        user = self.UserModel(sub=sub)
-        user.set_unusable_password()
-        user.save()
+    The sub stays the one of the introspection: the provider computes it for
+    the client that introspects, Meet's own, while userinfo gives the one of
+    the client the token was issued to.
+    """
 
-        return user
+    def __init__(self, sub):
+        super().__init__()
+        self._sub = sub
+
+    def get_userinfo(self, access_token, id_token, payload):
+        try:
+            user_info = super().get_userinfo(access_token, id_token, payload)
+        except RequestException as exc:
+            raise SuspiciousOperation("Could not fetch userinfo") from exc
+        return {**user_info, "sub": self._sub}

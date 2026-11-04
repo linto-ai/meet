@@ -327,6 +327,8 @@ class Base(Configuration):
     REST_FRAMEWORK = {
         "DEFAULT_AUTHENTICATION_CLASSES": (
             "core.authentication.backends.SessionAuthenticationWith401",
+            # Inert unless OIDC_RS_CORE_API_ENABLED: see core.authentication.resource_server
+            "core.authentication.resource_server.CoreAPIResourceServerAuthentication",
         ),
         "DEFAULT_PARSER_CLASSES": [
             "rest_framework.parsers.JSONParser",
@@ -654,6 +656,17 @@ class Base(Configuration):
     )
     OIDC_RS_SCOPES_PREFIX = values.Value(
         default=None, environ_name="OIDC_RS_SCOPES_PREFIX", environ_prefix=None
+    )
+    # Accept OIDC access tokens on the core API (/api/v1.0/), for native apps
+    # that cannot hold the session cookie. Reuses the OIDC_RS_* settings above
+    # for introspection; only tokens issued to the listed client ids are taken.
+    OIDC_RS_CORE_API_ENABLED = values.BooleanValue(
+        default=False, environ_name="OIDC_RS_CORE_API_ENABLED", environ_prefix=None
+    )
+    OIDC_RS_CORE_API_ALLOWED_AUDIENCES = values.ListValue(
+        default=[],
+        environ_name="OIDC_RS_CORE_API_ALLOWED_AUDIENCES",
+        environ_prefix=None,
     )
 
     # Video conference configuration
@@ -1319,6 +1332,35 @@ class Base(Configuration):
         if cls.FILE_UPLOAD_TMP_PATH == cls.FILE_UPLOAD_PATH:
             raise ValueError(
                 "FILE_UPLOAD_TMP_PATH cannot be the same as FILE_UPLOAD_PATH"
+            )
+
+        if cls.OIDC_RS_CORE_API_ENABLED and not cls.OIDC_RS_CORE_API_ALLOWED_AUDIENCES:
+            warnings.warn(
+                "OIDC_RS_CORE_API_ENABLED is set but OIDC_RS_CORE_API_ALLOWED_AUDIENCES "
+                "is empty: no access token will be accepted on the core API.",
+                UserWarning,
+                stacklevel=2,
+            )
+
+        if cls.OIDC_RS_CORE_API_ENABLED and not (
+            cls.OIDC_RS_CLIENT_SECRET
+            and cls.OIDC_OP_URL
+            and cls.OIDC_OP_INTROSPECTION_ENDPOINT
+        ):
+            warnings.warn(
+                "OIDC_RS_CORE_API_ENABLED is set but OIDC_RS_CLIENT_SECRET, "
+                "OIDC_OP_URL or OIDC_OP_INTROSPECTION_ENDPOINT is missing: no access "
+                "token will be accepted on the core API.",
+                UserWarning,
+                stacklevel=2,
+            )
+
+        if cls.OIDC_RS_CORE_API_ENABLED and not cls.OIDC_OP_USER_ENDPOINT:
+            warnings.warn(
+                "OIDC_RS_CORE_API_ENABLED is set but OIDC_OP_USER_ENDPOINT is missing: "
+                "an access token of a user Meet does not know yet will be refused.",
+                UserWarning,
+                stacklevel=2,
             )
 
         if (

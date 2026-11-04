@@ -52,3 +52,69 @@ Authentication relies on [django-lasuite](https://github.com/suitenumerique/djan
 * After login, users receive a **Django session cookie** to maintain authentication across requests.
 * Default session duration is 12 hours (`SESSION_COOKIE_AGE = 60 * 60 * 12`).
 * Ensure your session policy matches your security requirements.
+
+
+## Native apps: access tokens on the core API
+
+A native app (e.g. the Twake Visio mobile app) cannot hold the session cookie
+without embedding a WebView, which [RFC 8252](https://www.rfc-editor.org/rfc/rfc8252)
+rules out. It runs its own Authorization Code + PKCE flow against the OIDC
+provider, as a public client, and calls the core API (`/api/v1.0/`) with the
+access token as `Authorization: Bearer <token>`. Meet then acts as an OAuth 2.0
+resource server: it introspects the token ([RFC 7662](https://www.rfc-editor.org/rfc/rfc7662))
+and serves the request as the token's user, with the same role-based
+permissions as a session.
+
+This is **off by default**.
+
+| Option                             | Description                                                                                                                                                                       | Default |
+|------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
+| OIDC_RS_CORE_API_ENABLED           | Accept OIDC access tokens on the core API                                                                                                                                         | `false` |
+| OIDC_RS_CORE_API_ALLOWED_AUDIENCES | Client ids whose tokens are accepted, read from the `OIDC_RS_AUDIENCE_CLAIM` of the introspection response (`client_id` by default). Checked before any user is looked up or created. Empty: no token is accepted. Applies to the external API too while `OIDC_RS_CORE_API_ENABLED` is set: list there every client that uses it | `[]`    |
+
+It reuses the resource server settings, which must all be set:
+
+| Option                         | Value                                                                                                                                  |
+|--------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| OIDC_OP_INTROSPECTION_ENDPOINT | The provider's introspection endpoint                                                                                                   |
+| OIDC_OP_URL                    | The provider's issuer, **exactly** as in its discovery document: an introspection response whose `iss` differs is refused               |
+| OIDC_RS_CLIENT_ID / _SECRET    | The credentials Meet introspects with, usually its own client (`OIDC_RP_CLIENT_ID`). The provider must let it introspect the app's tokens |
+| OIDC_RS_SCOPES                 | At least one scope the app requests, e.g. `openid`                                                                                      |
+| OIDC_OP_USER_ENDPOINT          | The provider's userinfo endpoint, with the other settings of the web sign-in: a user seen for the first time goes through it             |
+
+Example, for an app registered as `twake-visio` on a LemonLDAP::NG provider:
+
+```
+OIDC_RS_CORE_API_ENABLED=True
+OIDC_RS_CORE_API_ALLOWED_AUDIENCES=twake-visio
+OIDC_OP_URL=https://sso.example.com
+OIDC_OP_INTROSPECTION_ENDPOINT=https://sso.example.com/oauth2/introspect
+OIDC_RS_CLIENT_ID=meet
+OIDC_RS_CLIENT_SECRET=<the secret of the meet client>
+OIDC_RS_SCOPES=openid
+```
+
+Behaviour worth knowing:
+
+* A Bearer token that is not an active token of an allowed client is passed
+  on to the next authentication backend rather than refused on the spot: some
+  endpoints (`start-recording`, `stop-recording`) also take a LiveKit room
+  token as Bearer. When nothing authenticates the request, the answer is
+  `401`, including for an expired token, so that the app refreshes it.
+* Each such request costs one introspection call to the provider; responses
+  are not cached.
+* A `sub` Meet does not know yet costs one more call, to the userinfo endpoint
+  (`OIDC_OP_USER_ENDPOINT`) with the app's token, then goes through the web
+  sign-in: the user an application provisioned by email is found
+  (`OIDC_FALLBACK_TO_EMAIL_FOR_IDENTIFICATION`), and a new user gets the email
+  and names of userinfo. The `sub` stays the one of the introspection. The
+  external API's resource server does the same.
+* The email and names are the claims the provider exports for the app's
+  client, not for Meet's: both clients must export `email` from the same
+  attribute.
+* The `sub` is the one the provider computes for the client Meet introspects
+  with (`OIDC_RS_CLIENT_ID`). When it differs from the `sub` of the web
+  sign-in, only the email fallback finds the same user: with
+  `OIDC_USER_SUB_FIELD_IMMUTABLE` the app's `sub` is never stored and userinfo
+  is called on each request, without it the two sign-ins overwrite each
+  other's `sub`.

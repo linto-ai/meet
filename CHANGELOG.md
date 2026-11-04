@@ -8,6 +8,10 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- ✨(backend) accept OIDC access tokens on the core API for native apps, opt-in and per client
+
 ### Changed
 
 - 📝(backend) log the outcome of every Twake Drive recording upload
