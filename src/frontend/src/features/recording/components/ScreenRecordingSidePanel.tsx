@@ -141,9 +141,7 @@ export const ScreenRecordingSidePanel = () => {
     return (
       <NoAccessView
         i18nKeyPrefix={keyPrefix}
-        i18nKey={
-          isOpenToAuthenticated ? 'notLoggedIn' : 'notAdminOrOwner'
-        }
+        i18nKey={isOpenToAuthenticated ? 'notLoggedIn' : 'notAdminOrOwner'}
         helpArticle={data?.support?.help_article_recording}
         imagePath="/assets/intro-slider/4.png"
         handleRequest={handleRequestScreenRecording}

@@ -152,9 +152,7 @@ export const TranscriptSidePanel = () => {
     return (
       <NoAccessView
         i18nKeyPrefix={keyPrefix}
-        i18nKey={
-          isOpenToAuthenticated ? 'notLoggedIn' : 'notAdminOrOwner'
-        }
+        i18nKey={isOpenToAuthenticated ? 'notLoggedIn' : 'notAdminOrOwner'}
         helpArticle={data?.support?.help_article_transcript}
         imagePath="/assets/intro-slider/3.png"
         handleRequest={handleRequestTranscription}
