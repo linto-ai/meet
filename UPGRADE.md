@@ -57,14 +57,14 @@ comes with it: dev-meet has the same `0023` to `0026` as meet.linagora.com, and
 
 New backend variables and their defaults:
 
-- `LINTO_ENTITLEMENTS_ENABLED` (default `True`): the per-user rights system.
-  `False` opens every LinTO feature to everyone (live and deferred
+- `LINTO_ENTITLEMENTS_ENABLED` (default `False`): the per-user rights system.
+  Off by default: every LinTO feature is open to everyone (live and deferred
   transcription, summary, translation, recording) without asking Studio for any
   right, and the browser's Studio token comes from the service account whatever
-  `LINTO_STUDIO_TOKEN_SOURCE` says. Left at `True` with the default
-  `ENTITLEMENTS_BACKEND`, nobody holds a LinTO capability: a deferred
-  transcription is refused (403 `no_entitlement`), the "transcribe" checkbox is
-  hidden and no summary is made.
+  `LINTO_STUDIO_TOKEN_SOURCE` says. `True` turns the rights on; it goes with the
+  `linto` `ENTITLEMENTS_BACKEND`, since with the default backend nobody holds a
+  LinTO capability (a deferred transcription is refused with 403
+  `no_entitlement`, the "transcribe" checkbox is hidden, no summary is made).
 - `LINTO_RECORDING_ENTITLEMENT_ENABLED` (default `False`): when `True`, the
   video recording also needs the `recording` capability, on top of the
   per-room recording permission (admins and owner by default).
@@ -89,20 +89,23 @@ a deployment that only sets `LINTO_STUDIO_API_TOKEN` is unchanged.
 
 Changes to make in `lasuite-meet-deploy`:
 
-- meet.linagora.com (`configs/meet/meet/prd/values.yaml`): add
-  `LINTO_ENTITLEMENTS_ENABLED: False`. It is the only change that keeps the
-  current behaviour (deferred transcription and summary for everyone, no right
-  asked to Studio or Twake); without it the deferred transcription is refused
-  to everyone. Leave `LINTO_FEATURE_ENABLED`, `ENTITLEMENTS_BACKEND` and
-  `LINTO_RECORDING_ENTITLEMENT_ENABLED` unset: no live panel, recording
-  governed by the room permission only.
+- meet.linagora.com (`configs/meet/meet/prd/values.yaml`): nothing to add.
+  `LINTO_ENTITLEMENTS_ENABLED` defaults to `False`, which keeps the current
+  behaviour (deferred transcription and summary for everyone, no right asked
+  to Studio or Twake). Leave `LINTO_FEATURE_ENABLED`, `ENTITLEMENTS_BACKEND`
+  and `LINTO_RECORDING_ENTITLEMENT_ENABLED` unset too: no live panel,
+  recording governed by the room permission only.
 - dev-meet (`configs/meet/meet/stg/values.yaml`): nothing to add. It already
   sets the live line's variables (`LINTO_FEATURE_ENABLED`,
   `LINTO_ENTITLEMENTS_ENABLED: True`, the `linto` entitlements backend,
   `LINTO_STUDIO_TOKEN_SOURCE: user_key`,
   `LINTO_RECORDING_ENTITLEMENT_ENABLED: False`, the service account, the
   native bot). Its image moves from `v1.26-live` to this line's, with the
-  changes of the section above.
+  changes of the section above. It keeps its rights because it sets
+  `LINTO_ENTITLEMENTS_ENABLED: True` explicitly.
+- Any other instance that wants the per-user rights of Twake must set
+  `LINTO_ENTITLEMENTS_ENABLED: True` (with the `linto` entitlements backend):
+  without it, every LinTO feature is open to everyone.
 - The LinTO endpoints (`prepare`, `started`, `stopped`, `studio-token`,
   `summary-services`, `transcription-languages`) now take the LiveKit room
   token in an `Authorization: X-LiveKit-Token <token>` header, no longer in the

@@ -4,6 +4,7 @@ deferred transcription."""
 
 # pylint: disable=redefined-outer-name,unused-argument
 
+import importlib.util
 import json
 from unittest import mock
 
@@ -25,6 +26,8 @@ from core.entitlements.capabilities import (
     user_linto_capabilities,
 )
 from core.entitlements.factory import get_entitlements_backend
+
+from meet import settings as meet_settings
 
 pytestmark = pytest.mark.django_db
 
@@ -393,21 +396,40 @@ def test_summary_is_granted_with_the_kill_switch_off(linto_settings):
 # -- the kill switch off is the behaviour without rights management --
 
 
+def _value_without_the_variable(name, monkeypatch):
+    """What an instance gets when its environment does not carry `name`: the
+    settings module evaluated afresh, the variable removed beforehand."""
+    monkeypatch.delenv(name, raising=False)
+    spec = importlib.util.spec_from_file_location(
+        "meet_settings_without_variable", meet_settings.__file__
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return getattr(module.Base, name)
+
+
 @responses.activate
+@pytest.mark.parametrize("kill_switch", ["false", "unset"])
 @pytest.mark.parametrize("backend", [LINTO_BACKEND, None])
 def test_kill_switch_off_opens_everything_without_asking_studio(
-    linto_settings, backend
+    linto_settings, monkeypatch, backend, kill_switch
 ):
-    """LINTO_ENTITLEMENTS_ENABLED=False (meet.linagora.com): every LinTO feature
-    is open to everyone and Studio is never asked for a right, whether the
-    `linto` entitlements backend is configured or the upstream default is kept:
-    not at sign-in, not by users/me or the config, not when a room is created,
-    a recording or a deferred transcription is started, or a summary decided."""
+    """LINTO_ENTITLEMENTS_ENABLED=False, or the variable left out (the default,
+    meet.linagora.com): every LinTO feature is open to everyone and Studio is
+    never asked for a right, whether the `linto` entitlements backend is
+    configured or the upstream default is kept: not at sign-in, not by
+    users/me or the config, not when a room is created, a recording or a
+    deferred transcription is started, or a summary decided."""
     if backend is None:
         linto_settings.ENTITLEMENTS_BACKEND = (
             "core.entitlements.backends.local.LocalEntitlementsBackend"
         )
-    linto_settings.LINTO_ENTITLEMENTS_ENABLED = False
+    if kill_switch == "false":
+        linto_settings.LINTO_ENTITLEMENTS_ENABLED = False
+    else:
+        linto_settings.LINTO_ENTITLEMENTS_ENABLED = _value_without_the_variable(
+            "LINTO_ENTITLEMENTS_ENABLED", monkeypatch
+        )
     linto_settings.LINTO_STUDIO_TOKEN_SOURCE = "user_key"
     linto_settings.RECORDING_ENABLE = True
     linto_settings.METADATA_COLLECTOR_ENABLED = False

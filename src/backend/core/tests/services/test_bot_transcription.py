@@ -624,6 +624,8 @@ class TestStudioTokenFor:
             BotTranscriptionService().studio_token_for(UserFactory())
 
     def test_unknown_source_raises(self, studio_settings):
+        # The token source is only read when the per-user rights are on.
+        studio_settings.LINTO_ENTITLEMENTS_ENABLED = True
         studio_settings.LINTO_STUDIO_TOKEN_SOURCE = "keycloak"
         with pytest.raises(
             BotTranscriptionException, match="LINTO_STUDIO_TOKEN_SOURCE"
@@ -639,6 +641,8 @@ class TestStudioTokenFor:
 
 @pytest.fixture
 def user_key_settings(studio_settings):
+    # user_key only exists with the per-user rights on (off by default).
+    studio_settings.LINTO_ENTITLEMENTS_ENABLED = True
     studio_settings.LINTO_STUDIO_TOKEN_SOURCE = "user_key"
     studio_settings.LINTO_IDENTITY_PROVIDER = "meet:test"
     studio_settings.LINTO_STUDIO_INTEGRATION_TOKEN = "integration-key"

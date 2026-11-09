@@ -1204,12 +1204,13 @@ class Base(Configuration):
     # translation, recording) is granted to every participant, Studio's
     # entitlement resolution is never called, and the browser gets its Studio
     # token from the shared service account whatever LINTO_STUDIO_TOKEN_SOURCE
-    # says (there is no per-user key without an entitlement). This is how an
-    # instance ships every feature before the external subscription system
-    # (Twake) feeds Studio; remove the variable the day it does. Default True:
-    # the gating is on and the ENTITLEMENTS_BACKEND decides.
+    # says (there is no per-user key without an entitlement). Default False:
+    # an instance has no rights management unless it asks for it, every
+    # feature is open as soon as LinTO is deployed. An instance whose rights
+    # come from the external subscription system (Twake, through Studio) sets
+    # True, and the ENTITLEMENTS_BACKEND then decides.
     LINTO_ENTITLEMENTS_ENABLED = values.BooleanValue(
-        True, environ_name="LINTO_ENTITLEMENTS_ENABLED", environ_prefix=None
+        False, environ_name="LINTO_ENTITLEMENTS_ENABLED", environ_prefix=None
     )
     # Extends the per-user gating to the VIDEO RECORDING: when True, the
     # recording button and `start-recording` require the `recording`
@@ -1328,9 +1329,9 @@ class Base(Configuration):
     # Entitlements. The fork adds `core.entitlements.backends.linto.
     # LintoEntitlementsBackend`: the per-feature LinTO capabilities of a person,
     # read from LinTO Studio's entitlement resolution (declared there by the
-    # external subscription system). With the upstream `local` backend nobody
-    # holds a LinTO capability: no AI button at all (an instance without LinTO),
-    # unless LINTO_ENTITLEMENTS_ENABLED=False grants everything to everyone.
+    # external subscription system). Only consulted for LinTO when
+    # LINTO_ENTITLEMENTS_ENABLED=True; then, with the upstream `local` backend,
+    # nobody holds a LinTO capability: no AI button at all.
     ENTITLEMENTS_BACKEND = values.Value(
         "core.entitlements.backends.local.LocalEntitlementsBackend",
         environ_name="ENTITLEMENTS_BACKEND",
