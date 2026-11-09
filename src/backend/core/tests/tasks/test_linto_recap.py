@@ -187,10 +187,11 @@ class TestDocumentName:
 class TestTwakeLinkOnResume:
     """A task resumed after the Twake step still links the Drive folder."""
 
-    def _deliver(self, checkpoint, settings):
+    def _deliver(self, checkpoint, settings, **owner):
         settings.CLOUDERY_URL = "http://cloudery.test"
         settings.CLOUDERY_TOKEN = "tok"
-        owner = factories.UserFactory(sub="owner-sub")
+        settings.TWAKE_DEV_INSTANCE_OVERRIDE = None
+        owner = factories.UserFactory(**{"sub": "owner-sub", **owner})
         recording = factories.RecordingFactory()
         with contextlib.ExitStack() as stack:
             token = stack.enter_context(
@@ -230,6 +231,26 @@ class TestTwakeLinkOnResume:
         link, _ = self._deliver(checkpoint, settings)
         assert link.endswith("/#/folder/dir-1")
         assert checkpoint.steps["twake"] == link
+
+    def test_an_email_sub_uploads_to_the_stored_instance(self, settings):
+        """The token is asked for the instance stored at sign-in."""
+        _, token = self._deliver(
+            _MemoryCheckpoint(),
+            settings,
+            sub="bob@example.com",
+            twake_instance="bob-1.twake.test",
+        )
+        assert token.await_args.kwargs["instance"] == "bob-1.twake.test"
+
+    def test_an_email_sub_without_an_instance_skips_the_upload(self, settings):
+        """No token request, no link, and the step stays open."""
+        checkpoint = _MemoryCheckpoint()
+        link, token = self._deliver(
+            checkpoint, settings, sub="bob@example.com", twake_instance=None
+        )
+        assert link is None
+        token.assert_not_awaited()
+        assert "twake" not in checkpoint.steps
 
     def test_a_resume_returns_the_checkpointed_link(self, settings):
         """No second upload, and the email still gets the link."""

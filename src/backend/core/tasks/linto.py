@@ -573,17 +573,12 @@ async def _deliver_to_twake(  # noqa: PLR0913 - delivery needs the full context
             build_drive_link,
             ensure_meeting_directory,
             get_drive_token,
+            resolve_instance,
             save_file,
         )
 
-        if recipient_user and recipient_user.sub:
-            sub = recipient_user.sub
-            domain = getattr(settings, "TWAKE_INSTANCE_DOMAIN", "twake.linagora.com")
-            instance = (
-                getattr(settings, "TWAKE_DEV_INSTANCE_OVERRIDE", None)
-                or f"{sub}.{domain}"
-            )
-
+        instance = resolve_instance(recipient_user) if recipient_user else None
+        if instance:
             drive_token = await get_drive_token(
                 cloudery_url=settings.CLOUDERY_URL,
                 cloudery_token=settings.CLOUDERY_TOKEN,
@@ -650,7 +645,7 @@ async def _deliver_to_twake(  # noqa: PLR0913 - delivery needs the full context
             await checkpoint.mark("twake", twake_drive_link)
         else:
             logger.warning(
-                "No room owner with sub found for %s, skipping Twake Drive", log_id
+                "No Twake instance for the owner of %s, skipping Twake Drive", log_id
             )
     except Exception:
         logger.exception("Twake Drive upload error for %s, continuing", log_id)
