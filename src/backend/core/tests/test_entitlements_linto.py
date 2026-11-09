@@ -14,6 +14,7 @@ import responses
 from rest_framework.test import APIClient
 
 from core import factories
+from core.authentication.backends import OIDCAuthenticationBackend
 from core.entitlements.backends.linto import LintoEntitlementsBackend
 from core.entitlements.capabilities import (
     all_capabilities,
@@ -386,4 +387,71 @@ def test_summary_is_granted_with_the_kill_switch_off(linto_settings):
     linto_settings.LINTO_ENTITLEMENTS_ENABLED = False
     assert summary_entitled(factories.UserFactory())
     assert summary_entitled(None)
+    assert not responses.calls
+
+
+# -- the kill switch off is the behaviour without rights management --
+
+
+@responses.activate
+@pytest.mark.parametrize("backend", [LINTO_BACKEND, None])
+def test_kill_switch_off_opens_everything_without_asking_studio(
+    linto_settings, backend
+):
+    """LINTO_ENTITLEMENTS_ENABLED=False (meet.linagora.com): every LinTO feature
+    is open to everyone and Studio is never asked for a right, whether the
+    `linto` entitlements backend is configured or the upstream default is kept:
+    not at sign-in, not by users/me or the config, not when a room is created,
+    a recording or a deferred transcription is started, or a summary decided."""
+    if backend is None:
+        linto_settings.ENTITLEMENTS_BACKEND = (
+            "core.entitlements.backends.local.LocalEntitlementsBackend"
+        )
+    linto_settings.LINTO_ENTITLEMENTS_ENABLED = False
+    linto_settings.LINTO_STUDIO_TOKEN_SOURCE = "user_key"
+    linto_settings.RECORDING_ENABLE = True
+    linto_settings.METADATA_COLLECTOR_ENABLED = False
+    responses.add(
+        responses.POST, RESOLVE, json={"organizationId": "o", "capabilities": {}}
+    )
+    user = factories.UserFactory(sub="owner")
+
+    OIDCAuthenticationBackend().post_get_or_create_user(
+        user, {"email": user.email, "sub": user.sub}, is_new_user=False
+    )
+    client = APIClient()
+    client.force_login(user)
+
+    me = client.get("/api/v1.0/users/me/").json()
+    assert me["can_create"] is True
+    assert me["linto"] == all_capabilities()
+
+    config = client.get("/api/v1.0/config/").json()["linto"]
+    assert config["entitlements_enabled"] is False
+    assert config["recording_entitlement_enabled"] is False
+    # No per-user key without an entitlement: the shared service account.
+    assert config["token_source"] == "service_account"
+
+    assert (
+        client.post(
+            "/api/v1.0/rooms/", {"name": "open-room"}, format="json"
+        ).status_code
+        == 201
+    )
+
+    bodies = (
+        {"mode": "transcript", "options": {"summary": True}},
+        {"mode": "screen_recording", "options": {"transcribe": True}},
+        {"mode": "screen_recording"},
+    )
+    with (
+        mock.patch("core.api.viewsets.get_worker_service"),
+        mock.patch("core.api.viewsets.WorkerServiceMediator"),
+    ):
+        for body in bodies:
+            room = factories.RoomFactory()
+            room.accesses.create(user=user, role="owner")
+            assert _start(client, room, body).status_code == 201, body
+
+    assert summary_entitled(user)
     assert not responses.calls
