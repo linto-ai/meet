@@ -25,15 +25,16 @@ mv "${DIR_MAILS}"html/*.txt "${DIR_MAILS}"text/;
 # unreadable, so substitute the markdown source variable.
 TRANSCRIPTION_TXT="${DIR_MAILS}text/transcription.txt"
 if [ -f "${TRANSCRIPTION_TXT}" ]; then
-  python3 -c "
-import re, sys
-p = sys.argv[1]
-with open(p) as f: s = f.read()
-s = re.sub(
-    r'\{\{ summary_preview_html\|safe \}\}',
-    '{% if summary_preview %}{{ summary_preview|truncatewords:100 }}{% endif %}',
-    s,
-)
-open(p, 'w').write(s)
-" "${TRANSCRIPTION_TXT}"
+  # node, not python3: the mail-builder image (node:*-alpine) has no python.
+  node -e '
+const fs = require("fs");
+const p = process.argv[1];
+fs.writeFileSync(
+  p,
+  fs.readFileSync(p, "utf8").replace(
+    /\{\{ summary_preview_html\|safe \}\}/g,
+    () => "{% if summary_preview %}{{ summary_preview|truncatewords:100 }}{% endif %}",
+  ),
+);
+' "${TRANSCRIPTION_TXT}"
 fi
