@@ -5,7 +5,7 @@ from logging import getLogger
 from django.conf import settings
 
 from asgiref.sync import async_to_sync
-from livekit.api import RoomParticipantIdentity
+from livekit.api import RoomParticipantIdentity, TwirpError, TwirpErrorCode
 from livekit.protocol.agent_dispatch import CreateAgentDispatchRequest
 
 from core import utils
@@ -79,13 +79,21 @@ class SubtitleService:
                 )
 
             # Evict the hidden agent participant (covers an agent still present
-            # even when no dispatch remains). Not-found is a no-op → idempotent.
+            # even when no dispatch remains). Not-found is a no-op → idempotent:
+            # it is the usual case (no subtitle agent ever joined), not a failure.
             try:
                 await lkapi.room.remove_participant(
                     RoomParticipantIdentity(
                         room=room_name, identity=f"{agent_name}-{room_name}"
                     )
                 )
+            except TwirpError as exc:
+                if exc.code != TwirpErrorCode.NOT_FOUND:
+                    logger.warning(
+                        "Failed to evict subtitle agent participant for room %s",
+                        room_name,
+                        exc_info=True,
+                    )
             except Exception:
                 logger.warning(
                     "Failed to evict subtitle agent participant for room %s",

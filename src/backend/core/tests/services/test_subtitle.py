@@ -6,6 +6,7 @@ Test subtitle service.
 from unittest import mock
 
 import pytest
+from livekit.api import TwirpError, TwirpErrorCode
 
 from core.factories import RoomFactory
 from core.services.subtitle import SubtitleService
@@ -96,3 +97,45 @@ def test_stop_subtitle_is_best_effort_on_failures(mock_livekit_client, settings)
     SubtitleService().stop_subtitle(room)
 
     mock_livekit_client.aclose.assert_awaited_once()
+
+
+def test_stop_subtitle_agent_absent_is_not_a_warning(
+    mock_livekit_client, settings, caplog
+):
+    """No subtitle agent in the room (the usual case when LinTO takes the CC
+    over): LiveKit answers not_found to the eviction, which logs no warning."""
+
+    settings.ROOM_SUBTITLE_AGENT_NAME = "multi-user-transcriber"
+
+    room = RoomFactory(name="my room")
+    mock_livekit_client.agent_dispatch.list_dispatch.return_value = []
+    mock_livekit_client.room.remove_participant.side_effect = TwirpError(
+        TwirpErrorCode.NOT_FOUND, "participant does not exist", status=404
+    )
+
+    with caplog.at_level("WARNING", logger="core.services.subtitle"):
+        SubtitleService().stop_subtitle(room)
+
+    assert not caplog.records
+    mock_livekit_client.aclose.assert_awaited_once()
+
+
+def test_stop_subtitle_other_eviction_errors_still_warn(
+    mock_livekit_client, settings, caplog
+):
+    """Any other LiveKit answer to the eviction is still logged as a warning."""
+
+    settings.ROOM_SUBTITLE_AGENT_NAME = "multi-user-transcriber"
+
+    room = RoomFactory(name="my room")
+    mock_livekit_client.agent_dispatch.list_dispatch.return_value = []
+    mock_livekit_client.room.remove_participant.side_effect = TwirpError(
+        TwirpErrorCode.INTERNAL, "boom", status=500
+    )
+
+    with caplog.at_level("WARNING", logger="core.services.subtitle"):
+        SubtitleService().stop_subtitle(room)
+
+    assert [r.getMessage() for r in caplog.records] == [
+        f"Failed to evict subtitle agent participant for room {room.id}"
+    ]
