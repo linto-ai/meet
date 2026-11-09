@@ -26,8 +26,9 @@ export const LintoBanner = () => {
       className={css({
         display: 'flex',
         position: 'fixed',
-        // Stacked just under the recording egress banner so both can coexist
-        // when the `record` add-on is also on.
+        // Stacked just under the recording indicator (RecordingStateToast),
+        // which a run keeping the meeting audio or the `record` add-on lights
+        // too, so both coexist.
         top: '48px',
         left: '10px',
         paddingY: '0.25rem',

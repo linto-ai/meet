@@ -14,13 +14,15 @@ import { useRoomMetadata } from '../hooks/useRoomMetadata'
 import { RecordingStatusIcon } from './RecordingStatusIcon'
 import { useIsRecording } from '@livekit/components-react'
 import { useScreenReaderAnnounce } from '@/hooks/useScreenReaderAnnounce'
+import { useLintoStatus } from '@/features/transcription-bot/hooks/useLintoStatus'
+import { resolveRecordingIndicator } from '../utils/recordingIndicator'
 
 export const RecordingStateToast = () => {
   const { t } = useTranslation('rooms', {
     keyPrefix: 'recordingStateToast',
   })
 
-  const { openTranscript, openScreenRecording } = useSidePanel()
+  const { openTranscript, openScreenRecording, openLinto } = useSidePanel()
 
   const lastKeyRef = useRef('')
   const announce = useScreenReaderAnnounce()
@@ -52,24 +54,23 @@ export const RecordingStateToast = () => {
 
   const metadata = useRoomMetadata()
   const isRecording = useIsRecording()
+  // A LinTO live run that keeps the meeting audio shows the same indicator.
+  const { keepsAudio: lintoKeepsAudio } = useLintoStatus()
 
-  const key = useMemo(() => {
-    if (!metadata?.recording_status || !metadata?.recording_mode) {
-      return undefined
-    }
-
-    if (!isStarting && !isStarted) {
-      return undefined
-    }
-
-    let status = metadata.recording_status
-
-    if (isStarted && !isRecording) {
-      status = 'starting'
-    }
-
-    return `${metadata.recording_mode}.${status}`
-  }, [metadata, isStarted, isStarting, isRecording])
+  const indicator = useMemo(
+    () =>
+      resolveRecordingIndicator({
+        recordingMode: metadata?.recording_mode,
+        recordingStatus: metadata?.recording_status,
+        isStarting,
+        isStarted,
+        isRecording,
+        lintoKeepsAudio,
+      }),
+    [metadata, isStarted, isStarting, isRecording, lintoKeepsAudio]
+  )
+  const key = indicator?.key
+  const isLintoIndicator = indicator?.source === 'linto'
 
   // Update screen reader message only when the key actually changes
   // This prevents duplicate announcements caused by re-renders
@@ -84,13 +85,15 @@ export const RecordingStateToast = () => {
   if (!key) return null
 
   const hasScreenRecordingAccessAndActive =
-    isScreenRecordingActive && hasScreenRecordingAccess
-  const hasTranscriptAccessAndActive = isTranscriptActive && hasTranscriptAccess
+    !isLintoIndicator && isScreenRecordingActive && hasScreenRecordingAccess
+  const hasTranscriptAccessAndActive =
+    !isLintoIndicator && isTranscriptActive && hasTranscriptAccess
 
   return (
     <>
       {/* Visual banner (without aria-live to avoid duplicate announcements) */}
       <div
+        data-testid="recording-state-toast"
         className={css({
           display: 'flex',
           position: 'fixed',
@@ -107,11 +110,24 @@ export const RecordingStateToast = () => {
         })}
       >
         <RecordingStatusIcon
-          isStarted={isStarted}
-          isTranscriptActive={isTranscriptActive}
+          isStarted={isLintoIndicator || isStarted}
+          isTranscriptActive={!isLintoIndicator && isTranscriptActive}
         />
 
-        {!hasScreenRecordingAccessAndActive &&
+        {isLintoIndicator && (
+          <RACButton
+            onPress={openLinto}
+            className={css({
+              textStyle: 'sm !important',
+              fontWeight: '500 !important',
+              cursor: 'pointer',
+            })}
+          >
+            {t(key)}
+          </RACButton>
+        )}
+        {!isLintoIndicator &&
+          !hasScreenRecordingAccessAndActive &&
           !hasTranscriptAccessAndActive && (
             <Text
               variant={'sm'}

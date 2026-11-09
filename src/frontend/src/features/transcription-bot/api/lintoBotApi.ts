@@ -260,6 +260,9 @@ const startLintoLive = async (
       summary_service: config.summary ? config.summaryService : undefined,
       record: config.record,
       catchup: config.catchup,
+      // The channel keeps the meeting audio: the backend lights the recording
+      // indicator every participant sees.
+      keep_audio: lintoConfig.live_keep_audio,
     }),
   })
 

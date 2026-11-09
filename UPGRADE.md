@@ -35,6 +35,10 @@ has none, the transcript, the document and the email go out without it.
   native bot), the bot must advertise `mixedRecording` (VisioBotService from
   linto-studio-plugins `next`, 2026-09-02 on), otherwise the Transcriber
   demotes the run to the mixed path to record it.
+- While such a run is active, every participant sees the "Recording in
+  progress" indicator, as for a LiveKit recording. The backend advertises it
+  in the room metadata (`linto_transcription_keep_audio`, cleared at the stop);
+  a text-only run (`LINTO_LIVE_KEEP_AUDIO=False`) shows none. Nothing to set.
 - Deploy the backend and the frontend together (the panel reads
   `live_keep_audio` from the config).
 

@@ -129,6 +129,9 @@ export const LINTO_METADATA_ORG_ID_KEY = 'linto_transcription_org_id'
 export const LINTO_METADATA_STARTED_AT_KEY = 'linto_transcription_started_at'
 // '1' when the starter left the late-joiner summary on, '0' otherwise.
 export const LINTO_METADATA_CATCHUP_KEY = 'linto_transcription_catchup'
+// '1' when the run keeps the meeting audio (the live channel's keepAudio): every
+// participant then sees the recording indicator, '0' for a text-only run.
+export const LINTO_METADATA_KEEP_AUDIO_KEY = 'linto_transcription_keep_audio'
 
 // Segment-id namespace used by the LinTO bot for the transcription segments it
 // publishes into the LiveKit room.
