@@ -3,7 +3,7 @@ Test the LinTO live-transcription HTTP endpoints (browser-first lifecycle).
 
 The browser drives Studio via the SDK; these Meet endpoints only mint the native
 bot token, gate on permissions, and drive the banner/egress/summary lifecycle.
-Auth = a LiveKit room token (header/body/query). The service layer is mocked.
+Auth = a LiveKit room token in an `X-LiveKit-Token` Authorization header. The service layer is mocked.
 """
 
 # pylint: disable=redefined-outer-name
@@ -16,6 +16,7 @@ import pytest
 from livekit.api import AccessToken, VideoGrants
 from rest_framework.test import APIClient
 
+from core.authentication.livekit import LIVEKIT_AUTH_SCHEME
 from core.factories import RoomFactory, UserFactory
 from core.services.bot_transcription import (
     BotTranscriptionException,
@@ -57,11 +58,17 @@ def _room_token(room, admin=False, user=None):
     )
 
 
+def _auth(token):
+    return f"{LIVEKIT_AUTH_SCHEME} {token}"
+
+
 def _post(client, room, path, body=None):
     token = _room_token(room)
-    payload = {"token": token, **(body or {})}
     return client.post(
-        f"/api/v1.0/rooms/{room.id}/linto/{path}/", payload, format="json"
+        f"/api/v1.0/rooms/{room.id}/linto/{path}/",
+        body or {},
+        format="json",
+        HTTP_AUTHORIZATION=_auth(token),
     )
 
 
@@ -149,7 +156,8 @@ class TestStudioToken:
             return_value={"enabled": True},
         ) as service:
             res = APIClient().get(
-                f"/api/v1.0/rooms/{room.id}/linto/studio-token/?token={token}"
+                f"/api/v1.0/rooms/{room.id}/linto/studio-token/",
+                HTTP_AUTHORIZATION=_auth(token),
             )
         assert res.status_code == 403
         assert res.json()["code"] == "anonymous"
@@ -169,7 +177,8 @@ class TestStudioToken:
             return_value={"enabled": True},
         ) as service:
             res = APIClient().get(
-                f"/api/v1.0/rooms/{room.id}/linto/studio-token/?token={token}"
+                f"/api/v1.0/rooms/{room.id}/linto/studio-token/",
+                HTTP_AUTHORIZATION=_auth(token),
             )
         assert res.status_code == 403
         assert res.json()["code"] == "anonymous"
@@ -192,7 +201,8 @@ class TestStudioToken:
             return_value=payload,
         ) as service:
             res = APIClient().get(
-                f"/api/v1.0/rooms/{room.id}/linto/studio-token/?token={token}"
+                f"/api/v1.0/rooms/{room.id}/linto/studio-token/",
+                HTTP_AUTHORIZATION=_auth(token),
             )
         assert res.status_code == 200
         assert res.json() == payload
@@ -207,7 +217,8 @@ class TestStudioToken:
             return_value={"enabled": False, "reason": "no_entitlement"},
         ):
             res = APIClient().get(
-                f"/api/v1.0/rooms/{room.id}/linto/studio-token/?token={token}"
+                f"/api/v1.0/rooms/{room.id}/linto/studio-token/",
+                HTTP_AUTHORIZATION=_auth(token),
             )
         assert res.status_code == 200
         assert res.json() == {"enabled": False, "reason": "no_entitlement"}
@@ -221,7 +232,8 @@ class TestStudioToken:
             side_effect=BotTranscriptionException("no Studio credentials"),
         ):
             res = APIClient().get(
-                f"/api/v1.0/rooms/{room.id}/linto/studio-token/?token={token}"
+                f"/api/v1.0/rooms/{room.id}/linto/studio-token/",
+                HTTP_AUTHORIZATION=_auth(token),
             )
         assert res.status_code == 502
         assert "credentials" in res.json()["error"]
@@ -245,7 +257,8 @@ class TestSummaryServices:
             return_value=services,
         ):
             res = APIClient().get(
-                f"/api/v1.0/rooms/{room.id}/linto/summary-services/?token={token}"
+                f"/api/v1.0/rooms/{room.id}/linto/summary-services/",
+                HTTP_AUTHORIZATION=_auth(token),
             )
         assert res.status_code == 200
         assert res.json() == {"services": services}
@@ -255,7 +268,8 @@ class TestSummaryServices:
         room = RoomFactory()
         token = _room_token(room)
         res = APIClient().get(
-            f"/api/v1.0/rooms/{room.id}/linto/summary-services/?token={token}"
+            f"/api/v1.0/rooms/{room.id}/linto/summary-services/",
+            HTTP_AUTHORIZATION=_auth(token),
         )
         assert res.status_code == 404
 
@@ -269,8 +283,8 @@ class TestTranscriptionLanguages:
             return_value=["*", "en", "fr"],
         ):
             res = APIClient().get(
-                f"/api/v1.0/rooms/{room.id}/linto/transcription-languages/"
-                f"?token={token}"
+                f"/api/v1.0/rooms/{room.id}/linto/transcription-languages/",
+                HTTP_AUTHORIZATION=_auth(token),
             )
         assert res.status_code == 200
         assert res.json() == {"languages": ["*", "en", "fr"]}
@@ -280,7 +294,8 @@ class TestTranscriptionLanguages:
         room = RoomFactory()
         token = _room_token(room)
         res = APIClient().get(
-            f"/api/v1.0/rooms/{room.id}/linto/transcription-languages/?token={token}"
+            f"/api/v1.0/rooms/{room.id}/linto/transcription-languages/",
+            HTTP_AUTHORIZATION=_auth(token),
         )
         assert res.status_code == 404
 
@@ -294,3 +309,33 @@ class TestAuth:
             format="json",
         )
         assert res.status_code in (401, 403)
+
+    def test_a_token_outside_the_authorization_header_is_ignored(self, linto_settings):
+        """The room token travels in the header only, never in a URL or a
+        body, as upstream's LiveKit token authentication wants it."""
+        room = RoomFactory()
+        token = _room_token(room)
+        res = APIClient().post(
+            f"/api/v1.0/rooms/{room.id}/linto/prepare/?token={token}",
+            {"channel_id": "c", "token": token},
+            format="json",
+        )
+        assert res.status_code in (401, 403)
+
+    def test_a_user_access_token_does_not_hide_the_room_token(self, linto_settings):
+        """Embedded mode: the frontend sends the room token in the Authorization
+        header in place of the user access token (Bearer) fetchApi would set."""
+        room = RoomFactory()
+        res = APIClient().post(
+            f"/api/v1.0/rooms/{room.id}/linto/prepare/",
+            {"channel_id": "c"},
+            format="json",
+            HTTP_AUTHORIZATION="Bearer some-user-access-token",
+        )
+        assert res.status_code in (401, 403)
+        with mock.patch(
+            "core.api.viewsets.BotTranscriptionService.prepare",
+            return_value={"token": "lk", "livekit_url": "ws://lk", "room": "r"},
+        ):
+            res = _post(APIClient(), room, "prepare", {"channel_id": "c"})
+        assert res.status_code == 200

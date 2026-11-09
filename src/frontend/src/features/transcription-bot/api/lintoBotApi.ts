@@ -4,6 +4,7 @@ import {
   useQuery,
 } from '@tanstack/react-query'
 import { fetchApi } from '@/api/fetchApi'
+import { getLiveKitAuthHeaders } from '@/features/rooms/utils/getLiveKitAuthHeaders'
 import { ApiError } from '@/api/ApiError'
 import type { LintoRuntimeConfig } from '@/api/useConfig'
 import {
@@ -118,9 +119,9 @@ export function useLintoSummaryServices(
   return useQuery<LintoSummaryService[], ApiError>({
     queryKey: ['lintoSummaryServices', roomId],
     queryFn: async () => {
-      const search = token ? `?token=${encodeURIComponent(token)}` : ''
       const res = await fetchApi<{ services?: LintoSummaryService[] }>(
-        `rooms/${roomId}/linto/summary-services/${search}`
+        `rooms/${roomId}/linto/summary-services/`,
+        { headers: getLiveKitAuthHeaders(token as string) }
       )
       return res.services ?? []
     },
@@ -148,9 +149,9 @@ export function useLintoTranscriptionLanguages(
   return useQuery<string[], ApiError>({
     queryKey: ['lintoTranscriptionLanguages', roomId],
     queryFn: async () => {
-      const search = token ? `?token=${encodeURIComponent(token)}` : ''
       const res = await fetchApi<{ languages?: string[] }>(
-        `rooms/${roomId}/linto/transcription-languages/${search}`
+        `rooms/${roomId}/linto/transcription-languages/`,
+        { headers: getLiveKitAuthHeaders(token as string) }
       )
       return res.languages ?? []
     },
@@ -231,7 +232,8 @@ const startLintoLive = async (
             `rooms/${roomId}/linto/prepare/`,
             {
               method: 'POST',
-              body: JSON.stringify({ channel_id: channelId, token }),
+              headers: getLiveKitAuthHeaders(token),
+              body: JSON.stringify({ channel_id: channelId }),
             }
           )
           return nativeMeta(
@@ -246,6 +248,7 @@ const startLintoLive = async (
   // Record the run + light the room-wide state (banner, egress, summary hook).
   await fetchApi(`rooms/${roomId}/linto/started/`, {
     method: 'POST',
+    headers: getLiveKitAuthHeaders(token),
     body: JSON.stringify({
       session_id: run.sessionId,
       channel_id: run.channelId,
@@ -255,7 +258,6 @@ const startLintoLive = async (
       summary_service: config.summary ? config.summaryService : undefined,
       record: config.record,
       catchup: config.catchup,
-      token,
     }),
   })
 
@@ -307,7 +309,8 @@ const stopLintoLive = async (
   // Clear the room-wide state + enqueue the summary (uses the conversation name).
   return fetchApi(`rooms/${roomId}/linto/stopped/`, {
     method: 'POST',
-    body: JSON.stringify({ conversation_name: conversationName, token }),
+    headers: getLiveKitAuthHeaders(token),
+    body: JSON.stringify({ conversation_name: conversationName }),
   })
 }
 

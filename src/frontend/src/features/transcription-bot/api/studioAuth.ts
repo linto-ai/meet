@@ -1,5 +1,6 @@
 import { useCallback, useRef } from 'react'
 import { fetchApi } from '@/api/fetchApi'
+import { getLiveKitAuthHeaders } from '@/features/rooms/utils/getLiveKitAuthHeaders'
 import { ApiError } from '@/api/ApiError'
 import { useConfig } from '@/api/useConfig'
 import type { LintoRuntimeConfig } from '@/api/useConfig'
@@ -76,10 +77,10 @@ async function fetchStudioToken(
   roomId: string,
   roomToken: string
 ): Promise<StudioTokenResponse> {
-  const search = roomToken ? `?token=${encodeURIComponent(roomToken)}` : ''
   try {
     return await fetchApi<StudioTokenResponse>(
-      `rooms/${roomId}/linto/studio-token/${search}`
+      `rooms/${roomId}/linto/studio-token/`,
+      { headers: getLiveKitAuthHeaders(roomToken) }
     )
   } catch (err) {
     if (err instanceof ApiError && err.statusCode === 403) {
