@@ -149,3 +149,69 @@ def test_polling_no_candidates_short_circuits(fake_s3_client):
     """With nothing to look at, no S3 call is issued."""
     assert polling.poll_storage_for_new_recordings() == 0
     fake_s3_client.head_object.assert_not_called()
+
+
+def test_polling_leaves_fresh_upload_to_the_webhook(fake_s3_client, settings):
+    """A file written within the grace period is left to egress_ended."""
+    settings.RECORDING_STORAGE_POLLING_GRACE_SECONDS = 300
+    recording = factories.RecordingFactory(
+        status=models.RecordingStatusChoices.STOPPED,
+    )
+    fake_s3_client.head_object.return_value = {
+        "LastModified": timezone.now() - timedelta(seconds=10)
+    }
+
+    with mock.patch(
+        "core.recording.event.notification.NotificationService.notify_external_services",
+    ) as notify:
+        processed = polling.poll_storage_for_new_recordings()
+
+    assert processed == 0
+    notify.assert_not_called()
+    recording.refresh_from_db()
+    assert recording.status == models.RecordingStatusChoices.STOPPED
+
+
+def test_polling_picks_upload_older_than_grace_period(fake_s3_client, settings):
+    """A file written before the grace period means the webhook was missed."""
+    settings.RECORDING_STORAGE_POLLING_GRACE_SECONDS = 300
+    recording = factories.RecordingFactory(
+        status=models.RecordingStatusChoices.STOPPED,
+    )
+    fake_s3_client.head_object.return_value = {
+        "LastModified": timezone.now() - timedelta(minutes=6)
+    }
+
+    with mock.patch(
+        "core.recording.event.notification.NotificationService.notify_external_services",
+        return_value=True,
+    ) as notify:
+        processed = polling.poll_storage_for_new_recordings()
+
+    assert processed == 1
+    notify.assert_called_once()
+    recording.refresh_from_db()
+    assert recording.status == models.RecordingStatusChoices.NOTIFICATION_SUCCEEDED
+
+
+def test_polling_does_not_notify_a_recording_the_webhook_claimed(fake_s3_client):
+    """The webhook claims the recording after polling selected it: no double run."""
+    recording = factories.RecordingFactory(
+        status=models.RecordingStatusChoices.STOPPED,
+    )
+
+    def webhook_claims_first(**_kwargs):
+        models.Recording.objects.filter(pk=recording.pk).update(
+            status=models.RecordingStatusChoices.SAVED
+        )
+        return {}
+
+    fake_s3_client.head_object.side_effect = webhook_claims_first
+
+    with mock.patch(
+        "core.recording.event.notification.NotificationService.notify_external_services",
+    ) as notify:
+        processed = polling.poll_storage_for_new_recordings()
+
+    assert processed == 0
+    notify.assert_not_called()

@@ -742,3 +742,68 @@ class TestNotifyAndUpdateStatus:
         assert result is False
         recording.refresh_from_db()
         assert recording.status == models.RecordingStatusChoices.NOTIFICATION_FAILED
+
+    def test_concurrent_callers_notify_once(self):
+        """Webhook and polling on the same recording: only the first one notifies."""
+        recording = factories.RecordingFactory(
+            status=models.RecordingStatusChoices.STOPPED
+        )
+        stale = models.Recording.objects.get(pk=recording.pk)
+        service = NotificationService()
+        second_results = []
+
+        def notify(_recording):
+            # The other path arrives while the first one is still notifying.
+            second_results.append(service.notify_and_update_status(stale))
+            return True
+
+        with mock.patch.object(
+            service, "notify_external_services", side_effect=notify
+        ) as notify_mock:
+            result = service.notify_and_update_status(recording)
+
+        assert result is True
+        assert second_results == [False]
+        assert notify_mock.call_count == 1
+        recording.refresh_from_db()
+        assert recording.status == models.RecordingStatusChoices.NOTIFICATION_SUCCEEDED
+
+    def test_claim_is_released_when_notification_raises(self):
+        """An unexpected error leaves the recording savable for a later retry."""
+        recording = factories.RecordingFactory(
+            status=models.RecordingStatusChoices.ACTIVE
+        )
+        service = NotificationService()
+
+        with (
+            mock.patch.object(
+                service, "notify_external_services", side_effect=RuntimeError("boom")
+            ),
+            pytest.raises(RuntimeError),
+        ):
+            service.notify_and_update_status(recording)
+
+        recording.refresh_from_db()
+        assert recording.status == models.RecordingStatusChoices.STOPPED
+
+    def test_success_does_not_overwrite_a_status_set_during_notification(self):
+        """A status written by a concurrent task while notifying is kept."""
+        recording = factories.RecordingFactory(
+            status=models.RecordingStatusChoices.STOPPED
+        )
+        service = NotificationService()
+
+        def notify(_recording):
+            models.Recording.objects.filter(pk=recording.pk).update(
+                status=models.RecordingStatusChoices.EXTERNAL_PROCESS_SUCCESSFUL
+            )
+            return True
+
+        with mock.patch.object(service, "notify_external_services", side_effect=notify):
+            service.notify_and_update_status(recording)
+
+        recording.refresh_from_db()
+        assert (
+            recording.status
+            == models.RecordingStatusChoices.EXTERNAL_PROCESS_SUCCESSFUL
+        )

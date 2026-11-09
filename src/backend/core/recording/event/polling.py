@@ -11,7 +11,11 @@ Algorithm:
   configured lookback window. Bounded by the number of in-flight recordings,
   not by the number of objects in the bucket.
 - For each candidate, issue a single HEAD_OBJECT on the expected key.
-- When the object exists, run the same notification flow as the webhook handler.
+- When the object exists and was written more than the grace period ago, run
+  the same notification flow as the webhook handler. The grace period leaves
+  the egress_ended webhook, which arrives seconds after the upload, to go first;
+  the atomic claim in notify_and_update_status guarantees a single notification
+  if both still meet.
 
 The cost per run scales with the number of recordings awaiting notification,
 not with bucket size: a bucket holding millions of historical recordings has
@@ -36,10 +40,10 @@ from .notification import notification_service
 logger = logging.getLogger(__name__)
 
 
-def _object_exists(s3_client, bucket: str, key: str) -> bool:
-    """Return True iff HEAD_OBJECT succeeds for the given key."""
+def _head_object(s3_client, bucket: str, key: str):
+    """Return the HEAD_OBJECT response, or None when the key does not exist."""
     try:
-        s3_client.head_object(Bucket=bucket, Key=key)
+        return s3_client.head_object(Bucket=bucket, Key=key)
     except ClientError as exc:
         # 404 / NoSuchKey is the expected "not yet uploaded" path.
         if exc.response.get("Error", {}).get("Code") in {
@@ -47,9 +51,8 @@ def _object_exists(s3_client, bucket: str, key: str) -> bool:
             "NoSuchKey",
             "NotFound",
         }:
-            return False
+            return None
         raise
-    return True
 
 
 def poll_storage_for_new_recordings() -> int:
@@ -63,6 +66,9 @@ def poll_storage_for_new_recordings() -> int:
     lookback = timedelta(hours=settings.RECORDING_STORAGE_POLLING_LOOKBACK_HOURS)
     cutoff = timezone.now() - lookback
     batch_size = settings.RECORDING_STORAGE_POLLING_BATCH_SIZE
+    grace_cutoff = timezone.now() - timedelta(
+        seconds=settings.RECORDING_STORAGE_POLLING_GRACE_SECONDS
+    )
 
     candidates = list(
         models.Recording.objects.filter(
@@ -89,9 +95,10 @@ def poll_storage_for_new_recordings() -> int:
 
     processed = 0
     missing = 0
+    deferred = 0
     for recording in candidates:
         try:
-            exists = _object_exists(s3_client, bucket, recording.key)
+            head = _head_object(s3_client, bucket, recording.key)
         except (BotoCoreError, ClientError):
             logger.exception(
                 "Storage polling HEAD failed for recording %s (key=%s)",
@@ -100,7 +107,7 @@ def poll_storage_for_new_recordings() -> int:
             )
             continue
 
-        if not exists:
+        if head is None:
             missing += 1
             logger.debug(
                 "Storage polling: %s not yet in bucket (key=%s)",
@@ -109,18 +116,30 @@ def poll_storage_for_new_recordings() -> int:
             )
             continue
 
+        last_modified = head.get("LastModified")
+        if last_modified is not None and last_modified > grace_cutoff:
+            deferred += 1
+            logger.debug(
+                "Storage polling: %s uploaded at %s, within the grace period; "
+                "leaving it to the egress_ended webhook",
+                recording.id,
+                last_modified,
+            )
+            continue
+
         logger.info(
             "Storage polling: notifying recording %s (key=%s)",
             recording.id,
             recording.key,
         )
-        notification_service.notify_and_update_status(recording)
-        processed += 1
+        if notification_service.notify_and_update_status(recording):
+            processed += 1
 
     logger.info(
-        "Storage polling done: notified=%d, awaiting_upload=%d, total=%d",
+        "Storage polling done: notified=%d, awaiting_upload=%d, in_grace=%d, total=%d",
         processed,
         missing,
+        deferred,
         len(candidates),
     )
 

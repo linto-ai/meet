@@ -17,6 +17,36 @@ the following command inside your docker container:
 ## [Unreleased]
 
 
+### LinTO fork: deploying the rebase on upstream 1.37.0
+
+Changes to make in `lasuite-meet-deploy` (`configs/meet/meet/{prd,stg}`) when
+this line replaces the one rebased on upstream 1.28.0:
+
+- Remove `RECORDING_STORAGE_EVENT_ENABLE` and `RECORDING_ENABLE_STORAGE_EVENT_AUTH`
+  from `values.yaml`, and `RECORDING_STORAGE_EVENT_TOKEN` from `secrets.yaml`:
+  the S3 storage hook is gone (upstream v1.30.0 above).
+- Keep `RECORDING_STORAGE_POLLING_ENABLED: True`. It is now a safety net
+  behind the LiveKit `egress_ended` webhook, which finalizes recordings. Polling
+  only picks up files written more than `RECORDING_STORAGE_POLLING_GRACE_SECONDS`
+  ago (300 by default), and a recording is claimed atomically, so the webhook and
+  polling never notify it twice.
+- Check that LiveKit still posts its webhooks to
+  `/api/v1.0/rooms/webhooks-livekit/` (set in `configs/livekit-meet/livekit/{prd,stg}`).
+- Replace `RECORDING_ENCODING_ENABLED`, `RECORDING_ENCODING_WIDTH`,
+  `RECORDING_ENCODING_HEIGHT`, `RECORDING_ENCODING_FRAMERATE` and
+  `RECORDING_ENCODING_VIDEO_BITRATE_KBPS`, which no longer exist, with
+  `RECORDING_ENCODING_DEFAULT_RESOLUTION: 720p` and
+  `RECORDING_ENCODING_DEFAULT_PROFILE: talking_heads` (720p, 15 fps, 700 kbps;
+  the former values were 720p, 15 fps, 600 kbps). Without them the default
+  profile is `full`: 30 fps and 3000 kbps, twice the frames to encode on the
+  egress worker and five times the file size.
+- Migrations `0023` to `0030` run in the `migrate` job; `0027` builds an index
+  concurrently (non-atomic migration).
+- Deploy the backend and the frontend together: LiveKit tokens now come from
+  `POST /api/v1.0/rooms/{id}/join/`, so a tab opened before the upgrade must be
+  reloaded.
+
+
 ### Room access tokens moved to POST /join/
 
 LiveKit access tokens are no longer returned when reading a room. They are henceforth issued by a dedicated `POST

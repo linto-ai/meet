@@ -10,6 +10,7 @@ from unittest import mock
 import pytest
 
 from core.factories import RecordingFactory
+from core.models import Recording
 from core.recording.enums import RecordingWorkerEvent
 from core.recording.services.recording_events import (
     RecordingEventsError,
@@ -488,3 +489,18 @@ def test_log_worker_error_stays_quiet_on_anything_else(event, service, caplog):
         service.log_worker_error(recording, event, error="some error", error_code=500)
 
     assert "Recording worker reported" not in caplog.text
+
+
+@pytest.mark.parametrize("handler", ("_handle_limit_reached", "_handle_interrupted"))
+@mock.patch("core.utils.notify_participants")
+def test_stop_handlers_keep_a_recording_already_claimed(mock_notify, handler, service):
+    """A stale ACTIVE instance must not reopen a recording polling already claimed."""
+
+    recording = RecordingFactory(status="active")
+    Recording.objects.filter(pk=recording.pk).update(status="saved")
+
+    getattr(service, handler)(recording)
+
+    assert recording.status == "saved"
+    recording.refresh_from_db()
+    assert recording.status == "saved"

@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.conf import settings
+from django.db.models.functions import Now
 from django.utils.translation import get_language, gettext, gettext_noop, override
 from django.utils.translation import gettext_lazy as _
 
@@ -54,27 +55,53 @@ class NotificationService:
     """Service for processing recordings and notifying external services."""
 
     def notify_and_update_status(self, recording) -> bool:
-        """Notify external services then persist the resulting recording status.
+        """Claim the recording, notify external services, then persist the status.
 
-        Centralizes the post-notification status transition shared by the
-        LiveKit egress_ended handler and the polling fallback.
+        Shared by the LiveKit egress_ended handler and the polling fallback,
+        which can both pick the same recording. The claim is an atomic
+        transition from a savable status (ACTIVE/STOPPED) to SAVED: only the
+        caller that wins it notifies, the other one returns without doing
+        anything. On success the row moves to NOTIFICATION_SUCCEEDED, unless a
+        concurrent writer (e.g. the Celery failure handler setting
+        NOTIFICATION_FAILED) changed it in the meantime.
         """
-        succeeded = self.notify_external_services(recording)
+        savable = (
+            models.RecordingStatusChoices.ACTIVE,
+            models.RecordingStatusChoices.STOPPED,
+        )
+        claimed = models.Recording.objects.filter(
+            pk=recording.pk, status__in=savable
+        ).update(status=models.RecordingStatusChoices.SAVED, updated_at=Now())
+        if not claimed:
+            logger.info(
+                "Recording %s is no longer savable (already claimed or failed); "
+                "skipping notification.",
+                recording.id,
+            )
+            recording.refresh_from_db(fields=["status"])
+            return False
+        recording.status = models.RecordingStatusChoices.SAVED
 
-        # The notification path (inline failure handler, or a concurrent Celery
-        # on_failure) may have already marked the row terminally FAILED on its
-        # own loaded instance. Re-read the persisted status so we never overwrite
-        # a terminal failure back to SUCCEEDED from our stale in-memory instance.
+        try:
+            succeeded = self.notify_external_services(recording)
+        except Exception:
+            # Release the claim so a later webhook or polling tick can retry.
+            models.Recording.objects.filter(
+                pk=recording.pk, status=models.RecordingStatusChoices.SAVED
+            ).update(status=models.RecordingStatusChoices.STOPPED, updated_at=Now())
+            raise
+
+        if succeeded:
+            models.Recording.objects.filter(
+                pk=recording.pk, status=models.RecordingStatusChoices.SAVED
+            ).update(
+                status=models.RecordingStatusChoices.NOTIFICATION_SUCCEEDED,
+                updated_at=Now(),
+            )
+
         recording.refresh_from_db(fields=["status"])
         if recording.status == models.RecordingStatusChoices.NOTIFICATION_FAILED:
             return False
-
-        recording.status = (
-            models.RecordingStatusChoices.NOTIFICATION_SUCCEEDED
-            if succeeded
-            else models.RecordingStatusChoices.SAVED
-        )
-        recording.save(update_fields=["status", "updated_at"])
         return succeeded
 
     def notify_external_services(self, recording):

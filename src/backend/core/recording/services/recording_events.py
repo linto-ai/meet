@@ -2,6 +2,8 @@
 
 from logging import getLogger
 
+from django.db.models.functions import Now
+
 from core import models, utils
 from core.models import Recording
 from core.recording.enums import (
@@ -228,12 +230,24 @@ class RecordingEventsService:
         except RecordingEventsError:
             self._log_notification_failure(recording, event)
 
+    @staticmethod
+    def _mark_stopped(recording: Recording):
+        """Move an ACTIVE recording to STOPPED without clobbering a newer status.
+
+        Conditional update rather than a full save: the polling fallback may
+        already have claimed the row (SAVED) from another process, and writing
+        our stale instance back would make it savable again and notify twice.
+        """
+        Recording.objects.filter(
+            pk=recording.pk, status=models.RecordingStatusChoices.ACTIVE
+        ).update(status=models.RecordingStatusChoices.STOPPED, updated_at=Now())
+        recording.refresh_from_db(fields=["status"])
+
     @classmethod
     def _handle_limit_reached(cls, recording: Recording):
         """Stop recording and notify participants when limit is reached."""
 
-        recording.status = models.RecordingStatusChoices.STOPPED
-        recording.save()
+        cls._mark_stopped(recording)
 
         cls._notify_participants(recording, RecordingWorkerEvent.LIMIT_REACHED)
 
@@ -246,8 +260,7 @@ class RecordingEventsService:
         recorded so far
         """
 
-        recording.status = models.RecordingStatusChoices.STOPPED
-        recording.save()
+        cls._mark_stopped(recording)
 
         cls._notify_participants(recording, RecordingWorkerEvent.INTERRUPTED)
 

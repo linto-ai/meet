@@ -938,6 +938,14 @@ class Base(Configuration):
         environ_name="RECORDING_STORAGE_POLLING_BATCH_SIZE",
         environ_prefix=None,
     )
+    # Leave recordings whose file was written less than this many seconds ago
+    # to the egress_ended webhook, which normally lands a few seconds after the
+    # upload; polling only picks up the ones whose webhook was missed.
+    RECORDING_STORAGE_POLLING_GRACE_SECONDS = values.IntegerValue(
+        300,
+        environ_name="RECORDING_STORAGE_POLLING_GRACE_SECONDS",
+        environ_prefix=None,
+    )
     # Ignore recordings older than this lookback window — bounds DB cost and
     # avoids re-checking zombie recordings stuck in ACTIVE for days.
     RECORDING_STORAGE_POLLING_LOOKBACK_HOURS = values.IntegerValue(

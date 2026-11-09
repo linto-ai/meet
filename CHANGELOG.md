@@ -29,6 +29,7 @@ and this project adheres to
 
 ### Fixed
 
+- 🐛(backend) notify a recording once when the egress webhook and storage polling race
 - 📌(summary) pin kombu to keep celery workers compatible with redis 5
 - 🐛(frontend) show a page when the connection ends unexpectedly
 - 🐛(frontend) show the transcript mic hint when every mic is muted
