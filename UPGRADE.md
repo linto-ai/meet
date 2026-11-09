@@ -17,6 +17,20 @@ the following command inside your docker container:
 ## [Unreleased]
 
 
+### LinTO fork: a live run's conversation follows LINTO_STUDIO_MEMBERS_RIGHT
+
+The Studio conversation of a live run now gives the members of the
+organization the right `LINTO_STUDIO_MEMBERS_RIGHT` (0 in prd and stg: none),
+as the deferred transcription does. It used to give them read and comment:
+Studio applies that to any non-private session without `meta.membersRight`.
+
+- Studio must apply `meta.membersRight` to the conversation of a stopped
+  session (Studio `master` since 2026-09-22, `next`). On an older Studio the
+  members keep read and comment.
+- Nothing to set on the Meet side. The conversations of the runs before this
+  release keep their rights: change them in Studio if needed.
+
+
 ### LinTO fork: the backend runs the live transcription, the Studio key stays on the server
 
 The live transcription panel no longer drives Studio from the browser with a

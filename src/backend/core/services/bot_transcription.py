@@ -602,7 +602,8 @@ class BotTranscriptionService:
 
     @staticmethod
     def _session_meta(room, channel_id=None):
-        meta = {}
+        # Studio gives it to the conversation's organization members.
+        meta = {"membersRight": settings.LINTO_STUDIO_MEMBERS_RIGHT}
         if settings.LINTO_VISIO_NATIVE_ENABLED:
             descriptor = {
                 "livekitUrl": settings.LINTO_NATIVE_LIVEKIT_URL,

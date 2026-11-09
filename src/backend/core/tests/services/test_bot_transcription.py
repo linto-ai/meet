@@ -905,6 +905,7 @@ def run_settings(studio_settings):
     studio_settings.LINTO_LIVE_KEEP_AUDIO = True
     studio_settings.LINTO_BOT_PROVIDER = "visio"
     studio_settings.EMAIL_APP_BASE_URL = "https://meet.example"
+    studio_settings.LINTO_STUDIO_MEMBERS_RIGHT = 0
     studio_settings.CACHES = {
         "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}
     }
@@ -1073,6 +1074,32 @@ class TestStart:
         assert linto["keep_audio"] is True
         assert linto["user_id"] == str(owner.id)
         self.banner.assert_called_once()
+
+    @responses.activate
+    @pytest.mark.parametrize("members_right", [0, 1])
+    def test_the_members_right_is_set_at_creation_and_kept_by_the_patch(
+        self, run_settings, members_right
+    ):
+        run_settings.LINTO_STUDIO_MEMBERS_RIGHT = members_right
+        room, owner = _owner_room()
+        _mock_studio_start()
+        BotTranscriptionService().start(room, {}, user=owner)
+        (create,) = _calls("POST", SESSIONS_URL)
+        assert json.loads(create.body)["meta"]["membersRight"] == members_right
+        (patch,) = _calls("PATCH", f"{STUDIO}/api/organizations/{ORG}/sessions/sess-1")
+        meta = json.loads(patch.body)["meta"]
+        assert meta["membersRight"] == members_right
+        assert meta["native"]["visio-native"]["token"] == "lk-jwt"
+
+    @responses.activate
+    def test_the_members_right_without_the_native_bot(self, run_settings):
+        run_settings.LINTO_VISIO_NATIVE_ENABLED = False
+        room, owner = _owner_room()
+        _mock_studio_start()
+        BotTranscriptionService().start(room, {}, user=owner)
+        (create,) = _calls("POST", SESSIONS_URL)
+        assert json.loads(create.body)["meta"] == {"membersRight": 0}
+        assert not _calls("PATCH", f"{STUDIO}/api/organizations/{ORG}/sessions/")
 
     @responses.activate
     def test_two_rooms_run_at_the_same_time_under_the_same_key(self, run_settings):
