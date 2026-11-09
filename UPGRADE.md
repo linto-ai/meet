@@ -47,6 +47,69 @@ this line replaces the one rebased on upstream 1.28.0:
   reloaded.
 
 
+### LinTO fork: live transcription line merged
+
+This line now also carries what ran on `linto-live` (the `v1.26-live` image of
+dev-meet): the live transcription panel in the meeting, the per-feature rights
+system (entitlements) and the reworked deferred transcription. No migration
+comes with it: dev-meet has the same `0023` to `0026` as meet.linagora.com, and
+`0030_merge_linto_and_upstream_migrations` still ends the chain.
+
+New backend variables and their defaults:
+
+- `LINTO_ENTITLEMENTS_ENABLED` (default `True`): the per-user rights system.
+  `False` opens every LinTO feature to everyone (live and deferred
+  transcription, summary, translation, recording) without asking Studio for any
+  right, and the browser's Studio token comes from the service account whatever
+  `LINTO_STUDIO_TOKEN_SOURCE` says. Left at `True` with the default
+  `ENTITLEMENTS_BACKEND`, nobody holds a LinTO capability: a deferred
+  transcription is refused (403 `no_entitlement`), the "transcribe" checkbox is
+  hidden and no summary is made.
+- `LINTO_RECORDING_ENTITLEMENT_ENABLED` (default `False`): when `True`, the
+  video recording also needs the `recording` capability, on top of the
+  per-room recording permission (admins and owner by default).
+- `ENTITLEMENTS_BACKEND` (default
+  `core.entitlements.backends.local.LocalEntitlementsBackend`, which knows
+  nothing about LinTO), `ENTITLEMENTS_BACKEND_PARAMETERS` (`{}`),
+  `ENTITLEMENTS_CACHE_TIMEOUT` (`300`). Studio's resolution is
+  `core.entitlements.backends.linto.LintoEntitlementsBackend`.
+- `LINTO_FEATURE_ENABLED` (default `False`): the live transcription panel.
+  With it: `LINTO_STUDIO_BROWSER_API_URL`, `LINTO_STUDIO_TOKEN_SOURCE`
+  (`service_account` or `user_key`), `LINTO_IDENTITY_PROVIDER` (`meet`),
+  `LINTO_STUDIO_INTEGRATION_TOKEN` (secret), `LINTO_STUDIO_AUTH_EMAIL` and
+  `LINTO_STUDIO_AUTH_PASSWORD`, `LINTO_STUDIO_DEFAULT_ORG_ID`,
+  `LINTO_STUDIO_DEFAULT_PROFILE_ID`, `LINTO_STUDIO_TOKEN_CACHE_TTL` (`300`),
+  `LINTO_BOT_PROVIDER` (`visio`), `LINTO_VISIO_NATIVE_ENABLED` (`True`),
+  `LINTO_NATIVE_LIVEKIT_URL`, `LINTO_NATIVE_TOKEN_TTL` (`43200`).
+
+The deferred transcription now logs in to Studio with
+`LINTO_STUDIO_INTEGRATION_TOKEN`, else the `LINTO_STUDIO_AUTH_EMAIL` /
+`LINTO_STUDIO_AUTH_PASSWORD` service account, else `LINTO_STUDIO_API_TOKEN`:
+a deployment that only sets `LINTO_STUDIO_API_TOKEN` is unchanged.
+
+Changes to make in `lasuite-meet-deploy`:
+
+- meet.linagora.com (`configs/meet/meet/prd/values.yaml`): add
+  `LINTO_ENTITLEMENTS_ENABLED: False`. It is the only change that keeps the
+  current behaviour (deferred transcription and summary for everyone, no right
+  asked to Studio or Twake); without it the deferred transcription is refused
+  to everyone. Leave `LINTO_FEATURE_ENABLED`, `ENTITLEMENTS_BACKEND` and
+  `LINTO_RECORDING_ENTITLEMENT_ENABLED` unset: no live panel, recording
+  governed by the room permission only.
+- dev-meet (`configs/meet/meet/stg/values.yaml`): nothing to add. It already
+  sets the live line's variables (`LINTO_FEATURE_ENABLED`,
+  `LINTO_ENTITLEMENTS_ENABLED: True`, the `linto` entitlements backend,
+  `LINTO_STUDIO_TOKEN_SOURCE: user_key`,
+  `LINTO_RECORDING_ENTITLEMENT_ENABLED: False`, the service account, the
+  native bot). Its image moves from `v1.26-live` to this line's, with the
+  changes of the section above.
+- The LinTO endpoints (`prepare`, `started`, `stopped`, `studio-token`,
+  `summary-services`, `transcription-languages`) now take the LiveKit room
+  token in an `Authorization: X-LiveKit-Token <token>` header, no longer in the
+  body or the query string: deploy the backend and the frontend together, and
+  a tab opened before the upgrade must be reloaded.
+
+
 ### Room access tokens moved to POST /join/
 
 LiveKit access tokens are no longer returned when reading a room. They are henceforth issued by a dedicated `POST
@@ -87,7 +150,8 @@ in the call.
 ### LiveKit room tokens name a user only through a signed proof
 
 The endpoints authenticated by a LiveKit room token (`start-subtitle`,
-`mute-participant`, `toggle-hand`, `rename`) no longer take the user from
+`mute-participant`, `toggle-hand`, `rename`, and LinTO's `studio-token`,
+`prepare`, `started`, `stopped`) no longer take the user from
 the token identity: Meet now sets a `user_id` attribute and its
 `user_id_proof` in the token of every authenticated user, and only that proof
 names a user. A token minted before the upgrade has no proof, so on these
