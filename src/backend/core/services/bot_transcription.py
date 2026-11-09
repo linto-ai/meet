@@ -21,6 +21,8 @@ no per-viewer Studio socket. ``_login`` / ``resolve_conversation_id`` stay for
 the summary Celery task and the teardown, which run under the service account.
 """
 
+# pylint: disable=too-many-lines
+
 import base64
 import json
 import time
@@ -80,6 +82,10 @@ ROOM_METADATA_STARTED_AT_KEY = "linto_transcription_started_at"
 # "1" when the starter left the late-joiner summary on: a participant joining
 # mid-run then asks Studio for the "before you arrived" summary; "0" = never.
 ROOM_METADATA_CATCHUP_KEY = "linto_transcription_catchup"
+# "1" when the run keeps the meeting audio (the live channel's ``keepAudio``):
+# every participant then sees the same "recording in progress" indicator as for
+# a LiveKit recording, since the audio ends up in Twake Drive; "0" = text only.
+ROOM_METADATA_KEEP_AUDIO_KEY = "linto_transcription_keep_audio"
 
 # A Meet room drives ONE quickMeeting channel, always at index 0 — the index (not
 # the channel id) is what namespaces the bot's segment ids
@@ -97,6 +103,7 @@ ROOM_METADATA_KEYS = [
     ROOM_METADATA_ORG_ID_KEY,
     ROOM_METADATA_STARTED_AT_KEY,
     ROOM_METADATA_CATCHUP_KEY,
+    ROOM_METADATA_KEEP_AUDIO_KEY,
 ]
 
 
@@ -342,11 +349,12 @@ class BotTranscriptionService:
         Writes DEDICATED LiveKit room-metadata keys (independent of the egress
         ``recording_mode``/``recording_status`` machinery, so both can coexist).
         Every participant's frontend reads them (banner, CC badge, panel state,
-        catch-up) and LiveKit replays them to late joiners. When ``linto`` (the
-        run state persisted by :meth:`mark_started`) is given, the Studio ids and
-        the start timestamp ride along so a LATE JOINER can hydrate the
-        transcript so far. Best-effort: a metadata failure must never break
-        start/stop.
+        catch-up, recording indicator) and LiveKit replays them to late
+        joiners. When ``linto`` (the run state persisted by :meth:`mark_started`)
+        is given, the Studio ids, the start timestamp and whether the run keeps
+        the meeting audio ride along, so a LATE JOINER can hydrate the
+        transcript so far and sees the recording indicator. Best-effort: a
+        metadata failure must never break start/stop.
         """
         # RoomManagement.update_metadata is already @async_to_sync — call it directly.
         try:
@@ -379,6 +387,9 @@ class BotTranscriptionService:
                     metadata[ROOM_METADATA_ORG_ID_KEY] = str(run["org_id"])
                 metadata[ROOM_METADATA_CATCHUP_KEY] = (
                     "1" if run.get("catchup", True) else "0"
+                )
+                metadata[ROOM_METADATA_KEEP_AUDIO_KEY] = (
+                    "1" if run.get("keep_audio") else "0"
                 )
                 RoomManagement().update_metadata(str(room.id), metadata)
             else:
@@ -459,7 +470,8 @@ class BotTranscriptionService:
         (``session_id``, ``channel_id``, ``org_id``, ``bot_id``) plus the add-ons
         (``summary`` default True, ``summary_service`` the chosen summary
         service route, ``record`` default False, ``catchup`` default True = a
-        late joiner gets the "before you arrived" summary). Re-checks the
+        late joiner gets the "before you arrived" summary, ``keep_audio`` the
+        channel's ``keepAudio``). Re-checks the
         transcript permission (defence in depth), drops both summaries without
         the ``summary`` capability, starts the optional video egress when allowed,
         persists ``room.configuration["linto"]`` and sets the banner. Returns the
@@ -474,6 +486,13 @@ class BotTranscriptionService:
         summary = bool(data.get("summary", True))
         catchup = bool(data.get("catchup", True))
         record = bool(data.get("record", False))
+        # The run keeps the meeting audio when the browser created the channel
+        # with keepAudio, or when the instance keeps it (LINTO_LIVE_KEEP_AUDIO,
+        # which the panel follows). It drives the recording indicator every
+        # participant sees, so it errs on the side of showing.
+        keep_audio = bool(
+            settings.LINTO_LIVE_KEEP_AUDIO or data.get("keep_audio") is True
+        )
         # Both summaries — at stop, and the late joiners' catch-up — are LLM
         # summaries: neither runs without the `summary` capability.
         if (summary or catchup) and not summary_entitled(user):
@@ -513,6 +532,9 @@ class BotTranscriptionService:
             # Late-joiner summary: advertised in the room metadata so the
             # joiner's browser knows whether to ask Studio for it.
             "catchup": catchup,
+            # Advertised in the room metadata: every participant sees the
+            # recording indicator while the run keeps the meeting audio.
+            "keep_audio": keep_audio,
             "org_id": data.get("org_id"),
             "session_id": data.get("session_id"),
             "channel_id": data.get("channel_id"),

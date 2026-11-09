@@ -977,7 +977,8 @@ class RoomViewSet(  # pylint: disable=too-many-public-methods
     def linto_started(self, request, pk=None):  # pylint: disable=unused-argument
         """Record a browser-started run + light the room-wide state.
 
-        Body: ``{session_id, channel_id, org_id, bot_id, summary?, record?}``.
+        Body: ``{session_id, channel_id, org_id, bot_id, summary?, record?,
+        catchup?, keep_audio?}``.
         """
         room = self.get_object()
         try:

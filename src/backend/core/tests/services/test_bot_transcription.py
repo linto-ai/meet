@@ -25,6 +25,7 @@ from core.services.bot_transcription import (
     ROOM_METADATA_CATCHUP_KEY,
     ROOM_METADATA_CHANNEL_ID_KEY,
     ROOM_METADATA_CHANNEL_INDEX_KEY,
+    ROOM_METADATA_KEEP_AUDIO_KEY,
     ROOM_METADATA_KEYS,
     ROOM_METADATA_ORG_ID_KEY,
     ROOM_METADATA_SESSION_ID_KEY,
@@ -145,6 +146,38 @@ class TestMarkStarted:
         # the Studio ids a late joiner needs to catch up.
         self.banner.assert_called_once_with(room, True, user=owner, linto=linto)
         self.rec.assert_not_called()
+
+    def test_keeps_audio_when_the_instance_keeps_it(self, studio_settings):
+        # LINTO_LIVE_KEEP_AUDIO on: the run keeps the audio, whatever the body.
+        studio_settings.LINTO_LIVE_KEEP_AUDIO = True
+        room, owner = _owner_room()
+        data = {"session_id": "s", "channel_id": "c", "keep_audio": False}
+        result = BotTranscriptionService().mark_started(room, data, user=owner)
+        assert result["keep_audio"] is True
+        room.refresh_from_db()
+        assert room.configuration["linto"]["keep_audio"] is True
+
+    def test_keeps_audio_when_the_channel_keeps_it(self, studio_settings):
+        # The browser created the channel with keepAudio: the indicator shows
+        # even if the instance setting says otherwise.
+        studio_settings.LINTO_LIVE_KEEP_AUDIO = False
+        room, owner = _owner_room()
+        data = {"session_id": "s", "channel_id": "c", "keep_audio": True}
+        result = BotTranscriptionService().mark_started(room, data, user=owner)
+        assert result["keep_audio"] is True
+
+    def test_text_only_run_keeps_no_audio(self, studio_settings):
+        studio_settings.LINTO_LIVE_KEEP_AUDIO = False
+        room, owner = _owner_room()
+        for data in (
+            {"session_id": "s", "channel_id": "c"},
+            {"session_id": "s", "channel_id": "c", "keep_audio": False},
+            {"session_id": "s", "channel_id": "c", "keep_audio": "yes"},
+        ):
+            result = BotTranscriptionService().mark_started(room, data, user=owner)
+            assert result["keep_audio"] is False
+        room.refresh_from_db()
+        assert room.configuration["linto"]["keep_audio"] is False
 
     def test_persists_the_late_joiner_summary_choice(self, studio_settings):
         room, owner = _owner_room()
@@ -325,6 +358,8 @@ class TestBannerMetadata:
         assert metadata[ROOM_METADATA_CHANNEL_INDEX_KEY] == LINTO_CHANNEL_INDEX
         assert metadata[ROOM_METADATA_ORG_ID_KEY] == "org-1"
         assert metadata[ROOM_METADATA_CATCHUP_KEY] == "1"
+        # LINTO_LIVE_KEEP_AUDIO defaults to True: the run keeps the audio.
+        assert metadata[ROOM_METADATA_KEEP_AUDIO_KEY] == "1"
         started_at = metadata[ROOM_METADATA_STARTED_AT_KEY]
         # ISO 8601 UTC, parseable by the browser's Date.parse.
         assert started_at.endswith("Z")
@@ -345,7 +380,33 @@ class TestBannerMetadata:
             ROOM_METADATA_STATUS_KEY,
             ROOM_METADATA_STARTER_KEY,
             ROOM_METADATA_CATCHUP_KEY,
+            ROOM_METADATA_KEEP_AUDIO_KEY,
         }
+
+    def test_kept_audio_is_advertised(self, studio_settings):
+        # Every participant's recording indicator reads this key.
+        room, owner = _owner_room()
+        with mock.patch(
+            "core.services.bot_transcription.RoomManagement"
+        ) as room_management:
+            BotTranscriptionService()._set_banner(
+                room, True, user=owner, linto={"keep_audio": True}
+            )
+        metadata = room_management.return_value.update_metadata.call_args[0][1]
+        assert metadata[ROOM_METADATA_KEEP_AUDIO_KEY] == "1"
+
+    def test_text_only_run_advertises_no_kept_audio(self, studio_settings):
+        # A run state without the key (started before it existed) is text only.
+        room, owner = _owner_room()
+        for linto in ({"keep_audio": False}, {}):
+            with mock.patch(
+                "core.services.bot_transcription.RoomManagement"
+            ) as room_management:
+                BotTranscriptionService()._set_banner(
+                    room, True, user=owner, linto=linto
+                )
+            metadata = room_management.return_value.update_metadata.call_args[0][1]
+            assert metadata[ROOM_METADATA_KEEP_AUDIO_KEY] == "0"
 
     def test_late_joiner_summary_off_is_advertised(self, studio_settings):
         room, owner = _owner_room()
@@ -368,6 +429,8 @@ class TestBannerMetadata:
         assert args[1] == {}
         assert sorted(args[2]) == sorted(ROOM_METADATA_KEYS)
         assert ROOM_METADATA_SESSION_ID_KEY in args[2]
+        # The recording indicator goes away with the run.
+        assert ROOM_METADATA_KEEP_AUDIO_KEY in args[2]
 
     def test_metadata_failure_never_breaks_the_run(self, studio_settings):
         room, owner = _owner_room()
@@ -565,6 +628,8 @@ class TestTeardown:
         args = room_management.return_value.update_metadata.call_args[0]
         assert args[1] == {}
         assert sorted(args[2]) == sorted(ROOM_METADATA_KEYS)
+        # The room emptied: the recording indicator is cleared with the run.
+        assert ROOM_METADATA_KEEP_AUDIO_KEY in args[2]
 
 
 def _jwt_with_exp(exp):
