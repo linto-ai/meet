@@ -24,6 +24,7 @@
     "errors": {
       "noProfile": "Chưa có hồ sơ chép lời nào được cấu hình cho tổ chức của bạn. Hãy yêu cầu quản trị viên tạo một hồ sơ.",
       "generic": "Không thể bắt đầu chép lời. Hãy thử lại.",
+      "studioRefused": "LinTO đã từ chối bắt đầu chép lời: tổ chức LinTO của bạn không có quyền này (gói đăng ký, vai trò hoặc quyền hạn). Hãy liên hệ quản trị viên LinTO.",
       "retry": "Thử lại"
     },
     "live": {

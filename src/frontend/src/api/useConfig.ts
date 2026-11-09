@@ -6,17 +6,12 @@ import type { ApiAccessLevel } from '@/features/rooms/api/ApiRoom'
 import type { Track, VideoCodec } from 'livekit-client'
 type Source = Track.Source
 
-// Runtime config for the browser-first LinTO live transcription: the panel talks
-// to studio-api DIRECTLY via the JS SDK, with a Studio token the Meet backend
-// hands it (GET rooms/{id}/linto/studio-token — the identity bridge), and only
-// mints the native bot join token + lifecycle hooks via the Meet backend.
+// Runtime config of the LinTO live transcription, run by the Meet backend.
 export interface LintoRuntimeConfig {
   enabled: boolean
-  // Browser-facing studio-api base URL the LinTO JS SDK talks to.
+  // Browser-facing studio-api base URL of the public session routes.
   studio_api_url: string
-  // Where the backend gets the Studio token it hands the browser (informational
-  // — the panel always asks the bridge): the shared service account, or the
-  // user's own LinTO API key via the studio-api identity exchange.
+  // The Studio identity the backend acts with (informational).
   token_source: 'service_account' | 'user_key'
   // Per-user feature gating (LINTO_ENTITLEMENTS_ENABLED, off by default).
   // false: every LinTO capability is granted to everyone, no entitlement lookup.
@@ -24,13 +19,6 @@ export interface LintoRuntimeConfig {
   // The video recording requires the `recording` capability
   // (LINTO_RECORDING_ENTITLEMENT_ENABLED); false = open to everyone.
   recording_entitlement_enabled: boolean
-  // LiveKit signaling URL injected into the native bot descriptor.
-  native_livekit_url: string
-  visio_native_enabled: boolean
-  bot_provider: string
-  // The live channel keeps the meeting audio in Studio (LINTO_LIVE_KEEP_AUDIO);
-  // the end-of-meeting delivery puts it in Twake Drive with the transcript.
-  live_keep_audio: boolean
   // Pinned ASR profile id (the panel never lets the user pick one); '' → the
   // first available profile is used.
   default_profile_id: string

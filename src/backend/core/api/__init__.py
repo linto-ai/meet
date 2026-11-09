@@ -83,16 +83,14 @@ def get_frontend_configuration(request):
             "default_access_level": settings.RESOURCE_DEFAULT_ACCESS_LEVEL,
         },
         "subtitle": {"enabled": settings.ROOM_SUBTITLE_ENABLED},
-        # LinTO live transcription (fork): the in-meeting "LinTO" tool. Browser-
-        # first — the panel talks to studio-api via the JS SDK as the user, and
-        # only mints the native bot join token + lifecycle hooks via the Meet
-        # backend. `studio_api_url` is the browser-facing studio-api base.
+        # LinTO live transcription (fork): the in-meeting "LinTO" tool, run by
+        # the backend. `studio_api_url` is the browser-facing studio-api base
+        # of the public session routes the late joiners read.
         "linto": {
             "enabled": settings.LINTO_FEATURE_ENABLED,
             "studio_api_url": settings.LINTO_STUDIO_BROWSER_API_URL,
-            # Where the browser's Studio JWT comes from (informational: the
-            # panel always asks GET rooms/{id}/linto/studio-token). Reported
-            # AFTER the kill switch below: the service account when it is off.
+            # The Studio identity the backend acts with (informational).
+            # Reported AFTER the kill switch below.
             "token_source": effective_token_source(),
             # Per-user feature gating. False = every capability granted to
             # everyone, no entitlement lookup (LINTO_ENTITLEMENTS_ENABLED).
@@ -102,12 +100,6 @@ def get_frontend_configuration(request):
             "recording_entitlement_enabled": (
                 settings.LINTO_RECORDING_ENTITLEMENT_ENABLED
             ),
-            "native_livekit_url": settings.LINTO_NATIVE_LIVEKIT_URL,
-            "visio_native_enabled": settings.LINTO_VISIO_NATIVE_ENABLED,
-            "bot_provider": settings.LINTO_BOT_PROVIDER,
-            # The live channel keeps the meeting audio (delivered to Twake
-            # Drive with the transcript).
-            "live_keep_audio": settings.LINTO_LIVE_KEEP_AUDIO,
             # Pinned ASR profile — the panel never lets the user pick one.
             "default_profile_id": settings.LINTO_STUDIO_DEFAULT_PROFILE_ID,
         },

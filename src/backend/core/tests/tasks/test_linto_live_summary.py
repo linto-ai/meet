@@ -679,6 +679,7 @@ class TestDeliveryWithoutSummary:
         service = BotTranscriptionService()
         with (
             mock.patch.object(BotTranscriptionService, "_set_banner"),
+            mock.patch.object(BotTranscriptionService, "_stop_studio_run"),
             mock.patch.object(BotTranscriptionService, "_enqueue_summary") as enqueue,
         ):
             service.mark_started(
@@ -686,9 +687,7 @@ class TestDeliveryWithoutSummary:
                 {"session_id": "sess-1", "channel_id": "c", "org_id": "org-1", **data},
                 user=starter,
             )
-            service.mark_stopped(
-                room, {"conversation_name": "linto-room-123"}, user=starter
-            )
+            service.stop(room, user=starter)
         enqueue.assert_called_once_with(room)
         room.refresh_from_db()
         return room

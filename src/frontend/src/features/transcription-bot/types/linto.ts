@@ -1,12 +1,10 @@
 // Public types for the LinTO live-transcription feature.
 //
-// The backend speaks snake_case (asr_profile_id, …); these camelCase shapes are
-// the frontend-facing contract. Conversion happens at the API boundary in
+// The backend speaks snake_case (summary_service, …); these camelCase shapes
+// are the frontend-facing contract. Conversion happens at the API boundary in
 // ../api/lintoBotApi.ts.
 
 export interface LintoBotConfig {
-  language?: string
-  asrProfileId?: string
   // Live transcription is implicit (always on). `summary` adds an autonomous
   // summary at stop (default true); `record` adds a LiveKit video recording;
   // `catchup` lets a late joiner ask for the "before you arrived" summary.
@@ -88,7 +86,7 @@ export interface LintoSummaryService {
   default: boolean
 }
 
-// A quickMeeting transcriber profile advertised by bot-profiles.
+// A live transcriber profile, as GET rooms/{id}/linto/profiles lists it.
 export interface LintoBotProfile {
   id: string
   name: string
@@ -96,17 +94,17 @@ export interface LintoBotProfile {
   translations: string[]
 }
 
-// Why bot-profiles came back the way it did: 'ok' (have profiles or a default),
-// 'unprovisioned' (org has none — admin must create one), 'upstream_error',
-// 'no_entitlement' (the LinTO option is not active for this account: no linked
-// key, or a key that may not run a quickMeeting).
+// Why linto/profiles came back the way it did: 'ok' (have profiles or a
+// default), 'unprovisioned' (org has none — admin must create one),
+// 'upstream_error', 'no_entitlement' (the LinTO option is not active for this
+// account: no linked key, or a key that may not run a live session).
 export type LintoBotProfilesReason =
   | 'ok'
   | 'unprovisioned'
   | 'upstream_error'
   | 'no_entitlement'
 
-// Full bot-profiles result surfaced to the panel for the empty/error state.
+// Full linto/profiles result surfaced to the panel for the empty/error state.
 export interface LintoBotProfilesResult {
   profiles: LintoBotProfile[]
   hasDefault: boolean

@@ -17,7 +17,7 @@ a Celery retry.
 
 # The SDK / asyncio / service imports are deferred inside the task bodies on
 # purpose (they are only needed when a task runs, and the service imports this
-# module lazily — see ``BotTranscriptionService.stop_bot``).
+# module lazily — see ``BotTranscriptionService._enqueue_summary``).
 # ruff: noqa: PLC0415
 # pylint: disable=too-many-lines
 
@@ -1157,11 +1157,11 @@ async def _resolve_summary_recipient(payload, room, service):
 
 
 async def _resolve_live_conversation_id(service, payload, room_id):
-    """Find the Studio conversation finalized by the quickMeeting DELETE.
+    """Find the Studio conversation finalized by the session DELETE.
 
     Re-queries a few times with a short delay (the conversation is stored by
-    Studio's ``storeQuickMeetingFromStop`` right after the DELETE returned, but
-    allow some margin). Still not found → :class:`TransientError` so Celery
+    Studio's ``storeSessionFromStop`` before the DELETE returns, but allow
+    some margin). Still not found → :class:`TransientError` so Celery
     retries the whole task later with back-off.
     """
     org_id = payload["org_id"]
@@ -1274,12 +1274,12 @@ def _live_audio_files(service, conversation_id, meeting, language, log_id):
 def process_bot_live_summary(self, room_id):
     """Summarize + deliver a LinTO bot's OWN live-transcription conversation.
 
-    Enqueued by ``BotTranscriptionService.mark_stopped`` for every run with a
+    Enqueued by ``BotTranscriptionService.stop`` for every run with a
     session; the LLM summary step runs only when the payload's ``summary`` is
     true (the starter's choice, gated by the ``summary`` capability), the
     document, Twake Drive and recap email always go out. It is INDEPENDENT of
     the recording pipeline / ``Recording`` model:
-    it resolves the Studio conversation that the quickMeeting DELETE finalized,
+    it resolves the Studio conversation that the session DELETE finalized,
     then reuses the shared tag/summary/export/share/Twake/email delivery helpers;
     the meeting audio Studio kept for the run (``keepAudio`` channel) goes to
     Twake Drive as an OGG when it is available, never blocking the rest.

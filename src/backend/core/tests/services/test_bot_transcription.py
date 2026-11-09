@@ -1,16 +1,12 @@
 """
-Test the LinTO live-transcription lifecycle service (browser-first).
+Test the LinTO live-transcription lifecycle service.
 
-The BROWSER drives Studio via the JS SDK; this service only mints the native bot
-join token, gates on permissions, drives the banner/egress/summary lifecycle, and
-(teardown/summary) talks to Studio under the service account. Studio HTTP is
-mocked; LiveKit side effects (banner metadata, native-agent stop, token mint,
-egress) are patched.
+Studio HTTP is mocked; LiveKit side effects (banner metadata, native-agent
+stop, token mint, egress) are patched.
 """
 
 # pylint: disable=redefined-outer-name,protected-access
 
-import base64
 import json
 from datetime import datetime, timezone
 from unittest import mock
@@ -66,38 +62,6 @@ def _owner_room():
     room = RoomFactory()
     room.accesses.create(user=owner, role=models.RoleChoices.OWNER)
     return room, owner
-
-
-class TestPrepare:
-    """prepare: permission gate + native token mint + native-subtitle stop."""
-
-    def test_denied_for_non_admin(self, studio_settings):
-        room = RoomFactory()
-        user = (
-            UserFactory()
-        )  # not admin/owner → transcript_permission defaults admin_owner
-        with pytest.raises(PermissionDeniedError):
-            BotTranscriptionService().prepare(room, "chan-1", user=user)
-
-    def test_mints_token_and_stops_native_subtitles(self, studio_settings):
-        room, owner = _owner_room()
-        with (
-            mock.patch.object(
-                BotTranscriptionService, "_stop_native_subtitles"
-            ) as stop_native,
-            mock.patch(
-                "core.services.bot_transcription.generate_bot_join_token",
-                return_value="lk-jwt",
-            ) as mint,
-        ):
-            result = BotTranscriptionService().prepare(room, "chan-1", user=owner)
-        mint.assert_called_once_with(str(room.id), "chan-1")
-        stop_native.assert_called_once_with(room)
-        assert result == {
-            "token": "lk-jwt",
-            "livekit_url": "ws://livekit:7880",
-            "room": str(room.id),
-        }
 
 
 class TestMarkStarted:
@@ -257,8 +221,11 @@ class TestMarkStarted:
             room.refresh_from_db()
             assert room.configuration["linto"]["summary"] is False
         # The run is still delivered at stop, without the summary step.
-        with mock.patch.object(BotTranscriptionService, "_enqueue_summary") as enqueue:
-            BotTranscriptionService().mark_stopped(room, {}, user=owner)
+        with (
+            mock.patch.object(BotTranscriptionService, "_stop_studio_run"),
+            mock.patch.object(BotTranscriptionService, "_enqueue_summary") as enqueue,
+        ):
+            BotTranscriptionService().stop(room, user=owner)
         enqueue.assert_called_once_with(room)
         room.refresh_from_db()
         assert room.configuration["linto_summary"]["summary"] is False
@@ -296,8 +263,11 @@ class TestMarkStarted:
         ):
             result = BotTranscriptionService().mark_started(room, data, user=owner)
         assert result["summary"] is True
-        with mock.patch.object(BotTranscriptionService, "_enqueue_summary") as enqueue:
-            BotTranscriptionService().mark_stopped(room, {}, user=owner)
+        with (
+            mock.patch.object(BotTranscriptionService, "_stop_studio_run"),
+            mock.patch.object(BotTranscriptionService, "_enqueue_summary") as enqueue,
+        ):
+            BotTranscriptionService().stop(room, user=owner)
         enqueue.assert_called_once_with(room)
         room.refresh_from_db()
         assert room.configuration["linto_summary"]["summary"] is True
@@ -450,137 +420,11 @@ class TestBannerMetadata:
             )
 
 
-class TestMarkStopped:
-    """mark_stopped: who-can-stop gate, banner off, summary enqueue, state clear."""
-
-    @pytest.fixture(autouse=True)
-    def _no_livekit(self):
-        with (
-            mock.patch.object(BotTranscriptionService, "_set_banner"),
-            mock.patch.object(BotTranscriptionService, "_stop_recording"),
-            mock.patch.object(BotTranscriptionService, "_enqueue_summary") as enqueue,
-        ):
-            self.enqueue = enqueue
-            yield
-
-    def test_idle_when_no_run(self, studio_settings):
-        room = RoomFactory()
-        assert BotTranscriptionService().mark_stopped(room, {}, user=None) == {
-            "status": "idle"
-        }
-
-    def test_denied_for_stranger(self, studio_settings):
-        room = RoomFactory()
-        room.configuration = {"linto": {"user_id": "999", "session_id": "s"}}
-        room.save()
-        with pytest.raises(PermissionDeniedError):
-            BotTranscriptionService().mark_stopped(room, {}, user=UserFactory())
-
-    def test_starter_stops_and_enqueues_summary(self, studio_settings):
-        room = RoomFactory()
-        starter = UserFactory()
-        room.configuration = {
-            "linto": {
-                "user_id": str(starter.id),
-                "org_id": "org-1",
-                "session_id": "sess-1",
-                "summary": True,
-                "summary_service": "minutes",
-            }
-        }
-        room.save()
-        result = BotTranscriptionService().mark_stopped(
-            room, {"conversation_name": "linto-x"}, user=starter
-        )
-        assert result == {"status": "stopped"}
-        room.refresh_from_db()
-        assert "linto" not in room.configuration
-        summary = room.configuration["linto_summary"]
-        assert summary["conversation_name"] == "linto-x"
-        assert summary["session_id"] == "sess-1"
-        assert summary["summary_service"] == "minutes"
-        assert summary["summary"] is True
-        self.enqueue.assert_called_once_with(room)
-
-    def test_a_run_without_summary_is_still_delivered(self, studio_settings):
-        """Summary off: the document, Twake Drive and email still go out, the
-        task is told to skip the LLM step."""
-        room = RoomFactory()
-        starter = UserFactory()
-        room.configuration = {
-            "linto": {
-                "user_id": str(starter.id),
-                "org_id": "org-1",
-                "session_id": "sess-1",
-                "summary": False,
-            }
-        }
-        room.save()
-        BotTranscriptionService().mark_stopped(
-            room, {"conversation_name": "linto-x"}, user=starter
-        )
-        room.refresh_from_db()
-        assert room.configuration["linto_summary"]["summary"] is False
-        assert room.configuration["linto_summary"]["conversation_name"] == "linto-x"
-        self.enqueue.assert_called_once_with(room)
-
-    def test_a_run_without_a_session_is_not_delivered(self, studio_settings):
-        room = RoomFactory()
-        starter = UserFactory()
-        room.configuration = {"linto": {"user_id": str(starter.id), "summary": True}}
-        room.save()
-        BotTranscriptionService().mark_stopped(room, {}, user=starter)
-        room.refresh_from_db()
-        assert "linto_summary" not in room.configuration
-        self.enqueue.assert_not_called()
-
-    def test_admin_stopping_others_run_deletes_studio_session(self, studio_settings):
-        # An admin who did NOT start the run has no browser-side SDK session, so
-        # mark_stopped must service-account-delete the Studio bot + quick session.
-        room = RoomFactory()
-        admin = UserFactory()
-        room.accesses.create(user=admin, role=models.RoleChoices.OWNER)
-        room.configuration = {
-            "linto": {
-                "user_id": "someone-else",
-                "org_id": "org-1",
-                "session_id": "sess-1",
-                "bot_id": "bot-1",
-                "summary": False,
-            }
-        }
-        room.save()
-        with mock.patch.object(
-            BotTranscriptionService, "_delete_studio_session"
-        ) as delete:
-            BotTranscriptionService().mark_stopped(room, {}, user=admin)
-        delete.assert_called_once()
-
-    def test_starter_stop_does_not_service_account_delete(self, studio_settings):
-        room = RoomFactory()
-        starter = UserFactory()
-        room.configuration = {
-            "linto": {
-                "user_id": str(starter.id),
-                "org_id": "org-1",
-                "session_id": "sess-1",
-                "bot_id": "bot-1",
-                "summary": False,
-            }
-        }
-        room.save()
-        with mock.patch.object(
-            BotTranscriptionService, "_delete_studio_session"
-        ) as delete:
-            BotTranscriptionService().mark_stopped(room, {}, user=starter)
-        delete.assert_not_called()
-
-
 class TestTeardown:
-    """teardown: service-account DELETEs then the stopped path (no perm gate)."""
+    """teardown: the stop without the permission gate."""
 
     @responses.activate
-    def test_deletes_bot_and_session_then_clears(self, studio_settings):
+    def test_deletes_bot_and_session_then_clears(self, run_settings):
         room = RoomFactory()
         room.configuration = {
             "linto": {
@@ -594,8 +438,8 @@ class TestTeardown:
         del_bot = responses.delete(
             f"{STUDIO}/api/organizations/org-1/bots/bot-1", json={}, status=200
         )
-        del_qm = responses.delete(
-            f"{STUDIO}/api/organizations/org-1/quickMeeting/sess-1",
+        del_session = responses.delete(
+            f"{STUDIO}/api/organizations/org-1/sessions/sess-1",
             json={"success": True},
             status=200,
         )
@@ -605,12 +449,13 @@ class TestTeardown:
         ):
             BotTranscriptionService().teardown(room)
         assert del_bot.call_count == 1
-        assert del_qm.call_count == 1
+        assert del_session.call_count == 1
+        assert "name=linto-" in del_session.calls[0].request.url
         room.refresh_from_db()
         assert "linto" not in room.configuration
 
     @responses.activate
-    def test_clears_the_room_metadata(self, studio_settings):
+    def test_clears_the_room_metadata(self, run_settings):
         # A room ending with a run still active must leave no stale session id
         # behind, or a later joiner would try to catch up on a dead session.
         room = RoomFactory()
@@ -619,7 +464,7 @@ class TestTeardown:
         }
         room.save()
         responses.delete(
-            f"{STUDIO}/api/organizations/org-1/quickMeeting/sess-1",
+            f"{STUDIO}/api/organizations/org-1/sessions/sess-1",
             json={"success": True},
             status=200,
         )
@@ -637,17 +482,8 @@ class TestTeardown:
         assert ROOM_METADATA_KEEP_AUDIO_KEY in args[2]
 
 
-def _jwt_with_exp(exp):
-    """An unsigned JWT-shaped string whose payload carries ``exp``."""
-
-    def b64(data):
-        return base64.urlsafe_b64encode(json.dumps(data).encode()).rstrip(b"=")
-
-    return f"{b64({'alg': 'HS256'}).decode()}.{b64({'exp': exp}).decode()}.sig"
-
-
 class TestStudioTokenFor:
-    """The identity bridge for the browser SDK (LINTO_STUDIO_TOKEN_SOURCE)."""
+    """The backend's Studio credential (LINTO_STUDIO_TOKEN_SOURCE)."""
 
     def test_service_account_with_pinned_org(self, studio_settings):
         studio_settings.LINTO_STUDIO_TOKEN_SOURCE = "service_account"
@@ -656,10 +492,7 @@ class TestStudioTokenFor:
         assert result == {
             "enabled": True,
             "token": "static-token",
-            "base_url": "http://studio.browser",
             "organization_id": "org-pin",
-            # A static (non-JWT) token has no readable expiry.
-            "expires_in": None,
             "capabilities": {"quickMeeting": True},
         }
 
@@ -680,14 +513,6 @@ class TestStudioTokenFor:
         responses.add(responses.GET, f"{STUDIO}/api/organizations/", json=[])
         with pytest.raises(BotTranscriptionException):
             BotTranscriptionService().studio_token_for(UserFactory())
-
-    def test_expires_in_is_read_from_the_jwt(self, studio_settings):
-        studio_settings.LINTO_STUDIO_DEFAULT_ORG_ID = "org-pin"
-        studio_settings.LINTO_STUDIO_API_TOKEN = _jwt_with_exp(
-            int(datetime.now(timezone.utc).timestamp()) + 3600
-        )
-        result = BotTranscriptionService().studio_token_for(UserFactory())
-        assert 3500 < result["expires_in"] <= 3600
 
     def test_raises_without_credentials(self, studio_settings):
         studio_settings.LINTO_STUDIO_API_TOKEN = None
@@ -751,7 +576,6 @@ class TestUserKeyToken:
         assert result == {
             "enabled": True,
             "token": "short-jwt",
-            "base_url": "http://studio.browser",
             "organization_id": "org-of-the-key",
             "expires_in": 3600,
             "capabilities": {"quickMeeting": True},

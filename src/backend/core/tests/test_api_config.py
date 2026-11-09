@@ -54,13 +54,18 @@ def test_config_linto_reports_the_kill_switch_and_effective_token_source(setting
     assert data["linto"]["token_source"] == "service_account"
 
 
-def test_config_linto_reports_whether_the_live_run_keeps_the_audio(settings):
-    """LINTO_LIVE_KEEP_AUDIO (on by default) reaches the panel, which sets the
-    live channel's keepAudio from it."""
+def test_config_linto_carries_no_studio_credential_nor_bot_wiring(settings):
     settings.LINTO_FEATURE_ENABLED = True
-    data = APIClient().get("/api/v1.0/config/").json()
-    assert data["linto"]["live_keep_audio"] is True
-
-    settings.LINTO_LIVE_KEEP_AUDIO = False
-    data = APIClient().get("/api/v1.0/config/").json()
-    assert data["linto"]["live_keep_audio"] is False
+    settings.LINTO_STUDIO_API_TOKEN = "the-studio-key"
+    settings.LINTO_NATIVE_LIVEKIT_URL = "ws://livekit.internal:7880"
+    response = APIClient().get("/api/v1.0/config/")
+    linto = response.json()["linto"]
+    for key in (
+        "native_livekit_url",
+        "visio_native_enabled",
+        "bot_provider",
+        "live_keep_audio",
+    ):
+        assert key not in linto
+    assert "the-studio-key" not in response.content.decode()
+    assert "livekit.internal" not in response.content.decode()

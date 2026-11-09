@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { useRoomContext } from '@livekit/components-react'
 import { useSnapshot } from 'valtio'
+import { useConfig } from '@/api/useConfig'
 import { useRoomData } from '@/features/rooms/livekit/hooks/useRoomData'
 import { useSidePanel } from '@/features/rooms/livekit/hooks/useSidePanel'
 import { notifyLintoCatchUpReady } from '@/features/notifications'
-import { useStudioClient } from '../api/studioAuth'
 import { IDLE_CATCH_UP, lintoStore } from '../store/lintoStore'
 import { hydrateCaptions } from '../store/transcriptStore'
 import { LINTO_SEGMENT_PREFIX, LintoCaption } from '../types/linto'
@@ -25,9 +25,8 @@ import { useLintoStatus } from './useLintoStatus'
  * the whole meeting and needs neither the history nor the summary.
  */
 
-// The transcript so far is fetched with the PUBLIC session route (the Meet flow
-// PATCHes the session to `visibility: public` at start), so an anonymous guest
-// with no Studio account can catch up too.
+// Studio's PUBLIC session routes, without credential: the backend creates the
+// session public, and its `publicSessionToken` authorizes the summary.
 
 /** sessionStorage key holding the join time — see {@link readJoinedAt}. */
 export const joinedAtStorageKey = (roomId: string, sessionId: string) =>
@@ -142,7 +141,8 @@ export const dismissLintoCatchUp = () => {
 export const useLintoCatchUp = () => {
   const room = useRoomContext()
   const apiRoomData = useRoomData()
-  const { getClient, config } = useStudioClient()
+  const { data: apiConfig } = useConfig()
+  const config = apiConfig?.linto
   const { active, sessionId, channelIndex, startedAt, catchUpEnabled } =
     useLintoStatus()
   const { startedByMe } = useSnapshot(lintoStore)
@@ -156,26 +156,17 @@ export const useLintoCatchUp = () => {
   openLintoRef.current = openLinto
 
   const roomId = apiRoomData?.livekit?.room || room?.name || ''
-  const roomToken = apiRoomData?.livekit?.token || ''
 
   // One run per (room, session): a metadata refresh or a re-render must not
   // re-hydrate the journal nor spend another LLM call.
   const doneKeyRef = useRef<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
-  /** The user's Studio client, or a bare one on the public path. */
-  const resolveClient = useCallback(async (): Promise<
-    InstanceType<typeof LinTO>
-  > => {
-    try {
-      const { linto } = await getClient(roomId, roomToken)
-      return linto
-    } catch {
-      // Anonymous guest (no SSO, no dev bridge): the public session routes need
-      // no Studio auth, so an unauthenticated client is enough.
-      return new LinTO({ baseUrl: config?.studio_api_url })
-    }
-  }, [getClient, roomId, roomToken, config?.studio_api_url])
+  const resolveClient = useCallback(
+    (): InstanceType<typeof LinTO> =>
+      new LinTO({ baseUrl: config?.studio_api_url }),
+    [config?.studio_api_url]
+  )
 
   /** Stream the "before you arrived" summary into the store. It is computed
    *  ONCE per run: no refresh, and the block can be closed for good. When it
@@ -275,7 +266,7 @@ export const useLintoCatchUp = () => {
       let linto: InstanceType<typeof LinTO>
       let session: PublicSession
       try {
-        linto = await resolveClient()
+        linto = resolveClient()
         session = await linto.getPublicSession(sessionId)
       } catch (err) {
         console.warn('LinTO catch-up: cannot read the running session', err)

@@ -13,8 +13,8 @@ export { useLintoEntitlement } from './hooks/useLintoEntitlement'
 export { useLintoCapabilities } from './hooks/useLintoCapabilities'
 export { useLintoTranscriptFeed } from './hooks/useLintoTranscriptFeed'
 
-// api — browser-first: the panel drives Studio via the JS SDK; the Meet backend
-// only mints the native token + runs the room-wide lifecycle hooks.
+// api — the Meet backend drives Studio with its own credential; the panel only
+// asks it to start or stop.
 export {
   useLintoBotProfiles,
   useLintoSummaryServices,
@@ -22,7 +22,6 @@ export {
   useStartLintoLive,
   useStopLintoLive,
 } from './api/lintoBotApi'
-export { useStudioClient, StudioAuthUnavailable } from './api/studioAuth'
 
 // stores
 export { lintoStore } from './store/lintoStore'

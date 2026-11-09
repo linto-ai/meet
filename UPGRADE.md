@@ -17,6 +17,43 @@ the following command inside your docker container:
 ## [Unreleased]
 
 
+### LinTO fork: the backend runs the live transcription, the Studio key stays on the server
+
+The live transcription panel no longer drives Studio from the browser with a
+token the backend handed it: `GET rooms/{id}/linto/studio-token/` is gone, and
+with it the Studio key (`LINTO_STUDIO_API_TOKEN` in `service_account` mode) that
+any logged-in participant could read in the browser. The backend lists the
+profiles, creates the room's Studio session, launches and stops the bot itself
+(`linto/profiles`, `linto/start`, `linto/stop` replace `linto/prepare`,
+`linto/started`, `linto/stopped`). Each room has a session of its own,
+`@meet-<room id>`, created through `POST /api/organizations/{org}/sessions/`
+instead of a quickMeeting: several rooms now transcribe at the same time under
+the same key.
+
+- In the Studio organization the key acts in (`linagora` on meet.linagora.com):
+  - the key's user needs the Meeting Manager role. Never Maintainer, which
+    reads every conversation of the organization;
+  - the organization needs the SESSION and BOT permissions;
+  - if the organization sets a minimal security level, the live ASR profile
+    (`LINTO_STUDIO_DEFAULT_PROFILE_ID`, else the first one) must reach it:
+    `POST /sessions` checks it, the quickMeeting did not;
+  - on a Studio with the SaaS plugin (`linto-saas`), the organization's plan
+    needs the `live.sessions` capability. Otherwise the creation answers
+    402/403 and the panel says that LinTO refused the transcription;
+  - a Meeting Manager may not create a root folder: an admin creates the
+    `LINTO_VISIO_FOLDER_NAME` folder (`Visio`) once, public, in the
+    organization. Without it the conversations stay outside any folder (the
+    delivery logs a 403 and goes on).
+- The bot is sent to `DJANGO_EMAIL_APP_BASE_URL/<room slug>` (set in prd and
+  stg).
+- With the per-user rights on (`user_key`), the backend acts with the
+  participant's own key, and stops a run with its starter's key.
+- The config no longer carries `native_livekit_url`, `visio_native_enabled`,
+  `bot_provider` nor `live_keep_audio`; the variables stay, read by the backend.
+- Deploy the backend and the frontend together: a tab opened before the
+  upgrade must be reloaded.
+
+
 ### LinTO fork: the live run's audio in Twake Drive
 
 A live transcription now asks Studio to keep the meeting audio (`keepAudio` on

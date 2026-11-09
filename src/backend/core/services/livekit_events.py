@@ -404,7 +404,7 @@ class LiveKitEventsService:
 
         # LinTO live transcription (fork): the room is gone, so any bot still
         # attached must be torn down (finalizing the Studio session) — otherwise
-        # it would keep the Studio quick-meeting open until its own timeouts.
+        # it would keep the room's Studio session open until its own timeouts.
         # Best-effort and idempotent: a room without a running bot is a no-op.
         try:
             room = models.Room.objects.filter(id=room_id).first()

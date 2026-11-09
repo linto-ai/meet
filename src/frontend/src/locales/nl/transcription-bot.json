@@ -24,6 +24,7 @@
     "errors": {
       "noProfile": "Er is geen transcriptieprofiel ingesteld voor je organisatie. Vraag een beheerder om er een aan te maken.",
       "generic": "De transcriptie kon niet worden gestart. Probeer het opnieuw.",
+      "studioRefused": "LinTO heeft het starten van de transcriptie geweigerd: je LinTO-organisatie heeft daar geen recht op (abonnement, rol of rechten). Neem contact op met je LinTO-beheerder.",
       "retry": "Opnieuw proberen"
     },
     "live": {

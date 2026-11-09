@@ -1,30 +1,14 @@
-"""LinTO live-transcription lifecycle helpers for a Meet room (browser-first).
+"""LinTO live transcription of a Meet room, run by the backend.
 
-The BROWSER owns the Studio control plane via the LinTO JS SDK, authenticated as
-the real user: it creates the quickMeeting, chooses the ASR profile/translations
-and starts/stops the bot. This service only does what the browser cannot:
-
-- ``prepare`` — gate on the organizer's ``transcript_permission`` and MINT the
-  native LiveKit bot join token (needs Meet's LiveKit secret) + stop the native
-  subtitle agent on takeover;
-- ``mark_started`` / ``mark_stopped`` — drive the room-wide banner, the optional
-  video egress and the autonomous post-meeting summary, and persist the run state
-  in ``room.configuration["linto"]``;
-- ``teardown`` — service-account cleanup when a room ends with a run still active;
-- ``studio_token_for`` — the identity bridge: the Studio JWT (+ organization)
-  the browser SDK acts with, from the configured source (shared service account
-  today, the user's own LinTO key through the studio-api identity exchange).
-
-The native bot republishes the live captions INTO the LiveKit room as
-transcription segments, so every participant sees them via the native overlay —
-no per-viewer Studio socket. ``_login`` / ``resolve_conversation_id`` stay for
-the summary Celery task and the teardown, which run under the service account.
+The backend drives Studio with its own credential, which never reaches the
+browser: the room's Studio session, the native bot, the room-wide state and the
+end-of-meeting delivery. The native bot republishes the captions into the
+LiveKit room; a late joiner reads the transcript so far through Studio's public
+session routes.
 """
 
 # pylint: disable=too-many-lines
 
-import base64
-import json
 import time
 from datetime import datetime, timezone
 from logging import getLogger
@@ -54,14 +38,15 @@ STOP_TIMEOUT = (DEFAULT_TIMEOUT, 60)
 START_LOCK_TTL = 120
 STOP_LOCK_TTL = 90
 
-# ``LINTO_STUDIO_TOKEN_SOURCE`` values — where the browser's Studio JWT comes from.
+# ``LINTO_STUDIO_TOKEN_SOURCE`` values — where the backend's Studio credential
+# comes from.
 TOKEN_SOURCE_SERVICE_ACCOUNT = "service_account"  # noqa: S105
 TOKEN_SOURCE_USER_KEY = "user_key"  # noqa: S105
 
 
 def effective_token_source():
-    """Where the browser's Studio token comes from, once the kill switch is
-    applied: ``LINTO_STUDIO_TOKEN_SOURCE``, forced to the service account when
+    """Where the backend's Studio credential comes from, once the kill switch
+    is applied: ``LINTO_STUDIO_TOKEN_SOURCE``, forced to the service account when
     the per-user feature system is off (``LINTO_ENTITLEMENTS_ENABLED=False``)."""
     if not settings.LINTO_ENTITLEMENTS_ENABLED:
         return TOKEN_SOURCE_SERVICE_ACCOUNT
@@ -76,9 +61,10 @@ ROOM_METADATA_STARTER_KEY = "linto_transcription_started_by"
 
 # Studio identity of the RUNNING session, broadcast the same way so a LATE
 # JOINER can fetch the transcript so far (catch-up) without ever having seen the
-# start: the browser reads these keys, calls studio-api for the finalized
-# captions and the "before you arrived" summary. They expose nothing that
-# ``GET /rooms/{id}/`` does not already return in ``configuration["linto"]``.
+# start: the browser reads these keys, calls studio-api's public session routes
+# for the finalized captions and the "before you arrived" summary. They expose
+# nothing that ``GET /rooms/{id}/`` does not already return in
+# ``configuration["linto"]``.
 ROOM_METADATA_SESSION_ID_KEY = "linto_transcription_session_id"
 ROOM_METADATA_CHANNEL_ID_KEY = "linto_transcription_channel_id"
 ROOM_METADATA_CHANNEL_INDEX_KEY = "linto_transcription_channel_index"
@@ -92,7 +78,7 @@ ROOM_METADATA_CATCHUP_KEY = "linto_transcription_catchup"
 # a LiveKit recording, since the audio ends up in Twake Drive; "0" = text only.
 ROOM_METADATA_KEEP_AUDIO_KEY = "linto_transcription_keep_audio"
 
-# A Meet room drives ONE quickMeeting channel, always at index 0 — the index (not
+# A Meet room drives ONE session channel, always at index 0 — the index (not
 # the channel id) is what namespaces the bot's segment ids
 # (``linto:<sessionId>,<channelIndex>:<segmentId>``), so the catch-up history can
 # be keyed exactly like the live feed.
@@ -201,7 +187,7 @@ class StudioRefusedError(BotTranscriptionException):
 
 
 class BotTranscriptionService:
-    """Start/stop/poll a Studio quick-meeting bot for a Meet room."""
+    """Start/stop a Meet room's Studio live session and its bot."""
 
     def __init__(self):
         self.studio_base = (settings.LINTO_STUDIO_BASE_URL or "").rstrip("/")
@@ -247,8 +233,8 @@ class BotTranscriptionService:
     def resolve_conversation_id(self, org_id, session_id, name):
         """Find the Studio conversation finalized for a stopped quick session.
 
-        After ``stop_bot`` DELETEs the quickMeeting with a unique ``&name=``,
-        Studio's ``storeQuickMeetingFromStop`` stores a conversation under that
+        After :meth:`stop` DELETEs the session with a unique ``&name=``,
+        Studio's ``storeSessionFromStop`` stores a conversation under that
         name. We look it up by name and confirm it via
         ``type.from_session_id == session_id`` (falling back to the exact name).
         Returns the conversation id, or ``None`` if not found yet / on error
@@ -832,45 +818,11 @@ class BotTranscriptionService:
         logger.info("LinTO run stopped for room %s (summary=%s)", room.id, summary)
         return {"status": "stopped"}
 
-    # ── Browser-first lifecycle hooks ────────────────────────────────────
-    # In the browser-first model the FRONTEND owns the Studio control plane via
-    # the JS SDK (as the real user): it creates the quickMeeting, chooses the
-    # profile/translations, and starts/stops the bot. The Meet backend only does
-    # what the browser cannot: mint the LiveKit bot join token (needs Meet's
-    # LiveKit secret), gate on the organizer's permissions, drive the room-wide
-    # banner + native-subtitle takeover, the optional video egress, and the
-    # autonomous post-meeting summary. Room state lives in
-    # ``room.configuration["linto"]`` exactly as before.
-
-    def prepare(self, room, channel_id, user=None):
-        """Gate + mint the native bot join token for a browser-launched session.
-
-        Enforces the organizer's ``transcript_permission`` (raises
-        :class:`PermissionDeniedError`), stops the native subtitle agent on
-        takeover, and returns the room-scoped LiveKit join token the browser
-        injects into ``session.meta.native`` before starting the bot. No state is
-        persisted yet (the session may still fail to start browser-side).
-        """
-        if not self._has_recording_permission(
-            room, user, models.RecordingModeChoices.TRANSCRIPT
-        ):
-            raise PermissionDeniedError(
-                "the organizer restricts transcription to administrators/owners"
-            )
-        # LinTO takes over the captions: stop the native subtitle agent (if any).
-        self._stop_native_subtitles(room)
-        token = generate_bot_join_token(str(room.id), str(channel_id))
-        return {
-            "token": token,
-            "livekit_url": settings.LINTO_NATIVE_LIVEKIT_URL,
-            "room": str(room.id),
-        }
-
     def mark_started(self, room, data, user=None):
-        """Record a browser-started run and light the room-wide state.
+        """Record a started run and light the room-wide state.
 
-        ``data`` carries the Studio ids the browser obtained via the SDK
-        (``session_id``, ``channel_id``, ``org_id``, ``bot_id``) plus the add-ons
+        ``data`` carries the Studio ids :meth:`start` obtained (``session_id``,
+        ``channel_id``, ``org_id``, ``bot_id``) plus the add-ons
         (``summary`` default True, ``summary_service`` the chosen summary
         service route, ``record`` default False, ``catchup`` default True = a
         late joiner gets the "before you arrived" summary, ``keep_audio`` the
@@ -889,10 +841,10 @@ class BotTranscriptionService:
         summary = bool(data.get("summary", True))
         catchup = bool(data.get("catchup", True))
         record = bool(data.get("record", False))
-        # The run keeps the meeting audio when the browser created the channel
-        # with keepAudio, or when the instance keeps it (LINTO_LIVE_KEEP_AUDIO,
-        # which the panel follows). It drives the recording indicator every
-        # participant sees, so it errs on the side of showing.
+        # The run keeps the meeting audio when its channel was created with
+        # keepAudio, which follows the instance (LINTO_LIVE_KEEP_AUDIO). It
+        # drives the recording indicator every participant sees, so it errs on
+        # the side of showing.
         keep_audio = bool(
             settings.LINTO_LIVE_KEEP_AUDIO or data.get("keep_audio") is True
         )
@@ -964,91 +916,12 @@ class BotTranscriptionService:
         )
         return {"status": "running", **linto}
 
-    def mark_stopped(
-        self,
-        room,
-        data=None,
-        user=None,
-        enforce_permission=True,
-        force_studio_delete=False,
-    ):
-        """Clear a run: banner off, stop egress, enqueue the delivery, drop state.
-
-        The STARTER's browser has already stopped the bot + quick session via the
-        SDK (and passes the ``conversation_name`` it used on the DELETE). When the
-        stopper is NOT the starter (an admin stopping someone else's run) or on
-        teardown (``force_studio_delete``), the run holds no browser-side SDK
-        session, so we service-account-delete the Studio bot + quick session here
-        instead. Who may stop: the STARTER or a room admin/owner. Idempotent.
-        """
-        data = data or {}
-        linto = (room.configuration or {}).get("linto")
-        if not linto:
-            return {"status": "idle"}
-        is_starter = False
-        if enforce_permission:
-            self._check_may_stop(room, linto, user)
-            starter_id = linto.get("user_id")
-            is_starter = bool(
-                user is not None
-                and getattr(user, "is_authenticated", False)
-                and starter_id
-                and str(user.id) == str(starter_id)
-            )
-        # The browser passes the unique name it used on the quickMeeting DELETE;
-        # fall back to a deterministic one if absent (keeps the task resolvable).
-        conversation_name = data.get("conversation_name") or (
-            f"linto-{room.id}-{int(time.time())}"
-        )
-        # The starter tore the run down browser-side; anyone else (or teardown)
-        # did not, so stop the Studio bot + session under the service account.
-        if force_studio_delete or not is_starter:
-            self._delete_studio_session(linto, conversation_name)
-        return self._close_run(room, linto, conversation_name)
-
-    def _delete_studio_session(self, linto, conversation_name):
-        """SERVICE-ACCOUNT delete of the Studio bot + quick session in ``linto``.
-
-        Best-effort and idempotent (a 404 from an already-stopped run is fine).
-        Used when the caller cannot stop the run browser-side via the SDK: an
-        admin stopping someone else's run, or the ``room_finished`` teardown.
-        ``conversation_name`` is passed to the quickMeeting DELETE so the summary
-        task can still resolve the finalized conversation.
-        """
-        org_id = linto.get("org_id")
-        session_id = linto.get("session_id")
-        bot_id = linto.get("bot_id")
-        if not (org_id and (bot_id or session_id)):
-            return
-        try:
-            headers = self._headers()
-            if bot_id is not None:
-                requests.delete(
-                    f"{self.studio_base}/api/organizations/{org_id}/bots/{bot_id}",
-                    headers=headers,
-                    timeout=DEFAULT_TIMEOUT,
-                )
-            if session_id:
-                requests.delete(
-                    f"{self.studio_base}/api/organizations/{org_id}/quickMeeting/{session_id}",
-                    headers=headers,
-                    params={"force": "true", "name": conversation_name},
-                    timeout=DEFAULT_TIMEOUT,
-                )
-        except (requests.RequestException, BotTranscriptionException) as exc:
-            logger.warning("LinTO service-account session delete: %s", exc)
-
     def teardown(self, room):
-        """Best-effort cleanup when a room ends with a run still active.
-
-        The browser may have closed without stopping. Delegates to
-        ``mark_stopped`` (no permission gate), which service-account-deletes the
-        Studio bot + quick session, clears the banner/egress and enqueues the
-        summary.
-        """
+        """Best-effort cleanup when a room ends with a run still active:
+        :meth:`stop` without the permission gate."""
         if not (room.configuration or {}).get("linto"):
             return
-        self.mark_stopped(room, {}, enforce_permission=False, force_studio_delete=True)
+        self.stop(room, enforce_permission=False)
 
     def _enqueue_summary(self, room):
         try:
@@ -1195,31 +1068,26 @@ class BotTranscriptionService:
         )
         return languages
 
-    # ── Studio token for the browser SDK (identity bridge) ───────────────
+    # ── Studio token of the backend (identity bridge) ────────────────────
     def studio_token_for(self, user):
-        """The Studio JWT + context the browser SDK acts with, for ``user``.
+        """The Studio JWT + organization the backend acts with for ``user``.
 
-        The Meet backend is the identity bridge between the meeting and LinTO:
-        it knows the participant (``sub``/``email`` from the LiveKit room token)
-        and hands the browser a Studio token from ``LINTO_STUDIO_TOKEN_SOURCE``:
+        From ``LINTO_STUDIO_TOKEN_SOURCE``:
 
         - ``service_account`` — the shared service account, acting in
-          ``LINTO_STUDIO_DEFAULT_ORG_ID`` (or its first organization). One Studio
-          identity for the whole instance ⇒ one live transcription at a time.
+          ``LINTO_STUDIO_DEFAULT_ORG_ID`` (or its first organization).
         - ``user_key`` — the user's OWN LinTO API key, through the studio-api
           identity exchange (``POST /api/auth/external/token``); the
-          organization is the key's. No per-instance limit.
+          organization is the key's.
 
         With the per-user feature system switched off
         (``LINTO_ENTITLEMENTS_ENABLED=False``) the token always comes from the
         service account: there is no per-user key without an entitlement.
 
-        Returns ``{"enabled": True, "token", "base_url", "organization_id",
-        "expires_in", "capabilities"}``, or ``{"enabled": False, "reason"}`` when
-        the option is not active for this user. Raises
-        :class:`BotTranscriptionException` on misconfiguration / Studio failure.
-        The browser never receives a long-lived key: ``expires_in`` (seconds,
-        ``None`` = unknown) lets it refresh before expiry.
+        Returns ``{"enabled": True, "token", "organization_id",
+        "capabilities"}``, or ``{"enabled": False, "reason"}`` when the option
+        is not active for this user. Raises :class:`BotTranscriptionException`
+        on misconfiguration / Studio failure.
         """
         source = effective_token_source()
         if source == TOKEN_SOURCE_SERVICE_ACCOUNT:
@@ -1231,18 +1099,13 @@ class BotTranscriptionService:
             f"(expected {TOKEN_SOURCE_SERVICE_ACCOUNT!r} or {TOKEN_SOURCE_USER_KEY!r})"
         )
 
-    def _browser_base(self):
-        return settings.LINTO_STUDIO_BROWSER_API_URL or settings.LINTO_STUDIO_BASE_URL
-
     def _service_account_token(self):
         token = self._login()
         headers = {"Authorization": f"Bearer {token}"}
         return {
             "enabled": True,
             "token": token,
-            "base_url": self._browser_base(),
             "organization_id": self._service_account_org(headers),
-            "expires_in": jwt_seconds_left(token),
             "capabilities": {"quickMeeting": True},
         }
 
@@ -1330,7 +1193,6 @@ class BotTranscriptionService:
             result = {
                 "enabled": True,
                 "token": data["token"],
-                "base_url": self._browser_base(),
                 "organization_id": data.get("organizationId"),
                 "expires_in": expires_in,
                 "capabilities": data.get("capabilities") or {"quickMeeting": True},
@@ -1362,21 +1224,3 @@ class BotTranscriptionService:
     def forget_user_token(self, user):
         """Drop a user's cached exchange result (e.g. after a revocation)."""
         cache.delete(self._user_token_cache_key(user))
-
-
-def jwt_seconds_left(token):
-    """Seconds until ``token`` (a JWT) expires, ``None`` if unknown.
-
-    Reads the unverified payload only — the token was minted by Studio and is
-    handed back to the browser as-is; this is purely a refresh hint.
-    """
-    try:
-        payload_b64 = token.split(".")[1]
-        payload_b64 += "=" * (-len(payload_b64) % 4)
-        payload = json.loads(base64.urlsafe_b64decode(payload_b64))
-        exp = payload.get("exp")
-    except (AttributeError, IndexError, ValueError, TypeError):
-        return None
-    if not isinstance(exp, (int, float)):
-        return None
-    return max(0, int(exp - time.time()))

@@ -24,6 +24,7 @@
     "errors": {
       "noProfile": "Aucun profil de transcription n'est configuré pour votre organisation. Demandez à un administrateur d'en créer un.",
       "generic": "La transcription n'a pas pu démarrer. Réessayez.",
+      "studioRefused": "LinTO a refusé de démarrer la transcription : votre organisation LinTO n'y a pas droit (abonnement, rôle ou permissions). Contactez votre administrateur LinTO.",
       "retry": "Réessayer"
     },
     "live": {

@@ -1128,8 +1128,8 @@ class Base(Configuration):
     )
 
     # ── LinTO live transcription (in-meeting "LinTO" tool) ───────────────────
-    # The Meet backend drives a Studio quick-meeting bot exactly as the Studio UI
-    # does (POST /api/organizations/{org}/quickMeeting + /bots): the native LinTO
+    # The Meet backend drives the room's own Studio session and its bot
+    # (POST /api/organizations/{org}/sessions/ + /bots): the native LinTO
     # visio bot joins the LiveKit room, transcribes live and republishes the
     # captions into the room as LiveKit transcription segments; a finalized Studio
     # conversation + LLM summary is produced on stop. Reuses LINTO_STUDIO_BASE_URL
@@ -1164,9 +1164,10 @@ class Base(Configuration):
     LINTO_LIVE_KEEP_AUDIO = values.BooleanValue(
         True, environ_name="LINTO_LIVE_KEEP_AUDIO", environ_prefix=None
     )
-    # Service auth to Studio (org-scoped quickMeeting/bots need BOT+MICROPHONE
-    # rights). Set LINTO_STUDIO_AUTH_EMAIL/PASSWORD to a dedicated service account,
-    # or rely on a static LINTO_STUDIO_API_TOKEN carrying those rights (fallback).
+    # Service auth to Studio (live sessions and bots need the Meeting Manager
+    # role, and the SESSION and BOT permissions on the organization). Set
+    # LINTO_STUDIO_AUTH_EMAIL/PASSWORD to a dedicated service account, or rely
+    # on a static LINTO_STUDIO_API_TOKEN carrying those rights (fallback).
     LINTO_STUDIO_AUTH_EMAIL = values.Value(
         "", environ_name="LINTO_STUDIO_AUTH_EMAIL", environ_prefix=None
     )
@@ -1179,24 +1180,22 @@ class Base(Configuration):
     LINTO_STUDIO_DEFAULT_ORG_ID = values.Value(
         "", environ_name="LINTO_STUDIO_DEFAULT_ORG_ID", environ_prefix=None
     )
-    # Pinned quickMeeting ASR profile; empty → the first available profile.
+    # Pinned live ASR profile; empty → the first available profile.
     LINTO_STUDIO_DEFAULT_PROFILE_ID = values.Value(
         "", environ_name="LINTO_STUDIO_DEFAULT_PROFILE_ID", environ_prefix=None
     )
-    # ── Browser-first live transcription (SDK + user identity) ───────────────
-    # Browser-facing studio-api base URL the LinTO JS SDK talks to (the user's own
-    # token; NOT the internal LINTO_STUDIO_BASE_URL). Surfaced in the frontend
-    # config. e.g. dev "http://127.0.0.1.nip.io:38001", prod ".../cm-api".
+    # ── Live transcription: browser-facing Studio + Studio identity ─────────
+    # Browser-facing studio-api base URL of the public session routes the late
+    # joiners read (no credential; NOT the internal LINTO_STUDIO_BASE_URL).
+    # Surfaced in the frontend config. e.g. dev "http://127.0.0.1.nip.io:38001",
+    # prod ".../cm-api".
     LINTO_STUDIO_BROWSER_API_URL = values.Value(
         "", environ_name="LINTO_STUDIO_BROWSER_API_URL", environ_prefix=None
     )
-    # Where GET rooms/{id}/linto/studio-token gets the Studio JWT it hands the
-    # browser SDK. The Meet backend is the identity bridge: it knows the
-    # participant from the LiveKit room token and never exposes a long-lived key.
+    # The Studio identity the backend acts with for a live run; it never leaves
+    # the server.
     #  - "service_account": the shared service account (LINTO_STUDIO_AUTH_EMAIL/
-    #    PASSWORD or LINTO_STUDIO_API_TOKEN) in LINTO_STUDIO_DEFAULT_ORG_ID. ONE
-    #    Studio identity for the whole instance ⇒ ONE live transcription at a
-    #    time (Studio allows a single active quickMeeting per identity).
+    #    PASSWORD or LINTO_STUDIO_API_TOKEN) in LINTO_STUDIO_DEFAULT_ORG_ID.
     #  - "user_key": exchange the user's identity (sub, email) for a short-lived
     #    token of the user's OWN LinTO API key (POST /api/auth/external/token on
     #    studio-api, authenticated with the integration credential). Users

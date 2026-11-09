@@ -958,10 +958,9 @@ class RoomViewSet(  # pylint: disable=too-many-public-methods
             {"status": "success"}, status=drf_status.HTTP_200_OK
         )
 
-    # ── LinTO live transcription (fork), browser-first ──────────────────────
-    # The FRONTEND drives Studio via the JS SDK as the user; these endpoints only
-    # do what the browser cannot: mint the LiveKit bot join token, gate on the
-    # organizer's permissions, and drive the banner/egress/summary lifecycle.
+    # ── LinTO live transcription (fork) ─────────────────────────────────────
+    # The backend drives Studio with its own credential; the panel only asks
+    # for a start or a stop.
     @decorators.action(
         detail=True,
         methods=["get"],
@@ -1051,106 +1050,6 @@ class RoomViewSet(  # pylint: disable=too-many-public-methods
 
     @decorators.action(
         detail=True,
-        methods=["post"],
-        url_path="linto/prepare",
-        permission_classes=[permissions.HasLiveKitRoomAccess],
-        authentication_classes=[LiveKitTokenAuthentication],
-    )
-    @FeatureFlag.require("linto")
-    def linto_prepare(self, request, pk=None):  # pylint: disable=unused-argument
-        """Gate the run + mint the native bot join token for a channel.
-
-        Body: ``{channel_id}``. Enforces transcript_permission, stops the native
-        subtitle agent, returns ``{token, livekit_url, room}`` the browser injects
-        into the Studio session meta before starting the bot.
-        """
-        room = self.get_object()
-        channel_id = request.data.get("channel_id")
-        if not channel_id:
-            return drf_response.Response(
-                {"error": "channel_id is required"},
-                status=drf_status.HTTP_400_BAD_REQUEST,
-            )
-        try:
-            result = BotTranscriptionService().prepare(
-                room, channel_id, user=request.user
-            )
-        except PermissionDeniedError as exc:
-            return drf_response.Response(
-                {"error": str(exc), "code": "permission_denied"},
-                status=drf_status.HTTP_403_FORBIDDEN,
-            )
-        except BotTranscriptionException as exc:
-            logger.exception("LinTO prepare failed for room %s", room.id)
-            return drf_response.Response(
-                {"error": str(exc)}, status=drf_status.HTTP_502_BAD_GATEWAY
-            )
-        return drf_response.Response(result, status=drf_status.HTTP_200_OK)
-
-    @decorators.action(
-        detail=True,
-        methods=["post"],
-        url_path="linto/started",
-        permission_classes=[permissions.HasLiveKitRoomAccess],
-        authentication_classes=[LiveKitTokenAuthentication],
-    )
-    @FeatureFlag.require("linto")
-    def linto_started(self, request, pk=None):  # pylint: disable=unused-argument
-        """Record a browser-started run + light the room-wide state.
-
-        Body: ``{session_id, channel_id, org_id, bot_id, summary?, record?,
-        catchup?, keep_audio?}``.
-        """
-        room = self.get_object()
-        try:
-            result = BotTranscriptionService().mark_started(
-                room, request.data, user=request.user
-            )
-        except PermissionDeniedError as exc:
-            return drf_response.Response(
-                {"error": str(exc), "code": "permission_denied"},
-                status=drf_status.HTTP_403_FORBIDDEN,
-            )
-        except BotTranscriptionException as exc:
-            logger.exception("LinTO started failed for room %s", room.id)
-            return drf_response.Response(
-                {"error": str(exc)}, status=drf_status.HTTP_502_BAD_GATEWAY
-            )
-        return drf_response.Response(result, status=drf_status.HTTP_200_OK)
-
-    @decorators.action(
-        detail=True,
-        methods=["post"],
-        url_path="linto/stopped",
-        permission_classes=[permissions.HasLiveKitRoomAccess],
-        authentication_classes=[LiveKitTokenAuthentication],
-    )
-    @FeatureFlag.require("linto")
-    def linto_stopped(self, request, pk=None):  # pylint: disable=unused-argument
-        """Clear a run (banner off, egress stop, enqueue summary).
-
-        Body: ``{conversation_name?}`` — the unique name the browser used on the
-        quickMeeting DELETE so the summary task can resolve the conversation.
-        """
-        room = self.get_object()
-        try:
-            result = BotTranscriptionService().mark_stopped(
-                room, request.data, user=request.user
-            )
-        except PermissionDeniedError as exc:
-            return drf_response.Response(
-                {"error": str(exc), "code": "permission_denied"},
-                status=drf_status.HTTP_403_FORBIDDEN,
-            )
-        except BotTranscriptionException as exc:
-            logger.exception("LinTO stopped failed for room %s", room.id)
-            return drf_response.Response(
-                {"error": str(exc)}, status=drf_status.HTTP_502_BAD_GATEWAY
-            )
-        return drf_response.Response(result, status=drf_status.HTTP_200_OK)
-
-    @decorators.action(
-        detail=True,
         methods=["get"],
         url_path="linto/summary-services",
         permission_classes=[permissions.HasLiveKitRoomAccess],
@@ -1188,44 +1087,6 @@ class RoomViewSet(  # pylint: disable=too-many-public-methods
         return drf_response.Response(
             {"languages": languages}, status=drf_status.HTTP_200_OK
         )
-
-    @decorators.action(
-        detail=True,
-        methods=["get"],
-        url_path="linto/studio-token",
-        permission_classes=[permissions.HasLiveKitRoomAccess],
-        authentication_classes=[LiveKitTokenAuthentication],
-    )
-    @FeatureFlag.require("linto")
-    def linto_studio_token(self, request, pk=None):  # pylint: disable=unused-argument
-        """The Studio JWT + context the browser SDK acts with, for the caller.
-
-        The Meet backend is the identity bridge: it knows the participant from
-        the LiveKit room token and hands the browser a Studio token from the
-        configured source (``LINTO_STUDIO_TOKEN_SOURCE``: the shared service
-        account, or the user's OWN LinTO key via the studio-api identity
-        exchange), plus the organization to act in. ``{"enabled": false,
-        "reason": ...}`` (200) means the option is not active for this user.
-        Anonymous guests have no identity to bridge → 403 ``anonymous`` (they
-        can still read a running transcript through the public routes).
-        """
-        self.get_object()  # room access check
-        user = request.user
-        if user is None or not getattr(user, "is_authenticated", False):
-            return drf_response.Response(
-                {
-                    "code": "anonymous",
-                    "error": "anonymous participants have no LinTO identity",
-                },
-                status=drf_status.HTTP_403_FORBIDDEN,
-            )
-        try:
-            result = BotTranscriptionService().studio_token_for(user)
-        except BotTranscriptionException as exc:
-            return drf_response.Response(
-                {"error": str(exc)}, status=drf_status.HTTP_502_BAD_GATEWAY
-            )
-        return drf_response.Response(result, status=drf_status.HTTP_200_OK)
 
     @decorators.action(
         detail=True,

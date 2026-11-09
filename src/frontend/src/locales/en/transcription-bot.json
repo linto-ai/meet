@@ -24,6 +24,7 @@
     "errors": {
       "noProfile": "No transcription profile is set up for your organization. Ask an administrator to create one.",
       "generic": "The transcription could not start. Try again.",
+      "studioRefused": "LinTO refused to start the transcription: your LinTO organization is not allowed to (subscription, role or permissions). Contact your LinTO administrator.",
       "retry": "Try again"
     },
     "live": {
