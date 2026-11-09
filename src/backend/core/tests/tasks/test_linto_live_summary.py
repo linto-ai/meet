@@ -20,7 +20,11 @@ import aiohttp
 import pytest
 
 from core import factories, models
-from core.services.bot_transcription import BotTranscriptionService
+from core.services.bot_transcription import (
+    BotTranscriptionException,
+    BotTranscriptionService,
+    StudioAudioNotReady,
+)
 from core.services.twake_drive import (
     build_linto_shortcut_filename,
     build_recording_filename,
@@ -70,8 +74,11 @@ def no_twake(settings):
 
 @pytest.fixture
 def fast_resolve():
-    """No sleep between conversation-resolution re-queries."""
-    with mock.patch.object(linto_task, "_CONV_RESOLVE_DELAY", 0):
+    """No sleep between conversation-resolution re-queries and audio checks."""
+    with (
+        mock.patch.object(linto_task, "_CONV_RESOLVE_DELAY", 0),
+        mock.patch.object(linto_task, "_AUDIO_READY_DELAY", 0),
+    ):
         yield
 
 
@@ -131,6 +138,8 @@ def _patch_service(stack, *, conversation_id="conv-1", owner=None):
     service._login.return_value = "fresh-token"
     service.resolve_conversation_id.return_value = conversation_id
     service._room_owner.return_value = owner
+    # No audio kept by default (a run started without keepAudio).
+    service.conversation_audio_size.return_value = None
     return service
 
 
@@ -449,54 +458,88 @@ class TestNoRecipient:
         assert "linto_summary" not in room.configuration
 
 
-class TestTwakeTextOnly:
-    """The live path pushes transcript/summary/document but NO media bytes."""
+def _patch_twake(stack):
+    """Twake Drive reachable; return the ``save_file`` mock."""
+    stack.enter_context(
+        mock.patch(
+            "core.services.twake_drive.get_drive_token",
+            mock.AsyncMock(return_value="drive-token"),
+        )
+    )
+    stack.enter_context(
+        mock.patch(
+            "core.services.twake_drive.ensure_meeting_directory",
+            mock.AsyncMock(return_value="dir-1"),
+        )
+    )
+    save_file = stack.enter_context(
+        mock.patch("core.services.twake_drive.save_file", mock.AsyncMock())
+    )
+    stack.enter_context(
+        mock.patch(
+            "core.services.twake_drive.build_drive_link",
+            return_value="http://drive.test/dir-1",
+        )
+    )
+    return save_file
 
-    def test_twake_upload_is_text_only(self, no_twake, fast_resolve):
-        """Transcript/summary/shortcut/document are pushed, never Enregistrement_*."""
+
+class TestTwakeLiveAudio:
+    """The live path pushes transcript, shortcut and document, plus the meeting
+    audio Studio kept as an OGG when there is one; the audio never blocks the
+    rest of the delivery."""
+
+    STOPPED_AT = "2026-09-23T05:53:57+00:00"
+
+    @pytest.fixture
+    def twake_on(self, no_twake):
         no_twake.CLOUDERY_URL = "http://cloudery.test"
         no_twake.CLOUDERY_TOKEN = "tok"
         no_twake.LINTO_STUDIO_FRONTEND_URL = "http://studio-front.test"
+        return no_twake
+
+    def _run(self, *, audio_size=None, audio=None, convert=None):
+        """Run the delivery with the given Studio audio answers; return
+        (room, recipient, service, convert mock, save_file mock, marked)."""
         recipient = factories.UserFactory(
             sub="starter-sub", email="starter@example.com"
         )
-        stopped_at = "2026-09-23T05:53:57+00:00"
-        room = _make_room({**PAYLOAD, "stopped_at": stopped_at}, recipient=recipient)
-
+        room = _make_room(
+            {**PAYLOAD, "stopped_at": self.STOPPED_AT}, recipient=recipient
+        )
         with contextlib.ExitStack() as stack:
             _patch_sdk(stack)
-            _patch_service(stack)
-            stack.enter_context(
-                mock.patch(
-                    "core.services.twake_drive.get_drive_token",
-                    mock.AsyncMock(return_value="drive-token"),
+            service = _patch_service(stack)
+            if isinstance(audio_size, (list, Exception)):
+                service.conversation_audio_size.side_effect = audio_size
+            else:
+                service.conversation_audio_size.return_value = audio_size
+            if isinstance(audio, Exception):
+                service.fetch_conversation_audio.side_effect = audio
+            else:
+                service.fetch_conversation_audio.return_value = audio
+            convert_mock = stack.enter_context(
+                mock.patch.object(
+                    linto_task,
+                    "extract_audio_from_video",
+                    side_effect=convert if convert is not None else [b"OggS-audio"],
                 )
             )
-            stack.enter_context(
-                mock.patch(
-                    "core.services.twake_drive.ensure_meeting_directory",
-                    mock.AsyncMock(return_value="dir-1"),
-                )
-            )
-            save_file = stack.enter_context(
-                mock.patch("core.services.twake_drive.save_file", mock.AsyncMock())
-            )
-            stack.enter_context(
-                mock.patch(
-                    "core.services.twake_drive.build_drive_link",
-                    return_value="http://drive.test/dir-1",
-                )
-            )
+            save_file = _patch_twake(stack)
             marked = _spy_checkpoints(stack)
             linto_task._process_bot_live_summary_sync(str(room.id))
+        return room, recipient, service, convert_mock, save_file, marked
 
-        # Names follow the Twake Drive convention in the recipient's language
-        # (core.services.twake_drive builders): the transcript note, the LinTO
-        # shortcut and the published document — no recording bytes, no summary
-        # note.
-        meeting = SimpleNamespace(
-            created_at=datetime.fromisoformat(stopped_at), room=room
+    def _meeting(self, room):
+        return SimpleNamespace(
+            created_at=datetime.fromisoformat(self.STOPPED_AT), room=room
         )
+
+    def _assert_text_delivered(self, room, recipient, save_file, marked):
+        """Transcript note, LinTO shortcut and document reached Twake Drive in
+        the recipient's language, the step is checkpointed and the email
+        links the folder."""
+        meeting = self._meeting(room)
         lang = recipient.language
         filenames = [c.kwargs["filename"] for c in save_file.await_args_list]
         assert build_transcript_filename(meeting, lang) in filenames
@@ -505,17 +548,120 @@ class TestTwakeTextOnly:
         assert build_transcript_document_filename(meeting, "docx", lang) in filenames
         assert build_summary_filename(meeting, "docx", lang) not in filenames
         assert build_recording_filename(meeting, "mp4", lang) not in filenames
-        assert build_recording_filename(meeting, "ogg", lang) not in filenames
-        assert not any(f.endswith((".mp4", ".ogg")) for f in filenames)
-        assert len(filenames) == 3
         assert marked == ["tag", "move", "document", "share", "twake", "email"]
-
         # With a drive link the email carries the link instead of the attachment.
         assert len(mail.outbox) == 1
         assert mail.outbox[0].attachments == []
         assert "http://drive.test/dir-1" in mail.outbox[0].body
         room.refresh_from_db()
         assert "linto_summary" not in room.configuration
+        return filenames
+
+    def test_the_meeting_audio_is_uploaded_as_ogg(self, twake_on, fast_resolve):
+        """Studio's MP3 is converted and pushed as ``{date} - Recording.ogg``."""
+        room, recipient, service, convert, save_file, marked = self._run(
+            audio_size=[2048, 2048], audio=b"ID3-mp3"
+        )
+        filenames = self._assert_text_delivered(room, recipient, save_file, marked)
+        ogg_name = build_recording_filename(
+            self._meeting(room), "ogg", recipient.language
+        )
+        assert ogg_name in filenames
+        assert len(filenames) == 4
+        (ogg_call,) = [
+            c for c in save_file.await_args_list if c.kwargs["filename"] == ogg_name
+        ]
+        assert ogg_call.kwargs["content"] == b"OggS-audio"
+        assert ogg_call.kwargs["content_type"] == "audio/ogg"
+        service.fetch_conversation_audio.assert_called_once_with("conv-1")
+        convert.assert_called_once_with(
+            b"ID3-mp3", output_format="ogg", input_suffix=".mp3"
+        )
+
+    def test_a_file_still_written_is_awaited(self, twake_on, fast_resolve):
+        """404 then a growing size: the download waits for a stable size."""
+        room, recipient, service, _, save_file, marked = self._run(
+            audio_size=[StudioAudioNotReady("404"), 100, 900, 900],
+            audio=b"ID3-mp3",
+        )
+        filenames = self._assert_text_delivered(room, recipient, save_file, marked)
+        assert service.conversation_audio_size.call_count == 4
+        service.fetch_conversation_audio.assert_called_once_with("conv-1")
+        assert len(filenames) == 4
+
+    def test_no_audio_kept_is_text_only(self, twake_on, fast_resolve):
+        """A run without keepAudio: nothing downloaded, the text goes out."""
+        room, recipient, service, convert, save_file, marked = self._run(
+            audio_size=None
+        )
+        filenames = self._assert_text_delivered(room, recipient, save_file, marked)
+        assert not any(f.endswith((".mp4", ".ogg")) for f in filenames)
+        assert len(filenames) == 3
+        service.fetch_conversation_audio.assert_not_called()
+        convert.assert_not_called()
+
+    def test_audio_never_ready_still_delivers_the_text(self, twake_on, fast_resolve):
+        """A file that never shows up is given up after the checks."""
+        with mock.patch.object(linto_task, "_AUDIO_READY_ATTEMPTS", 3):
+            room, recipient, service, convert, save_file, marked = self._run(
+                audio_size=StudioAudioNotReady("404")
+            )
+        filenames = self._assert_text_delivered(room, recipient, save_file, marked)
+        assert len(filenames) == 3
+        assert service.conversation_audio_size.call_count == 3
+        service.fetch_conversation_audio.assert_not_called()
+        convert.assert_not_called()
+
+    def test_audio_download_failure_still_delivers_the_text(
+        self, twake_on, fast_resolve
+    ):
+        """Studio failing on the download: no OGG, nothing else lost."""
+        room, recipient, _, convert, save_file, marked = self._run(
+            audio_size=-1, audio=BotTranscriptionException("500")
+        )
+        filenames = self._assert_text_delivered(room, recipient, save_file, marked)
+        assert len(filenames) == 3
+        convert.assert_not_called()
+
+    def test_audio_conversion_failure_still_delivers_the_text(
+        self, twake_on, fast_resolve
+    ):
+        """ffmpeg failing on the file: no OGG, nothing else lost."""
+        room, recipient, _, _, save_file, marked = self._run(
+            audio_size=-1, audio=b"garbage", convert=RuntimeError("ffmpeg")
+        )
+        filenames = self._assert_text_delivered(room, recipient, save_file, marked)
+        assert len(filenames) == 3
+
+    def test_a_resumed_delivery_does_not_fetch_the_audio_again(
+        self, twake_on, fast_resolve
+    ):
+        """Twake Drive checkpointed by a previous attempt: no new download."""
+        recipient = factories.UserFactory(email="starter@example.com")
+        room = _make_room(
+            {
+                **PAYLOAD,
+                "stopped_at": self.STOPPED_AT,
+                "conversation_id": "conv-1",
+                "steps": {
+                    "tag": True,
+                    "move": True,
+                    "document": True,
+                    "share": True,
+                    "twake": "http://drive.test/dir-1",
+                },
+            },
+            recipient=recipient,
+        )
+        with contextlib.ExitStack() as stack:
+            _patch_sdk(stack)
+            service = _patch_service(stack)
+            save_file = _patch_twake(stack)
+            linto_task._process_bot_live_summary_sync(str(room.id))
+        service.conversation_audio_size.assert_not_called()
+        service.fetch_conversation_audio.assert_not_called()
+        save_file.assert_not_called()
+        assert "http://drive.test/dir-1" in mail.outbox[0].body
 
 
 class TestDeliveryWithoutSummary:

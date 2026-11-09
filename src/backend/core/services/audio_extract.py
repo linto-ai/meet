@@ -18,11 +18,15 @@ CODEC_MAP = {
 COPY_FORMAT = "copy"
 
 
-def extract_audio_from_video(video_bytes: bytes, output_format: str = "ogg") -> bytes:
+def extract_audio_from_video(
+    video_bytes: bytes, output_format: str = "ogg", input_suffix: str = ".mp4"
+) -> bytes:
     """Extract audio track from a video and return the audio bytes.
 
     Writes video_bytes to a temp file, runs ffmpeg to extract the audio
     stream to the requested format, reads back and returns the audio bytes.
+    The input may also be an audio file (``input_suffix`` names its container,
+    e.g. ``".mp3"``): the same call then converts it.
     When ``output_format`` is ``"copy"``, the original audio stream is
     demuxed into an .m4a container without re-encoding — faster and
     lossless, suitable when the downstream consumer can decode whatever
@@ -42,7 +46,7 @@ def extract_audio_from_video(video_bytes: bytes, output_format: str = "ogg") -> 
     else:
         raise ValueError(f"Unsupported output_format: {output_format}")
 
-    input_file = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+    input_file = tempfile.NamedTemporaryFile(suffix=input_suffix, delete=False)
     input_path = input_file.name
     try:
         input_file.write(video_bytes)

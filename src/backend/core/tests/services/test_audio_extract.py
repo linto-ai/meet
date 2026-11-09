@@ -93,3 +93,22 @@ class TestExtractAudioFromVideo:
         assert "ipod" in captured["cmd"]
         assert captured["cmd"][-1].endswith(".m4a")
         assert "-acodec" not in captured["cmd"]
+
+    def test_audio_input_keeps_its_container_suffix(self, monkeypatch):
+        """An MP3 converted to OGG is written with its own suffix for ffmpeg."""
+        captured = {}
+
+        def fake_run(cmd, **kwargs):
+            captured["cmd"] = cmd
+            with open(cmd[-1], "wb") as f:
+                f.write(b"OggS")
+            return mock.Mock(returncode=0)
+
+        monkeypatch.setattr(subprocess, "run", fake_run)
+        result = extract_audio_from_video(
+            b"ID3 mp3", output_format="ogg", input_suffix=".mp3"
+        )
+
+        assert result == b"OggS"
+        assert captured["cmd"][captured["cmd"].index("-i") + 1].endswith(".mp3")
+        assert "libvorbis" in captured["cmd"]

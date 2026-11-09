@@ -44,6 +44,8 @@ from core.utils import generate_bot_join_token
 logger = getLogger(__name__)
 
 DEFAULT_TIMEOUT = 15
+# (connect, read): downloading a whole meeting's audio takes longer.
+AUDIO_DOWNLOAD_TIMEOUT = (DEFAULT_TIMEOUT, 300)
 
 # ``LINTO_STUDIO_TOKEN_SOURCE`` values — where the browser's Studio JWT comes from.
 TOKEN_SOURCE_SERVICE_ACCOUNT = "service_account"  # noqa: S105
@@ -100,6 +102,14 @@ ROOM_METADATA_KEYS = [
 
 class BotTranscriptionException(Exception):
     """Raised when a transcription-bot operation fails."""
+
+
+class StudioAudioNotReady(BotTranscriptionException):
+    """Studio has no audio file for the conversation yet (HTTP 404).
+
+    A live channel that keeps its audio has it transcoded by the Transcriber
+    once the session stops, so the file can trail the conversation for a while.
+    """
 
 
 class PermissionDeniedError(BotTranscriptionException):
@@ -205,6 +215,61 @@ class BotTranscriptionService:
             if item.get("name") == name:
                 return item.get("_id") or item.get("id")
         return None
+
+    # ── conversation audio ───────────────────────────────────────────────
+    def _conversation_media(self, method, conversation_id, timeout):
+        """``{method} {studio}/api/conversations/{id}/media``: the response when
+        Studio has the file, ``None`` when the conversation keeps no audio
+        (204). Raises :class:`StudioAudioNotReady` on 404, else
+        :class:`BotTranscriptionException` on any failure."""
+        try:
+            r = requests.request(
+                method,
+                f"{self.studio_base}/api/conversations/{conversation_id}/media",
+                headers=self._headers(),
+                timeout=timeout,
+            )
+        except requests.RequestException as exc:
+            raise BotTranscriptionException(
+                f"Studio conversation audio error: {exc}"
+            ) from exc
+        if r.status_code == 204:
+            return None
+        if r.status_code == 404:
+            raise StudioAudioNotReady(
+                f"Studio has no audio file for conversation {conversation_id} yet"
+            )
+        if r.status_code != 200:
+            raise BotTranscriptionException(
+                f"Studio conversation audio returned {r.status_code}"
+            )
+        return r
+
+    def conversation_audio_size(self, conversation_id):
+        """Size in bytes of the audio Studio keeps for a conversation, read by
+        a HEAD request (nothing downloaded): ``None`` when the conversation
+        keeps no audio, ``-1`` when Studio does not tell. Raises like
+        :meth:`fetch_conversation_audio`."""
+        r = self._conversation_media("HEAD", conversation_id, DEFAULT_TIMEOUT)
+        if r is None:
+            return None
+        try:
+            return int(r.headers.get("Content-Length", -1))
+        except (TypeError, ValueError):
+            return -1
+
+    def fetch_conversation_audio(self, conversation_id):
+        """The audio Studio archived for a live run, or ``None`` when the
+        conversation keeps none (channel started without ``keepAudio``).
+
+        A live channel with a transcriber profile keeps its audio compressed
+        (Session-API defaults ``compressAudio`` to true there): an MP3.
+        Raises :class:`StudioAudioNotReady` while the Transcriber has not
+        written the file yet, :class:`BotTranscriptionException` on any other
+        failure.
+        """
+        r = self._conversation_media("GET", conversation_id, AUDIO_DOWNLOAD_TIMEOUT)
+        return None if r is None else r.content
 
     def _start_recording(self, room, user):
         """Start a LiveKit video egress for the room; never block transcription.

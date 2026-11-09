@@ -7,8 +7,8 @@ Two Celery tasks live here and share the same delivery pipeline:
   summarized / exported / shared / pushed to Twake Drive / emailed.
 - ``process_bot_live_summary(room_id)`` — the autonomous bot flow: the LinTO
   bot already produced a finalized Studio conversation while transcribing the
-  room live; the task resolves it and runs the SAME delivery steps (text-only,
-  there is no original media to push).
+  room live; the task resolves it and runs the SAME delivery steps, the
+  meeting audio Studio kept for the run standing in for the original media.
 
 The delivery steps are factored as backend-agnostic helpers checkpointed
 through :class:`_StepCheckpoint`, so both flows are idempotent / resumable on
@@ -555,7 +555,7 @@ async def _deliver_to_twake(  # noqa: PLR0913 - delivery needs the full context
     folder and file names follow it. ``extra_files_provider`` is an optional
     async callable returning a list of ``(filename, content, content_type)`` for
     the original-media bytes (the recording flow uploads the mp4/ogg; the live
-    flow passes ``None`` — text only). Returns the Twake Drive folder link (on
+    flow the ogg of the audio Studio kept). Returns the Twake Drive folder link (on
     a resume, the one a previous attempt checkpointed, so the email still links
     the files), or ``None`` when Twake is not configured or the upload failed.
     """
@@ -598,7 +598,7 @@ async def _deliver_to_twake(  # noqa: PLR0913 - delivery needs the full context
                 content_type="text/vnd.cozy.note+markdown",
             )
 
-            # Original media bytes (recording flow only); live flow = text-only.
+            # Original media bytes (the recording, or the live run's audio).
             if extra_files_provider is not None:
                 for filename, content, content_type in await extra_files_provider():
                     await save_file(
@@ -1100,6 +1100,13 @@ async def _process_linto_transcription_sync(recording_id):  # noqa: PLR0915
 # giving up THIS attempt (which raises TransientError → a later Celery retry).
 _CONV_RESOLVE_ATTEMPTS = 6
 _CONV_RESOLVE_DELAY = 2  # seconds between in-attempt re-queries
+# The Transcriber writes a live channel's kept audio once the session stops
+# (PCM transcoded to MP3 in place), so Studio may answer 404, or a file still
+# growing, for a while after the conversation exists. The file is downloaded
+# once two HEADs this far apart report the same size; past the attempts the
+# delivery goes on without it.
+_AUDIO_READY_ATTEMPTS = 36
+_AUDIO_READY_DELAY = 5  # seconds between two size checks
 
 
 @sync_to_async
@@ -1192,6 +1199,77 @@ async def _summarize_live_run(linto, conversation_id, room_id, checkpoint, paylo
     )
 
 
+async def _fetch_live_audio(service, conversation_id, log_id):
+    """The audio Studio kept for a live run once complete, else ``None``.
+
+    Soft by design: no audio (a run started without ``keepAudio``), a file
+    that never shows up or any Studio failure is logged and answers ``None``,
+    so the transcript, the document and the email still go out.
+    """
+    from core.services.bot_transcription import (
+        BotTranscriptionException,
+        StudioAudioNotReady,
+    )
+
+    last_size = None
+    for attempt in range(_AUDIO_READY_ATTEMPTS):
+        try:
+            size = await sync_to_async(service.conversation_audio_size)(conversation_id)
+        except StudioAudioNotReady:
+            size = 0
+        except BotTranscriptionException as exc:
+            logger.warning("Live audio size check failed for %s: %s", log_id, exc)
+            size = 0
+        if size is None:
+            logger.info("The live run of %s kept no audio", log_id)
+            return None
+        # -1: Studio does not tell the size, nothing to wait on.
+        if size == -1 or (size > 0 and size == last_size):
+            try:
+                return await sync_to_async(service.fetch_conversation_audio)(
+                    conversation_id
+                )
+            except BotTranscriptionException as exc:
+                logger.warning("Live audio download failed for %s: %s", log_id, exc)
+                return None
+        last_size = size
+        if attempt < _AUDIO_READY_ATTEMPTS - 1:
+            await asyncio.sleep(_AUDIO_READY_DELAY)
+    logger.warning(
+        "Live audio of %s not ready after %d checks, delivering without it",
+        log_id,
+        _AUDIO_READY_ATTEMPTS,
+    )
+    return None
+
+
+def _live_audio_files(service, conversation_id, meeting, language, log_id):
+    """``extra_files_provider`` of the live delivery: the meeting audio as an
+    OGG next to the transcript, named like the recording flow's, or nothing
+    when it is unavailable (never fails the Twake Drive step)."""
+
+    async def _provide():
+        audio = await _fetch_live_audio(service, conversation_id, log_id)
+        if not audio:
+            return []
+        try:
+            ogg_audio = await sync_to_async(extract_audio_from_video)(
+                audio, output_format="ogg", input_suffix=".mp3"
+            )
+        except Exception:  # the audio never blocks the delivery
+            logger.exception("Live audio conversion failed for %s", log_id)
+            return []
+        return [
+            (
+                build_recording_filename(meeting, "ogg", language),
+                ogg_audio,
+                "audio/ogg",
+            )
+        ]
+
+    return _provide
+
+
 @task(**_RETRY_KWARGS)
 def process_bot_live_summary(self, room_id):
     """Summarize + deliver a LinTO bot's OWN live-transcription conversation.
@@ -1202,8 +1280,9 @@ def process_bot_live_summary(self, room_id):
     document, Twake Drive and recap email always go out. It is INDEPENDENT of
     the recording pipeline / ``Recording`` model:
     it resolves the Studio conversation that the quickMeeting DELETE finalized,
-    then reuses the shared tag/summary/export/share/Twake/email delivery helpers
-    (text-only — no original audio bytes for the live path).
+    then reuses the shared tag/summary/export/share/Twake/email delivery helpers;
+    the meeting audio Studio kept for the run (``keepAudio`` channel) goes to
+    Twake Drive as an OGG when it is available, never blocking the rest.
 
     Progress is checkpointed in ``room.configuration["linto_summary"]["steps"]``
     so a retry resumes; only transient failures retry (conversation not stored
@@ -1301,8 +1380,8 @@ async def _process_bot_live_summary_sync(room_id):
     pub_filename = _document_filename(meeting, pub_format, language, summary_result)
     summary_preview = _extract_summary_preview(summary_result)
 
-    # 5. Share + Twake + email. Live path is TEXT-ONLY: no original audio bytes
-    # (extra_files_provider=None); the conversation already carries its text.
+    # 5. Share + Twake + email. Twake Drive also gets the meeting audio Studio
+    # kept for the run, as an OGG (soft: the text files go without it).
     await _share_conversation(
         linto, conversation_id, recipient_user, room_id, checkpoint
     )
@@ -1318,7 +1397,9 @@ async def _process_bot_live_summary_sync(room_id):
         pub_mime=pub_mime,
         meeting=meeting,
         language=language,
-        extra_files_provider=None,
+        extra_files_provider=_live_audio_files(
+            service, conversation_id, meeting, language, room_id
+        ),
         log_id=room_id,
         checkpoint=checkpoint,
     )

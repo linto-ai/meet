@@ -52,3 +52,15 @@ def test_config_linto_reports_the_kill_switch_and_effective_token_source(setting
     data = APIClient().get("/api/v1.0/config/").json()
     assert data["linto"]["entitlements_enabled"] is False
     assert data["linto"]["token_source"] == "service_account"
+
+
+def test_config_linto_reports_whether_the_live_run_keeps_the_audio(settings):
+    """LINTO_LIVE_KEEP_AUDIO (on by default) reaches the panel, which sets the
+    live channel's keepAudio from it."""
+    settings.LINTO_FEATURE_ENABLED = True
+    data = APIClient().get("/api/v1.0/config/").json()
+    assert data["linto"]["live_keep_audio"] is True
+
+    settings.LINTO_LIVE_KEEP_AUDIO = False
+    data = APIClient().get("/api/v1.0/config/").json()
+    assert data["linto"]["live_keep_audio"] is False

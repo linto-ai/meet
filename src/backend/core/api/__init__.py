@@ -105,6 +105,9 @@ def get_frontend_configuration(request):
             "native_livekit_url": settings.LINTO_NATIVE_LIVEKIT_URL,
             "visio_native_enabled": settings.LINTO_VISIO_NATIVE_ENABLED,
             "bot_provider": settings.LINTO_BOT_PROVIDER,
+            # The live channel keeps the meeting audio (delivered to Twake
+            # Drive with the transcript).
+            "live_keep_audio": settings.LINTO_LIVE_KEEP_AUDIO,
             # Pinned ASR profile — the panel never lets the user pick one.
             "default_profile_id": settings.LINTO_STUDIO_DEFAULT_PROFILE_ID,
         },

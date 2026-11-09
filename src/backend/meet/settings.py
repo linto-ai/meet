@@ -1158,6 +1158,12 @@ class Base(Configuration):
     LINTO_NATIVE_TOKEN_TTL = values.IntegerValue(
         43200, environ_name="LINTO_NATIVE_TOKEN_TTL", environ_prefix=None
     )
+    # The live channel keeps the meeting audio in Studio (`keepAudio`), and the
+    # end-of-meeting delivery puts it in the Twake Drive folder as an OGG.
+    # False: the run is text-only, nothing of the audio is stored.
+    LINTO_LIVE_KEEP_AUDIO = values.BooleanValue(
+        True, environ_name="LINTO_LIVE_KEEP_AUDIO", environ_prefix=None
+    )
     # Service auth to Studio (org-scoped quickMeeting/bots need BOT+MICROPHONE
     # rights). Set LINTO_STUDIO_AUTH_EMAIL/PASSWORD to a dedicated service account,
     # or rely on a static LINTO_STUDIO_API_TOKEN carrying those rights (fallback).

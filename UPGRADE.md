@@ -17,6 +17,28 @@ the following command inside your docker container:
 ## [Unreleased]
 
 
+### LinTO fork: the live run's audio in Twake Drive
+
+A live transcription now asks Studio to keep the meeting audio (`keepAudio` on
+the quickMeeting channel, compressed to MP3 by the Transcriber since the
+channel is live), and the end-of-meeting delivery puts it in the Twake Drive
+meeting folder as `{date} - Recording.ogg`, next to the transcript, like the
+deferred transcription does. The audio is optional to the delivery: when Studio
+has none, the transcript, the document and the email go out without it.
+
+- New backend variable `LINTO_LIVE_KEEP_AUDIO` (default `True`). `False` keeps
+  the former text-only runs (nothing of the audio stored in Studio).
+- Studio side: the conversation's audio is read through
+  `GET /api/conversations/{id}/media` with the backend's Studio credential, so
+  studio-api must see the Transcriber's audio volume (it does on the LinTO
+  deployments). With per-participant diarization (`BOT_PERSTREAM=true` on the
+  native bot), the bot must advertise `mixedRecording` (VisioBotService from
+  linto-studio-plugins `next`, 2026-09-02 on), otherwise the Transcriber
+  demotes the run to the mixed path to record it.
+- Deploy the backend and the frontend together (the panel reads
+  `live_keep_audio` from the config).
+
+
 ### LinTO fork: deploying the rebase on upstream 1.37.0
 
 Changes to make in `lasuite-meet-deploy` (`configs/meet/meet/{prd,stg}`) when

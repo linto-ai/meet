@@ -34,6 +34,7 @@ from core.services.bot_transcription import (
     BotTranscriptionException,
     BotTranscriptionService,
     PermissionDeniedError,
+    StudioAudioNotReady,
     effective_token_source,
 )
 
@@ -938,3 +939,49 @@ class TestResolveConversationId:
             "org-1", "sess-1", "linto-x"
         )
         assert got == "c-match"
+
+
+class TestConversationAudio:
+    """The audio Studio kept for a live run (GET/HEAD .../media)."""
+
+    MEDIA = f"{STUDIO}/api/conversations/conv-1/media"
+
+    @responses.activate
+    def test_fetch_returns_the_file(self, studio_settings):
+        responses.get(self.MEDIA, body=b"ID3mp3", status=200)
+        got = BotTranscriptionService().fetch_conversation_audio("conv-1")
+        assert got == b"ID3mp3"
+        assert responses.calls[0].request.headers["Authorization"] == (
+            "Bearer static-token"
+        )
+
+    @responses.activate
+    def test_no_audio_kept_is_none(self, studio_settings):
+        responses.get(self.MEDIA, status=204)
+        responses.head(self.MEDIA, status=204)
+        service = BotTranscriptionService()
+        assert service.fetch_conversation_audio("conv-1") is None
+        assert service.conversation_audio_size("conv-1") is None
+
+    @responses.activate
+    def test_file_not_written_yet_is_not_ready(self, studio_settings):
+        responses.get(self.MEDIA, status=404)
+        responses.head(self.MEDIA, status=404)
+        service = BotTranscriptionService()
+        with pytest.raises(StudioAudioNotReady):
+            service.fetch_conversation_audio("conv-1")
+        with pytest.raises(StudioAudioNotReady):
+            service.conversation_audio_size("conv-1")
+
+    @responses.activate
+    def test_other_failure_raises(self, studio_settings):
+        responses.get(self.MEDIA, status=500)
+        with pytest.raises(BotTranscriptionException) as excinfo:
+            BotTranscriptionService().fetch_conversation_audio("conv-1")
+        assert not isinstance(excinfo.value, StudioAudioNotReady)
+
+    @responses.activate
+    def test_size_is_read_from_a_head(self, studio_settings):
+        responses.head(self.MEDIA, status=200, headers={"Content-Length": "1234"})
+        assert BotTranscriptionService().conversation_audio_size("conv-1") == 1234
+        assert responses.calls[0].request.method == "HEAD"
