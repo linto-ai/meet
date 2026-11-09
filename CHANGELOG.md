@@ -69,6 +69,7 @@ and this project adheres to
 - 🐛(mail) without a summary the recap email announces the transcript alone, and the document is named after it
 - 🐛(backend) a live run without a summary is still delivered (document, Twake Drive, recap email)
 - 🐛(frontend) the LinTO panel sends the room token in the X-LiveKit-Token header, so it works embedded
+- 🐛(backend) recordings sent to Studio declare their real media type (no more 415)
 
 ## [1.37.0] - 2026-11-01
 

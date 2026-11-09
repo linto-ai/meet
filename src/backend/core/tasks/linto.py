@@ -846,6 +846,7 @@ async def _process_linto_transcription_sync(recording_id):  # noqa: PLR0915
 
     file_content = None
     audio_content = None
+    audio_extension = recording.extension
     if need_upload or need_twake_bytes:
         # 1. Download audio from S3 (transient on botocore/network errors)
         logger.info("Downloading %s from S3 storage", recording.key)
@@ -869,6 +870,7 @@ async def _process_linto_transcription_sync(recording_id):  # noqa: PLR0915
             audio_content = await sync_to_async(extract_audio_from_video)(
                 file_content, output_format="copy"
             )
+            audio_extension = "m4a"
         else:
             audio_content = file_content
 
@@ -909,8 +911,11 @@ async def _process_linto_transcription_sync(recording_id):  # noqa: PLR0915
         # must propagate without being wrapped → no retry, straight to
         # on_failure. Only network/HTTP-5xx failures become TransientError.
         with classify_external("upload to LinTO Studio"):
+            # Studio refuses (415) a media declared neither audio nor video:
+            # name it after its container so the SDK declares its real type.
             conversation_id = await linto.upload(
                 file=audio_content,
+                filename=f"{conversation_name}.{audio_extension}",
                 enable_diarization=True,
                 number_of_speaker="0",
                 language=language,

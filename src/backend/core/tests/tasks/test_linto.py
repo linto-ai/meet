@@ -11,10 +11,12 @@ running the whole (soft-failing) downstream pipeline.
 # pylint: disable=redefined-outer-name,protected-access
 
 import contextlib
+import inspect
 from unittest import mock
 
 import aiohttp
 import pytest
+from linto import LinTO
 
 from core import factories, models
 from core.recording.enums import FileExtension
@@ -45,6 +47,10 @@ def _patch_storage(stack, payload):
     storage_mock.connection.meta.client = s3_client
     storage_mock.bucket_name = "bucket"
     return storage_mock
+
+
+def _conversation_name(rec):
+    return f"Reunion_{rec.created_at.strftime('%d-%m-%Y_%H-%M')}"
 
 
 def _patch_sdk(stack):
@@ -116,6 +122,7 @@ class TestAudioExtractionBranching:
         extract_mock.assert_called_once_with(b"fake mp4 bytes", output_format="copy")
         _, kwargs = sdk.upload.call_args
         assert kwargs["file"] == b"OggS extracted"
+        assert kwargs["filename"] == f"{_conversation_name(rec)}.m4a"
 
     def test_ogg_source_skips_extraction(self):
         rec = _make_recording(models.RecordingModeChoices.TRANSCRIPT)
@@ -135,6 +142,12 @@ class TestAudioExtractionBranching:
         extract_mock.assert_not_called()
         _, kwargs = sdk.upload.call_args
         assert kwargs["file"] == b"OggS raw"
+        assert kwargs["filename"] == f"{_conversation_name(rec)}.ogg"
+
+    def test_the_pinned_sdk_accepts_a_filename(self):
+        """Studio refuses (415) a media declared neither audio nor video: the
+        upload names it, so the pinned SDK must take a filename (linto>=1.4.2)."""
+        assert "filename" in inspect.signature(LinTO.upload).parameters
 
 
 class TestFreshUpload:
