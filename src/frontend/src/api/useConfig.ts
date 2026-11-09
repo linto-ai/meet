@@ -28,6 +28,9 @@ export interface LintoRuntimeConfig {
   native_livekit_url: string
   visio_native_enabled: boolean
   bot_provider: string
+  // The live channel keeps the meeting audio in Studio (LINTO_LIVE_KEEP_AUDIO);
+  // the end-of-meeting delivery puts it in Twake Drive with the transcript.
+  live_keep_audio: boolean
   // Pinned ASR profile id (the panel never lets the user pick one); '' → the
   // first available profile is used.
   default_profile_id: string

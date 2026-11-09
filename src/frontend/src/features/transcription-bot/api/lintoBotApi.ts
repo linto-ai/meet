@@ -199,9 +199,11 @@ const startLintoLive = async (
     transcriberProfileId: profileId,
     enableLiveTranscripts: true,
     diarization: true,
-    // Live transcription is text-only; the summary reads the finalized
-    // conversation text, never stored audio.
-    keepAudio: false,
+    // Studio keeps the meeting audio (compressed, the channel being live) so
+    // the end-of-meeting delivery can put it in Twake Drive next to the
+    // transcript (LINTO_LIVE_KEEP_AUDIO); the summary still reads the
+    // conversation text.
+    keepAudio: lintoConfig.live_keep_audio,
     translations: config.translations,
   }
 
