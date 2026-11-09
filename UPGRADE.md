@@ -17,6 +17,16 @@ the following command inside your docker container:
 ## [Unreleased]
 
 
+### LinTO fork: the late joiners' summary needs Studio's catch-up routes
+
+The "Before you arrived" summary a late joiner gets calls
+`GET /api/sessions/public/{id}/catchup/status` and
+`POST /api/sessions/public/{id}/catchup` on Studio. A Studio without them
+(the production one until the `feat/live-catchup` pull request is deployed)
+answers 404: the block now stays hidden, the history so far still shows, and
+nothing reports an error. Nothing to set.
+
+
 ### LinTO fork: a live run's conversation follows LINTO_STUDIO_MEMBERS_RIGHT
 
 The Studio conversation of a live run now gives the members of the

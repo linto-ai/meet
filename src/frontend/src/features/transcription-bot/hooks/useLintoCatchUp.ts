@@ -7,6 +7,7 @@ import { useSidePanel } from '@/features/rooms/livekit/hooks/useSidePanel'
 import { notifyLintoCatchUpReady } from '@/features/notifications'
 import { IDLE_CATCH_UP, lintoStore } from '../store/lintoStore'
 import { hydrateCaptions } from '../store/transcriptStore'
+import { catchUpFailureStatus } from '../utils/catchUpFailure'
 import { LINTO_SEGMENT_PREFIX, LintoCaption } from '../types/linto'
 import LinTO from '../vendor/linto-sdk'
 import type { PublicSession } from '../vendor/linto-sdk'
@@ -223,15 +224,9 @@ export const useLintoCatchUp = () => {
       } catch (err) {
         if (controller.signal.aborted) return
         const code = (err as { code?: string })?.code
-        const status =
-          code === 'catchup_too_short'
-            ? 'too_short'
-            : code === 'catchup_unavailable' || code === 'catchup_forbidden'
-              ? 'unavailable'
-              : 'error'
         lintoStore.catchUp = {
           ...IDLE_CATCH_UP,
-          status,
+          status: catchUpFailureStatus(err),
           updatedAt: Date.now(),
           error: code || (err as Error)?.message,
         }
