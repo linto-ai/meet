@@ -10,6 +10,8 @@ Auth = a LiveKit room token (header/body/query). The service layer is mocked.
 
 from unittest import mock
 
+from django.contrib.auth.models import AnonymousUser
+
 import pytest
 from livekit.api import AccessToken, VideoGrants
 from rest_framework.test import APIClient
@@ -19,6 +21,7 @@ from core.services.bot_transcription import (
     BotTranscriptionException,
     PermissionDeniedError,
 )
+from core.utils import generate_token
 
 pytestmark = pytest.mark.django_db
 
@@ -37,7 +40,10 @@ def linto_settings(settings):
     return settings
 
 
-def _room_token(room, admin=False):
+def _room_token(room, admin=False, user=None):
+    if user is not None:
+        # The token Meet mints for a user, who the LiveKit authentication names
+        return generate_token(room=str(room.id), user=user)
     grants = VideoGrants(
         room=str(room.id),
         room_join=True,
@@ -137,8 +143,30 @@ class TestStudioToken:
     def test_anonymous_is_forbidden(self, linto_settings):
         room = RoomFactory()
         token = _room_token(room)  # identity "user-1" matches no Meet user
+        # A concrete answer: were the caller let through, the view serializes it
         with mock.patch(
-            "core.api.viewsets.BotTranscriptionService.studio_token_for"
+            "core.api.viewsets.BotTranscriptionService.studio_token_for",
+            return_value={"enabled": True},
+        ) as service:
+            res = APIClient().get(
+                f"/api/v1.0/rooms/{room.id}/linto/studio-token/?token={token}"
+            )
+        assert res.status_code == 403
+        assert res.json()["code"] == "anonymous"
+        service.assert_not_called()
+
+    def test_anonymous_with_the_sub_of_a_user_is_forbidden(self, linto_settings):
+        """The identity of an anonymous participant comes from the client: a
+        token minted for one does not bridge the user whose sub it equals."""
+        UserFactory(sub="user-1")
+        room = RoomFactory()
+        token = generate_token(
+            room=str(room.id), user=AnonymousUser(), participant_id="user-1"
+        )
+        # A concrete answer: were the caller let through, the view serializes it
+        with mock.patch(
+            "core.api.viewsets.BotTranscriptionService.studio_token_for",
+            return_value={"enabled": True},
         ) as service:
             res = APIClient().get(
                 f"/api/v1.0/rooms/{room.id}/linto/studio-token/?token={token}"
@@ -150,7 +178,7 @@ class TestStudioToken:
     def test_authenticated_user_gets_the_token_context(self, linto_settings):
         user = UserFactory(sub="user-1")
         room = RoomFactory()
-        token = _room_token(room)
+        token = _room_token(room, user=user)
         payload = {
             "enabled": True,
             "token": "jwt",
@@ -171,9 +199,9 @@ class TestStudioToken:
         assert service.call_args.args[0] == user
 
     def test_not_entitled_is_a_200_with_enabled_false(self, linto_settings):
-        UserFactory(sub="user-1")
+        user = UserFactory(sub="user-1")
         room = RoomFactory()
-        token = _room_token(room)
+        token = _room_token(room, user=user)
         with mock.patch(
             "core.api.viewsets.BotTranscriptionService.studio_token_for",
             return_value={"enabled": False, "reason": "no_entitlement"},
@@ -185,9 +213,9 @@ class TestStudioToken:
         assert res.json() == {"enabled": False, "reason": "no_entitlement"}
 
     def test_studio_failure_is_a_502(self, linto_settings):
-        UserFactory(sub="user-1")
+        user = UserFactory(sub="user-1")
         room = RoomFactory()
-        token = _room_token(room)
+        token = _room_token(room, user=user)
         with mock.patch(
             "core.api.viewsets.BotTranscriptionService.studio_token_for",
             side_effect=BotTranscriptionException("no Studio credentials"),
