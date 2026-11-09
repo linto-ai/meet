@@ -20,7 +20,11 @@ from core.authentication.livekit import LIVEKIT_AUTH_SCHEME
 from core.factories import RoomFactory, UserFactory
 from core.services.bot_transcription import (
     BotTranscriptionException,
+    NoProfileError,
     PermissionDeniedError,
+    RunConflictError,
+    StudioNotEntitled,
+    StudioRefusedError,
 )
 from core.utils import generate_token
 
@@ -339,3 +343,157 @@ class TestAuth:
         ):
             res = _post(APIClient(), room, "prepare", {"channel_id": "c"})
         assert res.status_code == 200
+
+
+class TestProfiles:
+    def _get(self, room, token):
+        return APIClient().get(
+            f"/api/v1.0/rooms/{room.id}/linto/profiles/",
+            HTTP_AUTHORIZATION=_auth(token),
+        )
+
+    def test_anonymous_is_forbidden(self, linto_settings):
+        room = RoomFactory()
+        with mock.patch(
+            "core.api.viewsets.BotTranscriptionService.quick_meeting_profiles"
+        ) as service:
+            res = self._get(room, _room_token(room))
+        assert res.status_code == 403
+        assert res.json()["code"] == "anonymous"
+        service.assert_not_called()
+
+    def test_lists_the_profiles(self, linto_settings):
+        user = UserFactory(sub="user-1")
+        room = RoomFactory()
+        profiles = [{"id": "220", "name": "FR", "languages": [], "translations": []}]
+        with mock.patch(
+            "core.api.viewsets.BotTranscriptionService.quick_meeting_profiles",
+            return_value=profiles,
+        ) as service:
+            res = self._get(room, _room_token(room, user=user))
+        assert res.status_code == 200
+        assert res.json() == {"profiles": profiles, "reason": "ok"}
+        assert service.call_args.args[0] == user
+
+    def test_an_organization_without_profile_is_unprovisioned(self, linto_settings):
+        user = UserFactory(sub="user-1")
+        room = RoomFactory()
+        with mock.patch(
+            "core.api.viewsets.BotTranscriptionService.quick_meeting_profiles",
+            return_value=[],
+        ):
+            res = self._get(room, _room_token(room, user=user))
+        assert res.json() == {"profiles": [], "reason": "unprovisioned"}
+
+    def test_not_entitled_is_a_200(self, linto_settings):
+        user = UserFactory(sub="user-1")
+        room = RoomFactory()
+        with mock.patch(
+            "core.api.viewsets.BotTranscriptionService.quick_meeting_profiles",
+            side_effect=StudioNotEntitled("revoked"),
+        ):
+            res = self._get(room, _room_token(room, user=user))
+        assert res.status_code == 200
+        assert res.json() == {
+            "profiles": [],
+            "reason": "no_entitlement",
+            "detail": "revoked",
+        }
+
+    def test_studio_failure_is_a_502(self, linto_settings):
+        user = UserFactory(sub="user-1")
+        room = RoomFactory()
+        with mock.patch(
+            "core.api.viewsets.BotTranscriptionService.quick_meeting_profiles",
+            side_effect=BotTranscriptionException("Studio returned 500: secret"),
+        ):
+            res = self._get(room, _room_token(room, user=user))
+        assert res.status_code == 502
+        assert "secret" not in res.content.decode()
+
+
+class TestStart:
+    def test_starts_the_run(self, linto_settings):
+        room = RoomFactory()
+        with mock.patch(
+            "core.api.viewsets.BotTranscriptionService.start",
+            return_value={"status": "running", "session_id": "s"},
+        ) as start:
+            res = APIClient().post(
+                f"/api/v1.0/rooms/{room.id}/linto/start/",
+                {"translations": ["en"], "summary": True},
+                format="json",
+                HTTP_AUTHORIZATION=_auth(_room_token(room)),
+                HTTP_ORIGIN="https://meet.example",
+            )
+        assert res.status_code == 200
+        assert res.json() == {"status": "running", "session_id": "s"}
+        assert start.call_args.args[1] == {"translations": ["en"], "summary": True}
+        assert start.call_args.kwargs["origin"] == "https://meet.example"
+
+    @pytest.mark.parametrize(
+        ("error", "status", "code"),
+        [
+            (PermissionDeniedError("no"), 403, "permission_denied"),
+            (StudioNotEntitled("revoked"), 403, "not_entitled"),
+            (RunConflictError("already_running"), 409, "already_running"),
+            (RunConflictError("already_starting"), 409, "already_starting"),
+            (NoProfileError("none"), 409, "no_profile"),
+        ],
+    )
+    def test_refusals_carry_a_code(self, linto_settings, error, status, code):
+        room = RoomFactory()
+        with mock.patch(
+            "core.api.viewsets.BotTranscriptionService.start", side_effect=error
+        ):
+            res = _post(APIClient(), room, "start")
+        assert res.status_code == status
+        assert res.json()["code"] == code
+
+    def test_a_studio_refusal_is_a_403_the_panel_can_explain(self, linto_settings):
+        room = RoomFactory()
+        with mock.patch(
+            "core.api.viewsets.BotTranscriptionService.start",
+            side_effect=StudioRefusedError("session creation", 402, "plan"),
+        ):
+            res = _post(APIClient(), room, "start")
+        assert res.status_code == 403
+        assert res.json() == {
+            "error": "LinTO refused to start the live transcription",
+            "code": "studio_refused",
+            "studio_status": 402,
+            "studio_code": "plan",
+        }
+
+    def test_a_studio_failure_is_a_502_without_its_details(self, linto_settings):
+        room = RoomFactory()
+        with mock.patch(
+            "core.api.viewsets.BotTranscriptionService.start",
+            side_effect=BotTranscriptionException("Studio returned 500: internals"),
+        ):
+            res = _post(APIClient(), room, "start")
+        assert res.status_code == 502
+        assert "internals" not in res.content.decode()
+
+
+class TestStop:
+    def test_stops_the_run(self, linto_settings):
+        room = RoomFactory()
+        with mock.patch(
+            "core.api.viewsets.BotTranscriptionService.stop",
+            return_value={"status": "stopped"},
+        ) as stop:
+            res = _post(APIClient(), room, "stop")
+        assert res.status_code == 200
+        assert res.json() == {"status": "stopped"}
+        stop.assert_called_once()
+
+    def test_a_stranger_is_forbidden(self, linto_settings):
+        room = RoomFactory()
+        with mock.patch(
+            "core.api.viewsets.BotTranscriptionService.stop",
+            side_effect=PermissionDeniedError("no"),
+        ):
+            res = _post(APIClient(), room, "stop")
+        assert res.status_code == 403
+        assert res.json()["code"] == "permission_denied"

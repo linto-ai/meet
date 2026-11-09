@@ -31,6 +31,7 @@ from logging import getLogger
 
 from django.conf import settings
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 
 import requests
 
@@ -48,6 +49,10 @@ logger = getLogger(__name__)
 DEFAULT_TIMEOUT = 15
 # (connect, read): downloading a whole meeting's audio takes longer.
 AUDIO_DOWNLOAD_TIMEOUT = (DEFAULT_TIMEOUT, 300)
+# Studio waits for the last captions before it finalizes the conversation.
+STOP_TIMEOUT = (DEFAULT_TIMEOUT, 60)
+START_LOCK_TTL = 120
+STOP_LOCK_TTL = 90
 
 # ``LINTO_STUDIO_TOKEN_SOURCE`` values — where the browser's Studio JWT comes from.
 TOKEN_SOURCE_SERVICE_ACCOUNT = "service_account"  # noqa: S105
@@ -107,6 +112,38 @@ ROOM_METADATA_KEYS = [
 ]
 
 
+def studio_session_name(room):
+    """The room's Studio session; Studio's front hides the ``@…`` names."""
+    return f"@meet-{room.id}"
+
+
+def normalize_profile(profile):
+    """A Studio transcriber profile as the panel shows it."""
+    config = profile.get("config") or {}
+    languages = [
+        lang.get("candidate") if isinstance(lang, dict) else lang
+        for lang in config.get("languages") or []
+    ]
+    raw = (
+        profile.get("translations")
+        or config.get("availableTranslations")
+        or config.get("translations")
+        or []
+    )
+    if isinstance(raw, dict):
+        translations = [
+            code for group in raw.values() if isinstance(group, list) for code in group
+        ]
+    else:
+        translations = list(raw)
+    return {
+        "id": str(profile.get("_id") or profile.get("id") or ""),
+        "name": profile.get("name") or config.get("name") or "",
+        "languages": [lang for lang in languages if lang],
+        "translations": [code for code in translations if code],
+    }
+
+
 class BotTranscriptionException(Exception):
     """Raised when a transcription-bot operation fails."""
 
@@ -127,6 +164,40 @@ class PermissionDeniedError(BotTranscriptionException):
     the who-can-stop rule (starter OR room admin/owner) are enforced
     server-side. The viewset answers 403 with ``code='permission_denied'``.
     """
+
+
+class StudioNotEntitled(BotTranscriptionException):
+    """The LinTO option is not active for this participant."""
+
+    def __init__(self, reason="no_entitlement"):
+        super().__init__(f"the LinTO option is not active for this account ({reason})")
+        self.reason = reason
+
+
+class RunConflictError(BotTranscriptionException):
+    """One live run per room."""
+
+    MESSAGES = {
+        "already_running": "a live transcription already runs in this room",
+        "already_starting": "a live transcription is already starting in this room",
+    }
+
+    def __init__(self, code):
+        super().__init__(self.MESSAGES.get(code, code))
+        self.code = code
+
+
+class NoProfileError(BotTranscriptionException):
+    """The organization has no live ASR profile to start a run with."""
+
+
+class StudioRefusedError(BotTranscriptionException):
+    """Studio answered 402 or 403."""
+
+    def __init__(self, what, status, code=None):
+        super().__init__(f"Studio refused the {what} ({status} {code or ''})".strip())
+        self.status = status
+        self.code = code
 
 
 class BotTranscriptionService:
@@ -429,6 +500,338 @@ class BotTranscriptionService:
         )
         return access.user if access else None
 
+    # ── live run ─────────────────────────────────────────────────────────
+
+    def _acting_as(self, user):
+        credential = self.studio_token_for(user)
+        if not credential.get("enabled") or not credential.get("token"):
+            raise StudioNotEntitled(credential.get("reason") or "no_entitlement")
+        # `metadata.quickMeeting=false` on a key: no live run under it.
+        if (credential.get("capabilities") or {}).get("quickMeeting") is False:
+            raise StudioNotEntitled("quick_meeting_disabled")
+        organization_id = credential.get("organization_id")
+        if not organization_id:
+            raise BotTranscriptionException(
+                "the Studio credential has no organization to act in"
+            )
+        return {"Authorization": f"Bearer {credential['token']}"}, organization_id
+
+    def _run_headers(self, linto, user=None):
+        # A run started with the starter's own key is stopped with it.
+        if effective_token_source() == TOKEN_SOURCE_USER_KEY:
+            starter_id = linto.get("user_id")
+            starter = None
+            if (
+                user is not None
+                and getattr(user, "is_authenticated", False)
+                and str(user.id) == str(starter_id)
+            ):
+                starter = user
+            elif starter_id:
+                try:
+                    starter = models.User.objects.filter(id=starter_id).first()
+                except (ValueError, ValidationError):
+                    starter = None
+            if starter is not None:
+                try:
+                    return self._acting_as(starter)[0]
+                except BotTranscriptionException as exc:
+                    logger.warning(
+                        "LinTO: cannot act as the starter %s of the run (%s), "
+                        "using the backend credential",
+                        starter_id,
+                        exc,
+                    )
+        return self._headers()
+
+    def _studio(self, method, path, headers, what, timeout=DEFAULT_TIMEOUT, **kwargs):
+        try:
+            r = requests.request(
+                method,
+                f"{self.studio_base}{path}",
+                headers=headers,
+                timeout=timeout,
+                **kwargs,
+            )
+        except requests.RequestException as exc:
+            raise BotTranscriptionException(f"Studio {what} error: {exc}") from exc
+        if r.status_code in (402, 403):
+            try:
+                code = (r.json() or {}).get("code")
+            except (ValueError, AttributeError):
+                code = None
+            raise StudioRefusedError(what, r.status_code, code)
+        if r.status_code not in (200, 201, 204):
+            raise BotTranscriptionException(
+                f"Studio {what} returned {r.status_code}: {r.text[:200]}"
+            )
+        try:
+            return r.json() or {}
+        except ValueError:
+            return {}
+
+    def _studio_delete(self, path, headers, what, timeout=DEFAULT_TIMEOUT, **kwargs):
+        try:
+            r = requests.delete(
+                f"{self.studio_base}{path}",
+                headers=headers,
+                timeout=timeout,
+                **kwargs,
+            )
+        except requests.RequestException as exc:
+            logger.warning("LinTO %s failed: %s", what, exc)
+            return
+        if r.status_code >= 400 and r.status_code != 404:
+            logger.warning("LinTO %s returned %s %s", what, r.status_code, r.text[:200])
+
+    def quick_meeting_profiles(self, user):
+        """The live ASR profiles of the organization ``user`` starts a run in."""
+        headers, organization_id = self._acting_as(user)
+        return self._list_profiles(headers, organization_id)
+
+    def _list_profiles(self, headers, organization_id):
+        data = self._studio(
+            "GET",
+            f"/api/organizations/{organization_id}/transcriber_profiles",
+            headers,
+            "transcriber profiles",
+            params={"quickMeeting": "true"},
+        )
+        raw = (
+            data
+            if isinstance(data, list)
+            else (data.get("transcriber_profiles") or data.get("list") or [])
+        )
+        return [normalize_profile(p) for p in raw if isinstance(p, dict)]
+
+    @staticmethod
+    def _pick_profile(profiles):
+        pinned = str(settings.LINTO_STUDIO_DEFAULT_PROFILE_ID or "")
+        ids = [p["id"] for p in profiles if p.get("id")]
+        chosen = pinned if pinned in ids else (ids[0] if ids else None)
+        if chosen is None:
+            raise NoProfileError("no live ASR profile available for this organization")
+        # Session-API profile ids are integers.
+        return int(chosen) if chosen.isdigit() else chosen
+
+    @staticmethod
+    def _session_meta(room, channel_id=None):
+        meta = {}
+        if settings.LINTO_VISIO_NATIVE_ENABLED:
+            descriptor = {
+                "livekitUrl": settings.LINTO_NATIVE_LIVEKIT_URL,
+                "room": str(room.id),
+            }
+            if channel_id is not None:
+                descriptor["token"] = generate_bot_join_token(
+                    str(room.id), str(channel_id)
+                )
+            meta["native"] = {"visio-native": descriptor}
+            # One-release back-compat alias read by the Scheduler.
+            meta["linto_native"] = dict(descriptor)
+        return meta
+
+    @staticmethod
+    def _room_url(room, origin=None):
+        base = (settings.EMAIL_APP_BASE_URL or origin or "").rstrip("/")
+        return f"{base}/{room.slug}"
+
+    def start(self, room, data, user=None, origin=None):
+        """Start the room's live run: Studio session, bot, room-wide state."""
+        if not self._has_recording_permission(
+            room, user, models.RecordingModeChoices.TRANSCRIPT
+        ):
+            raise PermissionDeniedError(
+                "the organizer restricts transcription to administrators/owners"
+            )
+        lock = f"linto:start:{room.id}"
+        if not cache.add(lock, "1", START_LOCK_TTL):
+            raise RunConflictError("already_starting")
+        try:
+            room.refresh_from_db(fields=["configuration"])
+            if (room.configuration or {}).get("linto"):
+                raise RunConflictError("already_running")
+            return self._start_run(room, data, user, origin)
+        finally:
+            cache.delete(lock)
+
+    def _start_run(self, room, data, user, origin):
+        headers, organization_id = self._acting_as(user)
+        profile_id = self._pick_profile(self._list_profiles(headers, organization_id))
+        translations = data.get("translations")
+        if not isinstance(translations, list):
+            translations = []
+        translations = [code for code in translations if isinstance(code, str)]
+        channel = {
+            "name": "Main",
+            "transcriberProfileId": profile_id,
+            "enableLiveTranscripts": True,
+            "diarization": True,
+            "keepAudio": bool(settings.LINTO_LIVE_KEEP_AUDIO),
+            "translations": translations,
+        }
+        sessions = f"/api/organizations/{organization_id}/sessions"
+        session = self._studio(
+            "POST",
+            f"{sessions}/",
+            headers,
+            "session creation",
+            json={
+                "name": studio_session_name(room),
+                # The late joiners read it through Studio's public routes.
+                "visibility": "public",
+                "channels": [channel],
+                "meta": self._session_meta(room),
+            },
+        )
+        session_id = session.get("id") or session.get("_id")
+        channel_id = ((session.get("channels") or [{}])[0] or {}).get("id")
+        if not session_id or channel_id is None:
+            raise BotTranscriptionException(
+                "Studio session creation returned no session or channel id"
+            )
+        bot_id = None
+        try:
+            # LinTO takes over the captions: stop the native subtitle agent.
+            self._stop_native_subtitles(room)
+            if settings.LINTO_VISIO_NATIVE_ENABLED:
+                self._studio(
+                    "PATCH",
+                    f"{sessions}/{session_id}",
+                    headers,
+                    "session meta update",
+                    json={"meta": self._session_meta(room, channel_id)},
+                )
+            bot = self._studio(
+                "POST",
+                f"/api/organizations/{organization_id}/bots",
+                headers,
+                "bot launch",
+                json={
+                    "url": self._room_url(room, origin),
+                    "channelId": channel_id,
+                    "provider": settings.LINTO_BOT_PROVIDER or "visio",
+                    "enableDisplaySub": True,
+                    "subSource": "original",
+                },
+            )
+            bot_id = bot.get("id") or bot.get("_id")
+            choices = ("summary", "summary_service", "record", "catchup")
+            return self.mark_started(
+                room,
+                {
+                    **{key: data[key] for key in choices if key in data},
+                    "keep_audio": bool(settings.LINTO_LIVE_KEEP_AUDIO),
+                    "session_id": str(session_id),
+                    "channel_id": channel_id,
+                    "org_id": organization_id,
+                    "bot_id": str(bot_id) if bot_id else None,
+                },
+                user=user,
+            )
+        except Exception:
+            self._stop_studio_run(headers, organization_id, session_id, bot_id)
+            raise
+
+    def _stop_studio_run(self, headers, organization_id, session_id, bot_id, name=None):
+        if not organization_id:
+            return
+        if bot_id:
+            self._studio_delete(
+                f"/api/organizations/{organization_id}/bots/{bot_id}",
+                headers,
+                "bot stop",
+            )
+        if session_id:
+            params = {"force": "true"}
+            if name:
+                params["name"] = name
+            self._studio_delete(
+                f"/api/organizations/{organization_id}/sessions/{session_id}",
+                headers,
+                "session stop",
+                timeout=STOP_TIMEOUT,
+                params=params,
+            )
+
+    def stop(self, room, user=None, enforce_permission=True):
+        """Stop the room's live run: bot, Studio session, room-wide state."""
+        lock = f"linto:stop:{room.id}"
+        if not cache.add(lock, "1", STOP_LOCK_TTL):
+            return {"status": "stopping"}
+        try:
+            room.refresh_from_db(fields=["configuration"])
+            linto = (room.configuration or {}).get("linto")
+            if not linto:
+                return {"status": "idle"}
+            if enforce_permission:
+                self._check_may_stop(room, linto, user)
+            conversation_name = f"linto-{room.id}-{int(time.time())}"
+            try:
+                headers = self._run_headers(linto, user)
+            except BotTranscriptionException as exc:
+                logger.warning("LinTO: no Studio credential to stop the run: %s", exc)
+            else:
+                self._stop_studio_run(
+                    headers,
+                    linto.get("org_id"),
+                    linto.get("session_id"),
+                    linto.get("bot_id"),
+                    name=conversation_name,
+                )
+            return self._close_run(room, linto, conversation_name)
+        finally:
+            cache.delete(lock)
+
+    @staticmethod
+    def _check_may_stop(room, linto, user):
+        starter_id = linto.get("user_id")
+        is_starter = bool(
+            user is not None
+            and getattr(user, "is_authenticated", False)
+            and starter_id
+            and str(user.id) == str(starter_id)
+        )
+        if not (is_starter or room.is_administrator_or_owner(user)):
+            raise PermissionDeniedError(
+                "only the starter or a room admin/owner can stop the transcription"
+            )
+
+    def _close_run(self, room, linto, conversation_name):
+        self._set_banner(room, False)
+        recording_id = linto.get("recording_id")
+        if recording_id:
+            self._stop_recording(recording_id)
+
+        summary = bool(linto.get("summary", True))
+        org_id = linto.get("org_id")
+        session_id = linto.get("session_id")
+        # The delivery (document, Twake Drive, recap email) follows every run
+        # with a session; `summary` only says whether the LLM step runs in it.
+        summary_payload = None
+        if org_id and session_id:
+            summary_payload = {
+                "org_id": org_id,
+                "session_id": session_id,
+                "conversation_name": conversation_name,
+                "recipient_user_id": linto.get("user_id"),
+                "summary": summary,
+                "summary_service": linto.get("summary_service"),
+                "record": bool(linto.get("record", False)),
+                "steps": {},
+                "attempts": 0,
+            }
+        config = {k: v for k, v in (room.configuration or {}).items() if k != "linto"}
+        if summary_payload is not None:
+            config["linto_summary"] = summary_payload
+        room.configuration = config
+        room.save(update_fields=["configuration"])
+
+        if summary_payload is not None:
+            self._enqueue_summary(room)
+        logger.info("LinTO run stopped for room %s (summary=%s)", room.id, summary)
+        return {"status": "stopped"}
+
     # ── Browser-first lifecycle hooks ────────────────────────────────────
     # In the browser-first model the FRONTEND owns the Studio control plane via
     # the JS SDK (as the real user): it creates the quickMeeting, chooses the
@@ -584,6 +987,7 @@ class BotTranscriptionService:
             return {"status": "idle"}
         is_starter = False
         if enforce_permission:
+            self._check_may_stop(room, linto, user)
             starter_id = linto.get("user_id")
             is_starter = bool(
                 user is not None
@@ -591,18 +995,6 @@ class BotTranscriptionService:
                 and starter_id
                 and str(user.id) == str(starter_id)
             )
-            if not (is_starter or room.is_administrator_or_owner(user)):
-                raise PermissionDeniedError(
-                    "only the starter or a room admin/owner can stop the transcription"
-                )
-        self._set_banner(room, False)
-        recording_id = linto.get("recording_id")
-        if recording_id:
-            self._stop_recording(recording_id)
-
-        summary = bool(linto.get("summary", True))
-        org_id = linto.get("org_id")
-        session_id = linto.get("session_id")
         # The browser passes the unique name it used on the quickMeeting DELETE;
         # fall back to a deterministic one if absent (keeps the task resolvable).
         conversation_name = data.get("conversation_name") or (
@@ -612,31 +1004,7 @@ class BotTranscriptionService:
         # did not, so stop the Studio bot + session under the service account.
         if force_studio_delete or not is_starter:
             self._delete_studio_session(linto, conversation_name)
-        # The delivery (document, Twake Drive, recap email) follows every run
-        # with a session; `summary` only says whether the LLM step runs in it.
-        summary_payload = None
-        if org_id and session_id:
-            summary_payload = {
-                "org_id": org_id,
-                "session_id": session_id,
-                "conversation_name": conversation_name,
-                "recipient_user_id": linto.get("user_id"),
-                "summary": summary,
-                "summary_service": linto.get("summary_service"),
-                "record": bool(linto.get("record", False)),
-                "steps": {},
-                "attempts": 0,
-            }
-        config = {k: v for k, v in (room.configuration or {}).items() if k != "linto"}
-        if summary_payload is not None:
-            config["linto_summary"] = summary_payload
-        room.configuration = config
-        room.save(update_fields=["configuration"])
-
-        if summary_payload is not None:
-            self._enqueue_summary(room)
-        logger.info("LinTO run stopped for room %s (summary=%s)", room.id, summary)
-        return {"status": "stopped"}
+        return self._close_run(room, linto, conversation_name)
 
     def _delete_studio_session(self, linto, conversation_name):
         """SERVICE-ACCOUNT delete of the Studio bot + quick session in ``linto``.

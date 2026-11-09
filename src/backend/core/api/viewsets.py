@@ -67,7 +67,11 @@ from core.recording.worker.mediator import (
 from core.services.bot_transcription import (
     BotTranscriptionException,
     BotTranscriptionService,
+    NoProfileError,
     PermissionDeniedError,
+    RunConflictError,
+    StudioNotEntitled,
+    StudioRefusedError,
 )
 from core.services.invitation import InvitationService
 from core.services.jwt_token import JwtTokenService
@@ -281,6 +285,36 @@ class UserViewSet(
         if self.audit_code_refused:
             fields["reason"] = audit.Reason.AUTHENTICATION_FAILED
         return fields
+
+
+def _linto_start_failure(room, exc):
+    if isinstance(exc, PermissionDeniedError):
+        return drf_status.HTTP_403_FORBIDDEN, {
+            "error": str(exc),
+            "code": "permission_denied",
+        }
+    if isinstance(exc, StudioNotEntitled):
+        return drf_status.HTTP_403_FORBIDDEN, {
+            "error": str(exc),
+            "code": "not_entitled",
+            "reason": exc.reason,
+        }
+    if isinstance(exc, RunConflictError):
+        return drf_status.HTTP_409_CONFLICT, {"error": str(exc), "code": exc.code}
+    if isinstance(exc, NoProfileError):
+        return drf_status.HTTP_409_CONFLICT, {"error": str(exc), "code": "no_profile"}
+    if isinstance(exc, StudioRefusedError):
+        logger.warning("LinTO start refused by Studio for room %s: %s", room.id, exc)
+        return drf_status.HTTP_403_FORBIDDEN, {
+            "error": "LinTO refused to start the live transcription",
+            "code": "studio_refused",
+            "studio_status": exc.status,
+            "studio_code": exc.code,
+        }
+    logger.error("LinTO start failed for room %s: %s", room.id, exc)
+    return drf_status.HTTP_502_BAD_GATEWAY, {
+        "error": "the live transcription could not start"
+    }
 
 
 class RoomViewSet(  # pylint: disable=too-many-public-methods
@@ -928,6 +962,93 @@ class RoomViewSet(  # pylint: disable=too-many-public-methods
     # The FRONTEND drives Studio via the JS SDK as the user; these endpoints only
     # do what the browser cannot: mint the LiveKit bot join token, gate on the
     # organizer's permissions, and drive the banner/egress/summary lifecycle.
+    @decorators.action(
+        detail=True,
+        methods=["get"],
+        url_path="linto/profiles",
+        permission_classes=[permissions.HasLiveKitRoomAccess],
+        authentication_classes=[LiveKitTokenAuthentication],
+    )
+    @FeatureFlag.require("linto")
+    def linto_profiles(self, request, pk=None):  # pylint: disable=unused-argument
+        """The live ASR profiles the caller would start a run with."""
+        self.get_object()  # room access check
+        user = request.user
+        if user is None or not getattr(user, "is_authenticated", False):
+            return drf_response.Response(
+                {
+                    "code": "anonymous",
+                    "error": "anonymous participants have no LinTO identity",
+                },
+                status=drf_status.HTTP_403_FORBIDDEN,
+            )
+        try:
+            profiles = BotTranscriptionService().quick_meeting_profiles(user)
+        except StudioNotEntitled as exc:
+            return drf_response.Response(
+                {"profiles": [], "reason": "no_entitlement", "detail": exc.reason},
+                status=drf_status.HTTP_200_OK,
+            )
+        except BotTranscriptionException as exc:
+            logger.warning("LinTO profiles unavailable: %s", exc)
+            return drf_response.Response(
+                {"error": "the live transcription profiles are unavailable"},
+                status=drf_status.HTTP_502_BAD_GATEWAY,
+            )
+        return drf_response.Response(
+            {"profiles": profiles, "reason": "ok" if profiles else "unprovisioned"},
+            status=drf_status.HTTP_200_OK,
+        )
+
+    @decorators.action(
+        detail=True,
+        methods=["post"],
+        url_path="linto/start",
+        permission_classes=[permissions.HasLiveKitRoomAccess],
+        authentication_classes=[LiveKitTokenAuthentication],
+    )
+    @FeatureFlag.require("linto")
+    def linto_start(self, request, pk=None):  # pylint: disable=unused-argument
+        """Start the room's live run."""
+        room = self.get_object()
+        try:
+            result = BotTranscriptionService().start(
+                room,
+                request.data,
+                user=request.user,
+                origin=request.headers.get("Origin"),
+            )
+        except BotTranscriptionException as exc:
+            status, body = _linto_start_failure(room, exc)
+            return drf_response.Response(body, status=status)
+        return drf_response.Response(result, status=drf_status.HTTP_200_OK)
+
+    @decorators.action(
+        detail=True,
+        methods=["post"],
+        url_path="linto/stop",
+        permission_classes=[permissions.HasLiveKitRoomAccess],
+        authentication_classes=[LiveKitTokenAuthentication],
+    )
+    @FeatureFlag.require("linto")
+    def linto_stop(self, request, pk=None):  # pylint: disable=unused-argument
+        """Stop the room's live run."""
+        room = self.get_object()
+        try:
+            result = BotTranscriptionService().stop(room, user=request.user)
+        except PermissionDeniedError as exc:
+            return drf_response.Response(
+                {"error": str(exc), "code": "permission_denied"},
+                status=drf_status.HTTP_403_FORBIDDEN,
+            )
+        except BotTranscriptionException:
+            logger.exception("LinTO stop failed for room %s", room.id)
+            return drf_response.Response(
+                {"error": "the live transcription could not stop"},
+                status=drf_status.HTTP_502_BAD_GATEWAY,
+            )
+        return drf_response.Response(result, status=drf_status.HTTP_200_OK)
+
     @decorators.action(
         detail=True,
         methods=["post"],

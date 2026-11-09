@@ -34,9 +34,14 @@ from core.services.bot_transcription import (
     ROOM_METADATA_STATUS_KEY,
     BotTranscriptionException,
     BotTranscriptionService,
+    NoProfileError,
     PermissionDeniedError,
+    RunConflictError,
     StudioAudioNotReady,
+    StudioNotEntitled,
+    StudioRefusedError,
     effective_token_source,
+    normalize_profile,
 )
 
 pytestmark = pytest.mark.django_db
@@ -1050,3 +1055,494 @@ class TestConversationAudio:
         responses.head(self.MEDIA, status=200, headers={"Content-Length": "1234"})
         assert BotTranscriptionService().conversation_audio_size("conv-1") == 1234
         assert responses.calls[0].request.method == "HEAD"
+
+
+ORG = "org-1"
+PROFILES_URL = f"{STUDIO}/api/organizations/{ORG}/transcriber_profiles"
+SESSIONS_URL = f"{STUDIO}/api/organizations/{ORG}/sessions/"
+BOTS_URL = f"{STUDIO}/api/organizations/{ORG}/bots"
+PROFILES = [
+    {
+        "id": 220,
+        "name": "Whisper FR",
+        "config": {"languages": [{"candidate": "fr-FR"}]},
+        "translations": ["en", "de"],
+    },
+    {"id": 221, "name": "Other", "config": {}},
+]
+
+
+@pytest.fixture
+def run_settings(studio_settings):
+    studio_settings.LINTO_ENTITLEMENTS_ENABLED = False
+    studio_settings.LINTO_STUDIO_DEFAULT_ORG_ID = ORG
+    studio_settings.LINTO_STUDIO_DEFAULT_PROFILE_ID = ""
+    studio_settings.LINTO_VISIO_NATIVE_ENABLED = True
+    studio_settings.LINTO_LIVE_KEEP_AUDIO = True
+    studio_settings.LINTO_BOT_PROVIDER = "visio"
+    studio_settings.EMAIL_APP_BASE_URL = "https://meet.example"
+    studio_settings.CACHES = {
+        "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}
+    }
+    from django.core.cache import cache  # noqa: PLC0415
+
+    cache.clear()
+    return studio_settings
+
+
+def _mock_studio_start(session_id="sess-1", channel_id=7, bot_id="bot-1"):
+    responses.get(PROFILES_URL, json=PROFILES)
+    responses.post(
+        SESSIONS_URL,
+        json={"id": session_id, "channels": [{"id": channel_id, "index": 0}]},
+    )
+    responses.patch(f"{STUDIO}/api/organizations/{ORG}/sessions/{session_id}", json={})
+    responses.post(BOTS_URL, json={"id": bot_id})
+
+
+def _calls(method, url_prefix):
+    return [
+        c.request
+        for c in responses.calls
+        if c.request.method == method and c.request.url.startswith(url_prefix)
+    ]
+
+
+class TestNormalizeProfile:
+    def test_shapes_a_studio_profile_for_the_panel(self):
+        assert normalize_profile(PROFILES[0]) == {
+            "id": "220",
+            "name": "Whisper FR",
+            "languages": ["fr-FR"],
+            "translations": ["en", "de"],
+        }
+
+    def test_translations_grouped_by_kind_are_flattened(self):
+        profile = {
+            "_id": "p",
+            "config": {
+                "name": "From config",
+                "availableTranslations": {"discrete": ["en"], "external": ["it"]},
+            },
+        }
+        assert normalize_profile(profile) == {
+            "id": "p",
+            "name": "From config",
+            "languages": [],
+            "translations": ["en", "it"],
+        }
+
+
+class TestQuickMeetingProfiles:
+    @responses.activate
+    def test_lists_the_live_profiles_of_the_organization(self, run_settings):
+        responses.get(PROFILES_URL, json={"transcriber_profiles": PROFILES})
+        profiles = BotTranscriptionService().quick_meeting_profiles(UserFactory())
+        assert [p["id"] for p in profiles] == ["220", "221"]
+        request = responses.calls[0].request
+        assert "quickMeeting=true" in request.url
+        assert request.headers["Authorization"] == "Bearer static-token"
+
+    @responses.activate
+    def test_studio_failure_raises(self, run_settings):
+        responses.get(PROFILES_URL, status=500, body="down")
+        with pytest.raises(BotTranscriptionException):
+            BotTranscriptionService().quick_meeting_profiles(UserFactory())
+
+    @responses.activate
+    def test_not_entitled_user_key(self, user_key_settings):
+        responses.post(EXCHANGE, status=404, json={"code": "no_entitlement"})
+        with pytest.raises(StudioNotEntitled) as exc:
+            BotTranscriptionService().quick_meeting_profiles(UserFactory(sub="x"))
+        assert exc.value.reason == "no_entitlement"
+
+    @responses.activate
+    def test_a_key_without_quick_meeting_is_not_entitled(self, user_key_settings):
+        responses.post(
+            EXCHANGE,
+            json={
+                "token": "t",
+                "organizationId": ORG,
+                "capabilities": {"quickMeeting": False},
+            },
+        )
+        with pytest.raises(StudioNotEntitled) as exc:
+            BotTranscriptionService().quick_meeting_profiles(UserFactory(sub="y"))
+        assert exc.value.reason == "quick_meeting_disabled"
+
+
+class TestStart:
+    @pytest.fixture(autouse=True)
+    def _no_livekit(self):
+        with (
+            mock.patch.object(BotTranscriptionService, "_set_banner") as banner,
+            mock.patch.object(
+                BotTranscriptionService, "_stop_native_subtitles"
+            ) as stop_native,
+            mock.patch(
+                "core.services.bot_transcription.generate_bot_join_token",
+                return_value="lk-jwt",
+            ) as mint,
+        ):
+            self.banner = banner
+            self.stop_native = stop_native
+            self.mint = mint
+            yield
+
+    @responses.activate
+    def test_creates_the_rooms_session_and_launches_the_bot(self, run_settings):
+        room, owner = _owner_room()
+        _mock_studio_start()
+        result = BotTranscriptionService().start(
+            room,
+            {"translations": ["en"], "summary": False, "catchup": True},
+            user=owner,
+        )
+
+        (create,) = _calls("POST", SESSIONS_URL)
+        body = json.loads(create.body)
+        assert body["name"] == f"@meet-{room.id}"
+        assert body["visibility"] == "public"
+        assert body["channels"] == [
+            {
+                "name": "Main",
+                "transcriberProfileId": 220,
+                "enableLiveTranscripts": True,
+                "diarization": True,
+                "keepAudio": True,
+                "translations": ["en"],
+            }
+        ]
+        native = {"livekitUrl": "ws://livekit:7880", "room": str(room.id)}
+        assert body["meta"]["native"] == {"visio-native": native}
+        assert body["meta"]["linto_native"] == native
+
+        (patch,) = _calls("PATCH", f"{STUDIO}/api/organizations/{ORG}/sessions/sess-1")
+        with_token = {**native, "token": "lk-jwt"}
+        assert json.loads(patch.body)["meta"]["native"] == {"visio-native": with_token}
+        self.mint.assert_called_once_with(str(room.id), "7")
+        self.stop_native.assert_called_once_with(room)
+
+        (bot,) = _calls("POST", BOTS_URL)
+        assert json.loads(bot.body) == {
+            "url": f"https://meet.example/{room.slug}",
+            "channelId": 7,
+            "provider": "visio",
+            "enableDisplaySub": True,
+            "subSource": "original",
+        }
+        assert not any("/quickMeeting/" in c.request.url for c in responses.calls)
+        assert all(
+            c.request.headers["Authorization"] == "Bearer static-token"
+            for c in responses.calls
+        )
+
+        assert result["status"] == "running"
+        room.refresh_from_db()
+        linto = room.configuration["linto"]
+        assert linto["session_id"] == "sess-1"
+        assert linto["channel_id"] == 7
+        assert linto["org_id"] == ORG
+        assert linto["bot_id"] == "bot-1"
+        assert linto["summary"] is False
+        assert linto["catchup"] is True
+        assert linto["keep_audio"] is True
+        assert linto["user_id"] == str(owner.id)
+        self.banner.assert_called_once()
+
+    @responses.activate
+    def test_two_rooms_run_at_the_same_time_under_the_same_key(self, run_settings):
+        first, first_owner = _owner_room()
+        second, second_owner = _owner_room()
+        responses.get(PROFILES_URL, json=PROFILES)
+        responses.post(SESSIONS_URL, json={"id": "sess-a", "channels": [{"id": 1}]})
+        responses.post(SESSIONS_URL, json={"id": "sess-b", "channels": [{"id": 2}]})
+        responses.patch(f"{STUDIO}/api/organizations/{ORG}/sessions/sess-a", json={})
+        responses.patch(f"{STUDIO}/api/organizations/{ORG}/sessions/sess-b", json={})
+        responses.post(BOTS_URL, json={"id": "bot-a"})
+        responses.post(BOTS_URL, json={"id": "bot-b"})
+
+        service = BotTranscriptionService()
+        service.start(first, {}, user=first_owner)
+        service.start(second, {}, user=second_owner)
+
+        names = [json.loads(c.body)["name"] for c in _calls("POST", SESSIONS_URL)]
+        assert names == [f"@meet-{first.id}", f"@meet-{second.id}"]
+        first.refresh_from_db()
+        second.refresh_from_db()
+        assert first.configuration["linto"]["session_id"] == "sess-a"
+        assert second.configuration["linto"]["session_id"] == "sess-b"
+
+    @responses.activate
+    def test_a_room_already_running_refuses_a_second_start(self, run_settings):
+        room, owner = _owner_room()
+        room.configuration = {"linto": {"session_id": "sess-1"}}
+        room.save()
+        with pytest.raises(RunConflictError) as exc:
+            BotTranscriptionService().start(room, {}, user=owner)
+        assert exc.value.code == "already_running"
+        assert not responses.calls
+
+    @responses.activate
+    def test_a_start_under_way_refuses_another(self, run_settings):
+        room, owner = _owner_room()
+        from django.core.cache import cache  # noqa: PLC0415
+
+        cache.add(f"linto:start:{room.id}", "1", 60)
+        with pytest.raises(RunConflictError) as exc:
+            BotTranscriptionService().start(room, {}, user=owner)
+        assert exc.value.code == "already_starting"
+        assert not responses.calls
+
+    @responses.activate
+    def test_the_lock_is_released_after_a_failure(self, run_settings):
+        room, owner = _owner_room()
+        responses.get(PROFILES_URL, status=503, body="down")
+        with pytest.raises(BotTranscriptionException):
+            BotTranscriptionService().start(room, {}, user=owner)
+        responses.replace(responses.GET, PROFILES_URL, json=PROFILES)
+        _mock_studio_start()
+        assert BotTranscriptionService().start(room, {}, user=owner)["status"] == (
+            "running"
+        )
+
+    @responses.activate
+    def test_the_pinned_profile_is_used_when_the_organization_has_it(
+        self, run_settings
+    ):
+        run_settings.LINTO_STUDIO_DEFAULT_PROFILE_ID = "221"
+        room, owner = _owner_room()
+        _mock_studio_start()
+        BotTranscriptionService().start(room, {}, user=owner)
+        (create,) = _calls("POST", SESSIONS_URL)
+        assert json.loads(create.body)["channels"][0]["transcriberProfileId"] == 221
+
+    @responses.activate
+    def test_a_pinned_profile_gone_falls_back_to_the_first(self, run_settings):
+        run_settings.LINTO_STUDIO_DEFAULT_PROFILE_ID = "999"
+        room, owner = _owner_room()
+        _mock_studio_start()
+        BotTranscriptionService().start(room, {}, user=owner)
+        (create,) = _calls("POST", SESSIONS_URL)
+        assert json.loads(create.body)["channels"][0]["transcriberProfileId"] == 220
+
+    @responses.activate
+    def test_no_profile_starts_nothing(self, run_settings):
+        room, owner = _owner_room()
+        responses.get(PROFILES_URL, json=[])
+        with pytest.raises(NoProfileError):
+            BotTranscriptionService().start(room, {}, user=owner)
+        assert not _calls("POST", SESSIONS_URL)
+
+    @responses.activate
+    def test_a_bot_failure_stops_the_session_it_created(self, run_settings):
+        room, owner = _owner_room()
+        responses.get(PROFILES_URL, json=PROFILES)
+        responses.post(SESSIONS_URL, json={"id": "sess-1", "channels": [{"id": 7}]})
+        responses.patch(f"{STUDIO}/api/organizations/{ORG}/sessions/sess-1", json={})
+        responses.post(BOTS_URL, status=500, json={"error": "no bot"})
+        deleted = responses.delete(
+            f"{STUDIO}/api/organizations/{ORG}/sessions/sess-1", json={}
+        )
+        with pytest.raises(BotTranscriptionException):
+            BotTranscriptionService().start(room, {}, user=owner)
+        assert deleted.call_count == 1
+        room.refresh_from_db()
+        assert "linto" not in (room.configuration or {})
+        self.banner.assert_not_called()
+
+    @responses.activate
+    @pytest.mark.parametrize(
+        ("status", "body", "code"),
+        [
+            (402, {"code": "entitlement_required"}, "entitlement_required"),
+            (
+                403,
+                {"code": "transcriber_profile_security_level"},
+                "transcriber_profile_security_level",
+            ),
+            (403, "Forbidden", None),
+        ],
+    )
+    def test_a_refused_creation_says_so(self, run_settings, status, body, code):
+        room, owner = _owner_room()
+        responses.get(PROFILES_URL, json=PROFILES)
+        if isinstance(body, dict):
+            responses.post(SESSIONS_URL, status=status, json=body)
+        else:
+            responses.post(SESSIONS_URL, status=status, body=body)
+        with pytest.raises(StudioRefusedError) as exc:
+            BotTranscriptionService().start(room, {}, user=owner)
+        assert exc.value.status == status
+        assert exc.value.code == code
+        room.refresh_from_db()
+        assert "linto" not in (room.configuration or {})
+
+    @responses.activate
+    def test_a_refused_bot_stops_the_session(self, run_settings):
+        room, owner = _owner_room()
+        responses.get(PROFILES_URL, json=PROFILES)
+        responses.post(SESSIONS_URL, json={"id": "sess-1", "channels": [{"id": 7}]})
+        responses.patch(f"{STUDIO}/api/organizations/{ORG}/sessions/sess-1", json={})
+        responses.post(BOTS_URL, status=403, json={"message": "no BOT permission"})
+        deleted = responses.delete(
+            f"{STUDIO}/api/organizations/{ORG}/sessions/sess-1", json={}
+        )
+        with pytest.raises(StudioRefusedError):
+            BotTranscriptionService().start(room, {}, user=owner)
+        assert deleted.call_count == 1
+
+    def test_denied_for_non_admin(self, run_settings):
+        room = RoomFactory()
+        with pytest.raises(PermissionDeniedError):
+            BotTranscriptionService().start(room, {}, user=UserFactory())
+
+    @responses.activate
+    def test_user_key_acts_with_the_users_own_key(self, user_key_settings):
+        user_key_settings.LINTO_VISIO_NATIVE_ENABLED = True
+        user_key_settings.LINTO_STUDIO_DEFAULT_PROFILE_ID = ""
+        room, owner = _owner_room()
+        responses.post(
+            EXCHANGE,
+            json={"token": "user-jwt", "expiresIn": 3600, "organizationId": ORG},
+        )
+        _mock_studio_start()
+        with mock.patch(
+            "core.services.bot_transcription.summary_entitled", return_value=True
+        ):
+            BotTranscriptionService().start(room, {}, user=owner)
+        studio_calls = [
+            c for c in responses.calls if not c.request.url.startswith(EXCHANGE)
+        ]
+        assert studio_calls
+        assert all(
+            c.request.headers["Authorization"] == "Bearer user-jwt"
+            for c in studio_calls
+        )
+
+    @responses.activate
+    def test_user_key_not_entitled_starts_nothing(self, user_key_settings):
+        room, owner = _owner_room()
+        responses.post(EXCHANGE, status=404, json={"code": "no_entitlement"})
+        with pytest.raises(StudioNotEntitled):
+            BotTranscriptionService().start(room, {}, user=owner)
+        assert all(c.request.url.startswith(EXCHANGE) for c in responses.calls)
+
+
+class TestStop:
+    @pytest.fixture(autouse=True)
+    def _no_livekit(self):
+        with (
+            mock.patch.object(BotTranscriptionService, "_set_banner") as banner,
+            mock.patch.object(BotTranscriptionService, "_stop_recording"),
+            mock.patch.object(BotTranscriptionService, "_enqueue_summary") as enqueue,
+        ):
+            self.banner = banner
+            self.enqueue = enqueue
+            yield
+
+    @staticmethod
+    def _running(room, starter_id):
+        room.configuration = {
+            "linto": {
+                "user_id": starter_id,
+                "org_id": ORG,
+                "session_id": "sess-1",
+                "bot_id": "bot-1",
+                "summary": True,
+            }
+        }
+        room.save()
+
+    @responses.activate
+    def test_stops_the_bot_and_the_session_then_delivers(self, run_settings):
+        room = RoomFactory()
+        starter = UserFactory()
+        self._running(room, str(starter.id))
+        del_bot = responses.delete(f"{BOTS_URL}/bot-1", json={})
+        del_session = responses.delete(
+            f"{STUDIO}/api/organizations/{ORG}/sessions/sess-1", json={}
+        )
+        assert BotTranscriptionService().stop(room, user=starter) == {
+            "status": "stopped"
+        }
+        assert del_bot.call_count == 1
+        assert del_session.call_count == 1
+        url = del_session.calls[0].request.url
+        assert "force=true" in url
+        room.refresh_from_db()
+        name = room.configuration["linto_summary"]["conversation_name"]
+        assert f"name={name}" in url
+        assert name.startswith(f"linto-{room.id}-")
+        assert "linto" not in room.configuration
+        assert not any("/quickMeeting/" in c.request.url for c in responses.calls)
+        self.banner.assert_called_once_with(room, False)
+        self.enqueue.assert_called_once_with(room)
+
+    @responses.activate
+    def test_an_admin_stops_someone_elses_run(self, run_settings):
+        room, admin = _owner_room()
+        self._running(room, str(UserFactory().id))
+        responses.delete(f"{BOTS_URL}/bot-1", json={})
+        responses.delete(f"{STUDIO}/api/organizations/{ORG}/sessions/sess-1", json={})
+        assert BotTranscriptionService().stop(room, user=admin)["status"] == "stopped"
+        assert len(responses.calls) == 2
+
+    def test_a_stranger_may_not_stop(self, run_settings):
+        room = RoomFactory()
+        self._running(room, str(UserFactory().id))
+        with pytest.raises(PermissionDeniedError):
+            BotTranscriptionService().stop(room, user=UserFactory())
+
+    def test_idle_without_a_run(self, run_settings):
+        assert BotTranscriptionService().stop(RoomFactory(), user=None) == {
+            "status": "idle"
+        }
+
+    def test_a_concurrent_stop_does_nothing(self, run_settings):
+        room = RoomFactory()
+        starter = UserFactory()
+        self._running(room, str(starter.id))
+        from django.core.cache import cache  # noqa: PLC0415
+
+        cache.add(f"linto:stop:{room.id}", "1", 60)
+        assert BotTranscriptionService().stop(room, user=starter) == {
+            "status": "stopping"
+        }
+        self.enqueue.assert_not_called()
+
+    @responses.activate
+    def test_a_studio_failure_still_closes_the_run(self, run_settings):
+        room = RoomFactory()
+        starter = UserFactory()
+        self._running(room, str(starter.id))
+        responses.delete(f"{BOTS_URL}/bot-1", status=500, body="boom")
+        responses.delete(
+            f"{STUDIO}/api/organizations/{ORG}/sessions/sess-1", status=502, body="x"
+        )
+        assert BotTranscriptionService().stop(room, user=starter)["status"] == (
+            "stopped"
+        )
+        room.refresh_from_db()
+        assert "linto" not in room.configuration
+        self.enqueue.assert_called_once_with(room)
+
+    @responses.activate
+    def test_user_key_run_is_stopped_with_the_starters_key(self, user_key_settings):
+        room, admin = _owner_room()
+        starter = UserFactory(sub="starter-sub")
+        self._running(room, str(starter.id))
+        responses.post(
+            EXCHANGE,
+            json={"token": "starter-jwt", "expiresIn": 3600, "organizationId": ORG},
+        )
+        responses.delete(f"{BOTS_URL}/bot-1", json={})
+        responses.delete(f"{STUDIO}/api/organizations/{ORG}/sessions/sess-1", json={})
+        BotTranscriptionService().stop(room, user=admin)
+        exchange = json.loads(responses.calls[0].request.body)
+        assert exchange["subject"] == "starter-sub"
+        deletes = [c for c in responses.calls if c.request.method == "DELETE"]
+        assert len(deletes) == 2
+        assert all(
+            c.request.headers["Authorization"] == "Bearer starter-jwt" for c in deletes
+        )
