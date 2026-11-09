@@ -495,7 +495,7 @@ class TestTwakeTextOnly:
         # shortcut and the published document — no recording bytes, no summary
         # note.
         meeting = SimpleNamespace(
-            created_at=datetime.fromisoformat(stopped_at), room_id=room.id
+            created_at=datetime.fromisoformat(stopped_at), room=room
         )
         lang = recipient.language
         filenames = [c.kwargs["filename"] for c in save_file.await_args_list]
