@@ -40,6 +40,7 @@
     "catchup": {
       "heading": "Before you arrived",
       "loading": "Preparing the summary…",
+      "unavailable": "The catch-up service is not available.",
       "close": "Close the summary",
       "joined": "You joined the meeting at {{time}}"
     }

@@ -1,8 +1,8 @@
 import { proxy } from 'valtio'
 
-// Lifecycle of the "before you arrived" summary: 'unavailable' = the deployment
-// has no LLM (block hidden), 'too_short' = nothing worth summarizing was said
-// before I joined.
+// Lifecycle of the "before you arrived" summary: 'unavailable' = no catch-up
+// service on this deployment (the block says so), 'too_short' = nothing worth
+// summarizing was said before I joined.
 export type LintoCatchUpStatus =
   | 'idle'
   | 'loading'

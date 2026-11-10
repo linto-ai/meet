@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from unittest import mock
 
 import pytest
+import requests
 import responses
 
 from core import models
@@ -899,6 +900,7 @@ ORG = "org-1"
 PROFILES_URL = f"{STUDIO}/api/organizations/{ORG}/transcriber_profiles"
 SESSIONS_URL = f"{STUDIO}/api/organizations/{ORG}/sessions/"
 BOTS_URL = f"{STUDIO}/api/organizations/{ORG}/bots"
+CATCHUP_STATUS_URL = f"{STUDIO}/api/sessions/public/sess-1/catchup/status"
 PROFILES = [
     {
         "id": 220,
@@ -930,7 +932,7 @@ def run_settings(studio_settings):
     return studio_settings
 
 
-def _mock_studio_start(session_id="sess-1", channel_id=7, bot_id="bot-1"):
+def _mock_studio_start(session_id="sess-1", channel_id=7, bot_id="bot-1", catchup=None):
     responses.get(PROFILES_URL, json=PROFILES)
     responses.post(
         SESSIONS_URL,
@@ -938,6 +940,10 @@ def _mock_studio_start(session_id="sess-1", channel_id=7, bot_id="bot-1"):
     )
     responses.patch(f"{STUDIO}/api/organizations/{ORG}/sessions/{session_id}", json={})
     responses.post(BOTS_URL, json={"id": bot_id})
+    responses.get(
+        f"{STUDIO}/api/sessions/public/{session_id}/catchup/status",
+        **(catchup or {"json": {"enabled": True}}),
+    )
 
 
 def _calls(method, url_prefix):
@@ -1235,6 +1241,62 @@ class TestStart:
             room, {"translations": ["en", "de"]}, user=owner
         )
         assert result["status"] == "running"
+
+    @responses.activate
+    @pytest.mark.parametrize(
+        ("answer", "logged"),
+        [
+            (
+                {"json": {"enabled": False}},
+                "no LLM Gateway service for the catch-up (LLM_CATCHUP_SERVICE",
+            ),
+            ({"status": 404, "body": "Cannot GET"}, "Studio has no catch-up routes"),
+            (
+                {"status": 404, "json": {"code": "session_not_found"}},
+                "answered 404 session_not_found",
+            ),
+            ({"status": 503, "body": "down"}, "answered 503 down"),
+        ],
+    )
+    def test_an_unavailable_catchup_is_logged(
+        self, run_settings, caplog, answer, logged
+    ):
+        room, owner = _owner_room()
+        _mock_studio_start(catchup=answer)
+        with caplog.at_level("WARNING"):
+            result = BotTranscriptionService().start(room, {}, user=owner)
+        assert result["status"] == "running"
+        (check,) = _calls("GET", CATCHUP_STATUS_URL)
+        assert check.headers["Authorization"] == "Bearer static-token"
+        assert logged in caplog.text
+        assert "late joiners get no summary" in caplog.text
+
+    @responses.activate
+    def test_an_available_catchup_logs_nothing(self, run_settings, caplog):
+        room, owner = _owner_room()
+        _mock_studio_start()
+        with caplog.at_level("WARNING"):
+            BotTranscriptionService().start(room, {}, user=owner)
+        assert len(_calls("GET", CATCHUP_STATUS_URL)) == 1
+        assert "catch-up" not in caplog.text
+
+    @responses.activate
+    def test_an_unreachable_catchup_status_never_fails_the_start(
+        self, run_settings, caplog
+    ):
+        room, owner = _owner_room()
+        _mock_studio_start(catchup={"body": requests.ConnectionError("refused")})
+        with caplog.at_level("WARNING"):
+            result = BotTranscriptionService().start(room, {}, user=owner)
+        assert result["status"] == "running"
+        assert "LinTO catch-up status unknown" in caplog.text
+
+    @responses.activate
+    def test_a_run_without_catchup_checks_nothing(self, run_settings):
+        room, owner = _owner_room()
+        _mock_studio_start()
+        BotTranscriptionService().start(room, {"catchup": False}, user=owner)
+        assert not _calls("GET", CATCHUP_STATUS_URL)
 
     @responses.activate
     def test_a_bot_failure_stops_the_session_it_created(self, run_settings):

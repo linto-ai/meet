@@ -155,15 +155,17 @@ export const LiveTranscript = () => {
 
   // Catch-up: everything said BEFORE I joined is history, shown dimmed above a
   // "you joined at HH:MM" divider. The starter saw it all and gets neither.
-  // The summary block only shows while there is (or will be) something to
-  // read: nothing at all when the run has no summary, when too little was
-  // said, when the LLM failed, or once the reader closed it.
+  // The summary block shows while there is (or will be) something to read, or
+  // to say that the catch-up service is unavailable: nothing at all when the
+  // run has no summary, when too little was said, when the LLM failed, or once
+  // the reader closed it.
   const showCatchUp =
     !startedByMe &&
     joinedAt !== null &&
     !catchUp.dismissed &&
     (catchUp.status === 'loading' ||
       catchUp.status === 'streaming' ||
+      catchUp.status === 'unavailable' ||
       (catchUp.status === 'done' && !!catchUp.text.trim()))
   // The divider sits right before the first line received live (or at the tail
   // when the whole journal is still history).
@@ -387,7 +389,11 @@ export const LiveTranscript = () => {
             </Button>
           </div>
           <div data-testid="linto-catchup-summary">
-            {catchUp.text ? (
+            {catchUp.status === 'unavailable' ? (
+              <Text variant="smNote" data-testid="linto-catchup-unavailable">
+                {t('catchup.unavailable')}
+              </Text>
+            ) : catchUp.text ? (
               <SimpleMarkdown text={catchUp.text} />
             ) : (
               <Text variant="smNote">{t('catchup.loading')}</Text>

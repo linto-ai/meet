@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { catchUpFailureStatus } from './catchUpFailure'
+import { catchUpFailureReason, catchUpFailureStatus } from './catchUpFailure'
 
 // The errors the LinTO SDK throws on a catch-up call (catchUpError).
 const sdkError = (status: number, code: string) =>
@@ -9,13 +9,13 @@ const sdkError = (status: number, code: string) =>
   })
 
 describe('catchUpFailureStatus', () => {
-  it('hides the summary when Studio has no catch-up route', () => {
+  it('says the service is unavailable when Studio has no catch-up route', () => {
     expect(catchUpFailureStatus(sdkError(404, 'catchup_error'))).toBe(
       'unavailable'
     )
   })
 
-  it('hides the summary when the deployment has no LLM or refuses it', () => {
+  it('says the service is unavailable without an LLM service, or on a refusal', () => {
     expect(catchUpFailureStatus(sdkError(503, 'catchup_unavailable'))).toBe(
       'unavailable'
     )
@@ -33,5 +33,26 @@ describe('catchUpFailureStatus', () => {
   it('is an error otherwise', () => {
     expect(catchUpFailureStatus(sdkError(500, 'catchup_error'))).toBe('error')
     expect(catchUpFailureStatus(new Error('network'))).toBe('error')
+  })
+})
+
+describe('catchUpFailureReason', () => {
+  it('names the missing routes on a 404', () => {
+    expect(catchUpFailureReason(sdkError(404, 'catchup_error'))).toContain(
+      'no catch-up routes'
+    )
+  })
+
+  it('names the gateway service on a 503', () => {
+    expect(
+      catchUpFailureReason(sdkError(503, 'catchup_unavailable'))
+    ).toContain('LLM_CATCHUP_SERVICE')
+  })
+
+  it('carries the code and the HTTP status otherwise', () => {
+    expect(catchUpFailureReason(sdkError(500, 'catchup_error'))).toBe(
+      'catchup_error (HTTP 500): Request failed with status 500'
+    )
+    expect(catchUpFailureReason(new Error('network'))).toBe('error: network')
   })
 })

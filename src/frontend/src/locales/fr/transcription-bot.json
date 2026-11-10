@@ -40,6 +40,7 @@
     "catchup": {
       "heading": "Avant votre arrivée",
       "loading": "Résumé en préparation…",
+      "unavailable": "Le service de rattrapage n'est pas disponible.",
       "close": "Fermer le résumé",
       "joined": "Vous avez rejoint la réunion à {{time}}"
     }

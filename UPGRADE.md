@@ -28,14 +28,21 @@ the following command inside your docker container:
   `live_max_translations` from the config).
 
 
-### LinTO fork: the late joiners' summary needs Studio's catch-up routes
+### LinTO fork: the late joiners' summary needs Studio's catch-up routes and a gateway service
 
 The "Before you arrived" summary a late joiner gets calls
 `GET /api/sessions/public/{id}/catchup/status` and
-`POST /api/sessions/public/{id}/catchup` on Studio. A Studio without them
-(the production one until the `feat/live-catchup` pull request is deployed)
-answers 404: the block now stays hidden, the history so far still shows, and
-nothing reports an error. Nothing to set.
+`POST /api/sessions/public/{id}/catchup` on Studio (the `feat/live-catchup`
+pull request), which asks the LLM Gateway service `LLM_CATCHUP_SERVICE`
+(default `visio-catchup`). When Studio has no such routes (404, the
+production Studio until that pull request is deployed) or no gateway service
+resolves, the block says that the catch-up service is not available and the
+history so far still shows.
+
+- The backend checks it when a run with the catch-up starts and logs the
+  cause as a warning: `LinTO catch-up unavailable for room <id>, late joiners
+  get no summary: <cause>`. The late joiner's browser console carries it too.
+- Nothing to set on the Meet side.
 
 
 ### LinTO fork: a live run's conversation follows LINTO_STUDIO_MEMBERS_RIGHT

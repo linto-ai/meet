@@ -7,7 +7,11 @@ import { useSidePanel } from '@/features/rooms/livekit/hooks/useSidePanel'
 import { notifyLintoCatchUpReady } from '@/features/notifications'
 import { IDLE_CATCH_UP, lintoStore } from '../store/lintoStore'
 import { hydrateCaptions } from '../store/transcriptStore'
-import { catchUpFailureStatus } from '../utils/catchUpFailure'
+import {
+  CATCH_UP_NO_SERVICE,
+  catchUpFailureReason,
+  catchUpFailureStatus,
+} from '../utils/catchUpFailure'
 import { LINTO_SEGMENT_PREFIX, LintoCaption } from '../types/linto'
 import LinTO from '../vendor/linto-sdk'
 import type { PublicSession } from '../vendor/linto-sdk'
@@ -188,7 +192,7 @@ export const useLintoCatchUp = () => {
         const { enabled } = await linto.catchUpStatus(session, { token })
         if (controller.signal.aborted) return
         if (!enabled) {
-          // No LLM in this deployment — the panel hides the block entirely.
+          console.warn(`LinTO catch-up unavailable: ${CATCH_UP_NO_SERVICE}`)
           lintoStore.catchUp = {
             ...IDLE_CATCH_UP,
             status: 'unavailable',
@@ -224,9 +228,17 @@ export const useLintoCatchUp = () => {
       } catch (err) {
         if (controller.signal.aborted) return
         const code = (err as { code?: string })?.code
+        const status = catchUpFailureStatus(err)
+        if (status === 'unavailable') {
+          console.warn(
+            `LinTO catch-up unavailable: ${catchUpFailureReason(err)}`
+          )
+        } else if (status === 'error') {
+          console.warn(`LinTO catch-up failed: ${catchUpFailureReason(err)}`)
+        }
         lintoStore.catchUp = {
           ...IDLE_CATCH_UP,
-          status: catchUpFailureStatus(err),
+          status,
           updatedAt: Date.now(),
           error: code || (err as Error)?.message,
         }

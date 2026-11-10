@@ -36,6 +36,7 @@ DEFAULT_TIMEOUT = 15
 AUDIO_DOWNLOAD_TIMEOUT = (DEFAULT_TIMEOUT, 300)
 # Studio waits for the last captions before it finalizes the conversation.
 STOP_TIMEOUT = (DEFAULT_TIMEOUT, 60)
+CATCHUP_CHECK_TIMEOUT = 5
 START_LOCK_TTL = 120
 STOP_LOCK_TTL = 90
 
@@ -718,7 +719,7 @@ class BotTranscriptionService:
             )
             bot_id = bot.get("id") or bot.get("_id")
             choices = ("summary", "summary_service", "record", "catchup")
-            return self.mark_started(
+            run = self.mark_started(
                 room,
                 {
                     **{key: data[key] for key in choices if key in data},
@@ -733,6 +734,52 @@ class BotTranscriptionService:
         except Exception:
             self._stop_studio_run(headers, organization_id, session_id, bot_id)
             raise
+        if run.get("catchup"):
+            self._check_catchup(room, headers, session_id)
+        return run
+
+    def _check_catchup(self, room, headers, session_id):
+        """Log why the late joiners of the run will get no summary, if so."""
+        path = f"/api/sessions/public/{session_id}/catchup/status"
+        try:
+            r = requests.get(
+                f"{self.studio_base}{path}",
+                headers=headers,
+                timeout=CATCHUP_CHECK_TIMEOUT,
+            )
+        except requests.RequestException as exc:
+            logger.warning(
+                "LinTO catch-up status unknown for room %s: GET %s failed: %s",
+                room.id,
+                path,
+                exc,
+            )
+            return
+        try:
+            body = r.json()
+        except ValueError:
+            body = None
+        body = body if isinstance(body, dict) else {}
+        if r.status_code == 200 and body.get("enabled"):
+            return
+        if r.status_code == 200:
+            reason = (
+                "Studio resolves no LLM Gateway service for the catch-up "
+                "(LLM_CATCHUP_SERVICE, default visio-catchup, then "
+                "LLM_CHAT_SERVICE_ID)"
+            )
+        elif r.status_code == 404 and not body.get("code"):
+            reason = f"Studio has no catch-up routes (GET {path} answered 404)"
+        else:
+            reason = (
+                f"GET {path} answered {r.status_code} "
+                f"{body.get('code') or r.text[:200]}"
+            )
+        logger.warning(
+            "LinTO catch-up unavailable for room %s, late joiners get no summary: %s",
+            room.id,
+            reason,
+        )
 
     def _stop_studio_run(self, headers, organization_id, session_id, bot_id, name=None):
         if not organization_id:

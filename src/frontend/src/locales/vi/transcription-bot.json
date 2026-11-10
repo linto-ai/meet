@@ -40,6 +40,7 @@
     "catchup": {
       "heading": "Trước khi bạn tham gia",
       "loading": "Đang chuẩn bị bản tóm tắt…",
+      "unavailable": "Dịch vụ tóm tắt phần đã bỏ lỡ hiện không khả dụng.",
       "close": "Đóng bản tóm tắt",
       "joined": "Bạn đã tham gia cuộc họp lúc {{time}}"
     }
