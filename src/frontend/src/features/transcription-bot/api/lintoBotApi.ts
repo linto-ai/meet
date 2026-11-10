@@ -4,6 +4,7 @@ import {
   useQuery,
 } from '@tanstack/react-query'
 import { fetchApi } from '@/api/fetchApi'
+import { apiUrl } from '@/api/apiUrl'
 import { useConfig } from '@/api/useConfig'
 import { getLiveKitAuthHeaders } from '@/features/rooms/utils/getLiveKitAuthHeaders'
 import { ApiError } from '@/api/ApiError'
@@ -193,4 +194,163 @@ export function useStopLintoLive(
     mutationFn: stopLintoLive,
     ...options,
   })
+}
+
+// ── Late joiner's catch-up summary (Meet backend relay) ───────────────────────
+
+export type LintoCatchUpErrorCode =
+  | 'catchup_too_short'
+  | 'catchup_rate_limited'
+  | 'catchup_unavailable'
+  | 'catchup_forbidden'
+  | 'catchup_unauthorized'
+  | 'catchup_error'
+
+export class LintoCatchUpError extends Error {
+  status?: number
+  code: string
+  reason?: string
+  constructor(message: string, code: string, status?: number, reason?: string) {
+    super(message)
+    this.name = 'LintoCatchUpError'
+    this.code = code
+    this.status = status
+    this.reason = reason
+  }
+}
+
+const CATCH_UP_CODE_BY_STATUS: Record<number, LintoCatchUpErrorCode> = {
+  204: 'catchup_too_short',
+  401: 'catchup_unauthorized',
+  403: 'catchup_forbidden',
+  429: 'catchup_rate_limited',
+  503: 'catchup_unavailable',
+}
+
+const catchUpHttpError = (status: number, body: unknown) => {
+  const { code, reason } = (body ?? {}) as { code?: string; reason?: string }
+  return new LintoCatchUpError(
+    `Request failed with status ${status}`,
+    code || CATCH_UP_CODE_BY_STATUS[status] || 'catchup_error',
+    status,
+    reason
+  )
+}
+
+const csrfToken = () =>
+  typeof document === 'undefined'
+    ? undefined
+    : document.cookie
+        .split(';')
+        .filter((cookie) => cookie.trim().startsWith('csrftoken='))
+        .map((cookie) => cookie.split('=')[1])
+        .pop()
+
+export interface LintoCatchUpAvailability {
+  enabled: boolean
+  reason?: string
+}
+
+export const fetchLintoCatchUpStatus = async (
+  roomId: string,
+  token: string
+): Promise<LintoCatchUpAvailability> => {
+  try {
+    const res = await fetchApi<LintoCatchUpAvailability>(
+      `rooms/${roomId}/linto/catchup/status/`,
+      { headers: getLiveKitAuthHeaders(token) }
+    )
+    return { enabled: !!res?.enabled, reason: res?.reason }
+  } catch (err) {
+    if (err instanceof ApiError)
+      throw catchUpHttpError(err.statusCode, err.body)
+    throw err
+  }
+}
+
+export interface StreamLintoCatchUpParams {
+  roomId: string
+  token: string
+  before: string
+  signal?: AbortSignal
+  onToken?: (chunk: string, text: string) => void
+}
+
+export const streamLintoCatchUp = async ({
+  roomId,
+  token,
+  before,
+  signal,
+  onToken,
+}: StreamLintoCatchUpParams): Promise<{ text: string; cached: boolean }> => {
+  const csrf = csrfToken()
+  const res = await fetch(apiUrl(`rooms/${roomId}/linto/catchup/`), {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(!!csrf && { 'X-CSRFToken': csrf }),
+      ...getLiveKitAuthHeaders(token),
+    },
+    body: JSON.stringify({ before }),
+    ...(signal ? { signal } : {}),
+  })
+
+  if (res.status === 204) throw catchUpHttpError(204, null)
+  if (!res.ok) {
+    let body: unknown = null
+    if ((res.headers.get('content-type') ?? '').includes('application/json')) {
+      body = await res.json().catch(() => null)
+    }
+    throw catchUpHttpError(res.status, body)
+  }
+  if (!res.body) {
+    throw new LintoCatchUpError(
+      'Catch-up response is not streamable',
+      'catchup_error',
+      res.status
+    )
+  }
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let eventType: string | null = null
+  let text = ''
+  let cached = false
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() ?? ''
+    for (const line of lines) {
+      if (line.startsWith('event: ')) {
+        eventType = line.slice(7).trim()
+        continue
+      }
+      if (!line.startsWith('data: ')) continue
+      let data: { content?: string; cached?: boolean; message?: string }
+      try {
+        data = JSON.parse(line.slice(6))
+      } catch {
+        continue
+      }
+      if (eventType === 'token' && data?.content) {
+        text += data.content
+        onToken?.(data.content, text)
+      } else if (eventType === 'done') {
+        cached = !!data?.cached
+      } else if (eventType === 'error') {
+        throw new LintoCatchUpError(
+          data?.message || 'Catch-up failed',
+          'catchup_error',
+          res.status
+        )
+      }
+    }
+  }
+
+  return { text, cached }
 }

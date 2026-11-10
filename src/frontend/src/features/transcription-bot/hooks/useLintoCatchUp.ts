@@ -7,8 +7,9 @@ import { useSidePanel } from '@/features/rooms/livekit/hooks/useSidePanel'
 import { notifyLintoCatchUpReady } from '@/features/notifications'
 import { IDLE_CATCH_UP, lintoStore } from '../store/lintoStore'
 import { hydrateCaptions } from '../store/transcriptStore'
+import { fetchLintoCatchUpStatus, streamLintoCatchUp } from '../api/lintoBotApi'
 import {
-  CATCH_UP_NO_SERVICE,
+  catchUpDisabledReason,
   catchUpFailureReason,
   catchUpFailureStatus,
 } from '../utils/catchUpFailure'
@@ -30,8 +31,8 @@ import { useLintoStatus } from './useLintoStatus'
  * the whole meeting and needs neither the history nor the summary.
  */
 
-// Studio's PUBLIC session routes, without credential: the backend creates the
-// session public, and its `publicSessionToken` authorizes the summary.
+// The history comes from Studio's public session route, without credential;
+// the summary from the Meet backend, on the participant's LiveKit token.
 
 /** sessionStorage key holding the join time — see {@link readJoinedAt}. */
 export const joinedAtStorageKey = (roomId: string, sessionId: string) =>
@@ -161,6 +162,8 @@ export const useLintoCatchUp = () => {
   openLintoRef.current = openLinto
 
   const roomId = apiRoomData?.livekit?.room || room?.name || ''
+  const roomTokenRef = useRef('')
+  roomTokenRef.current = apiRoomData?.livekit?.token || ''
 
   // One run per (room, session): a metadata refresh or a re-render must not
   // re-hydrate the journal nor spend another LLM call.
@@ -177,22 +180,21 @@ export const useLintoCatchUp = () => {
    *  ONCE per run: no refresh, and the block can be closed for good. When it
    *  lands while the panel is closed, a discreet toast offers to open it. */
   const runSummary = useCallback(
-    async (
-      linto: InstanceType<typeof LinTO>,
-      session: string,
-      index: number,
-      joinedAt: number,
-      token?: string
-    ) => {
+    async (meetRoomId: string, token: string, joinedAt: number) => {
       abortRef.current?.abort()
       const controller = new AbortController()
       abortRef.current = controller
       lintoStore.catchUp = { ...IDLE_CATCH_UP, status: 'loading' }
       try {
-        const { enabled } = await linto.catchUpStatus(session, { token })
+        const { enabled, reason } = await fetchLintoCatchUpStatus(
+          meetRoomId,
+          token
+        )
         if (controller.signal.aborted) return
         if (!enabled) {
-          console.warn(`LinTO catch-up unavailable: ${CATCH_UP_NO_SERVICE}`)
+          console.warn(
+            `LinTO catch-up unavailable: ${catchUpDisabledReason(reason)}`
+          )
           lintoStore.catchUp = {
             ...IDLE_CATCH_UP,
             status: 'unavailable',
@@ -200,10 +202,10 @@ export const useLintoCatchUp = () => {
           }
           return
         }
-        const { text } = await linto.catchUp(session, {
+        const { text } = await streamLintoCatchUp({
+          roomId: meetRoomId,
           token,
           before: new Date(joinedAt).toISOString(),
-          channelIndex: index,
           signal: controller.signal,
           onToken: (_chunk, fullText) => {
             if (controller.signal.aborted) return
@@ -288,8 +290,19 @@ export const useLintoCatchUp = () => {
       // The summary is an option of the run: the history above is always
       // hydrated, the LLM is only asked when the starter left it on.
       if (!catchUpEnabled) return
-      const token = session?.publicSessionToken
-      await runSummary(linto, sessionId, channelIndex, joinedAt, token)
+      const token = roomTokenRef.current
+      if (!token) {
+        console.warn(
+          'LinTO catch-up unavailable: no LiveKit token for this room'
+        )
+        lintoStore.catchUp = {
+          ...IDLE_CATCH_UP,
+          status: 'unavailable',
+          updatedAt: Date.now(),
+        }
+        return
+      }
+      await runSummary(roomId, token, joinedAt)
     }
     void run()
 

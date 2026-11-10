@@ -1,12 +1,14 @@
 import type { LintoCatchUpStatus } from '../store/lintoStore'
 
-type CatchUpError = { code?: string; status?: number; message?: string }
+type CatchUpError = {
+  code?: string
+  status?: number
+  message?: string
+  reason?: string
+}
 
-export const CATCH_UP_NO_SERVICE =
-  'Studio resolves no LLM Gateway service for the catch-up ' +
-  '(LLM_CATCHUP_SERVICE, default visio-catchup, then LLM_CHAT_SERVICE_ID)'
-
-// A Studio without the catch-up routes answers 404.
+// A 429 hides the block (a reload within 20 s): nothing is wrong with the
+// service, so it is not reported as unavailable.
 export const catchUpFailureStatus = (err: unknown): LintoCatchUpStatus => {
   const { code, status } = (err ?? {}) as CatchUpError
   if (code === 'catchup_too_short') return 'too_short'
@@ -20,24 +22,26 @@ export const catchUpFailureStatus = (err: unknown): LintoCatchUpStatus => {
   return 'error'
 }
 
+export const catchUpDisabledReason = (reason?: string): string =>
+  reason || 'the Meet backend gave no reason'
+
 // The cause, for the console: the panel only says the service is unavailable.
 export const catchUpFailureReason = (err: unknown): string => {
-  const { code, status, message } = (err ?? {}) as CatchUpError
+  const { code, status, message, reason } = (err ?? {}) as CatchUpError
   if (status === 404) {
     return (
-      'Studio answered 404 on the catch-up route: this Studio has no ' +
-      'catch-up routes (/api/sessions/public/:id/catchup), or it does not ' +
-      'know the session'
+      'the Meet backend answered 404 on the catch-up relay: this Meet has no ' +
+      'catch-up relay route (/rooms/:id/linto/catchup/), or LinTO is off'
     )
   }
   if (code === 'catchup_unavailable') {
-    return (
-      `Studio answered 503: ${CATCH_UP_NO_SERVICE}, or the LLM Gateway is ` +
-      'unreachable or refused the completion'
-    )
+    return `the Meet backend answered ${status ?? 503}: ${catchUpDisabledReason(reason)}`
   }
   if (code === 'catchup_forbidden') {
-    return 'Studio refused the public session token (403)'
+    return 'the Meet backend refused the LiveKit token of this room (403)'
+  }
+  if (code === 'catchup_rate_limited') {
+    return 'the Meet backend allows one catch-up per participant every 20 s (429)'
   }
   return `${code ?? 'error'}${status ? ` (HTTP ${status})` : ''}: ${message ?? 'unknown error'}`
 }
