@@ -30,6 +30,21 @@ describe('lintoStartFailure', () => {
     ).toEqual({ kind: 'error', messageKey: 'errors.noProfile' })
   })
 
+  it('says how many translation languages are allowed', () => {
+    expect(
+      lintoStartFailure(
+        new ApiError(400, {
+          code: 'too_many_translations',
+          max_translations: 2,
+        })
+      )
+    ).toEqual({
+      kind: 'error',
+      messageKey: 'errors.tooManyTranslations',
+      params: { count: 2 },
+    })
+  })
+
   it('never shows the backend text of any other failure', () => {
     expect(
       lintoStartFailure(

@@ -16,6 +16,7 @@
     },
     "translations": {
       "label": "Übersetzen in",
+      "max": "max. {{count}}",
       "none": "Keine",
       "other": "Andere Sprache",
       "otherPlaceholder": "Sprache hinzufügen…",
@@ -23,6 +24,7 @@
     },
     "errors": {
       "noProfile": "Für deine Organisation ist kein Transkriptionsprofil eingerichtet. Bitte eine Administratorin oder einen Administrator, eines anzulegen.",
+      "tooManyTranslations": "Zu viele Übersetzungssprachen (höchstens {{count}}).",
       "generic": "Die Transkription konnte nicht gestartet werden. Versuche es erneut.",
       "studioRefused": "LinTO hat den Start der Transkription abgelehnt: Deine LinTO-Organisation ist dafür nicht berechtigt (Abonnement, Rolle oder Berechtigungen). Wende dich an deine LinTO-Administration.",
       "retry": "Erneut versuchen"

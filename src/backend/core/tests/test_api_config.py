@@ -54,6 +54,14 @@ def test_config_linto_reports_the_kill_switch_and_effective_token_source(setting
     assert data["linto"]["token_source"] == "service_account"
 
 
+@pytest.mark.parametrize("limit", [0, 3])
+def test_config_linto_reports_the_translation_limit(settings, limit):
+    settings.LINTO_FEATURE_ENABLED = True
+    settings.LINTO_LIVE_MAX_TRANSLATIONS = limit
+    data = APIClient().get("/api/v1.0/config/").json()
+    assert data["linto"]["live_max_translations"] == limit
+
+
 def test_config_linto_carries_no_studio_credential_nor_bot_wiring(settings):
     settings.LINTO_FEATURE_ENABLED = True
     settings.LINTO_STUDIO_API_TOKEN = "the-studio-key"

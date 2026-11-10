@@ -33,6 +33,7 @@ const chipClass = (on: boolean, disabled?: boolean) =>
     fontSize: '0.8125rem',
     fontWeight: on ? 'semibold' : 'medium',
     cursor: disabled ? 'default' : 'pointer',
+    opacity: disabled && !on ? 0.5 : 1,
     _hover: disabled ? {} : { backgroundColor: on ? 'primary.200' : 'gray.50' },
   })
 
@@ -43,6 +44,7 @@ const selectClass = css({
   border: '1px solid',
   borderColor: 'control.border',
   backgroundColor: 'white',
+  _disabled: { opacity: 0.5 },
 })
 
 interface TranslationPickerProps {
@@ -72,6 +74,9 @@ export const TranslationPicker = ({ isDisabled }: TranslationPickerProps) => {
   const { data } = useLintoBotProfiles(roomId, token)
   const { data: configData } = useConfig()
   const pinnedProfileId = configData?.linto?.default_profile_id
+  const maxTranslations = configData?.linto?.live_max_translations ?? 0
+  const isFull =
+    maxTranslations > 0 && selectedTranslations.length >= maxTranslations
 
   const profiles = useMemo(() => data?.profiles ?? [], [data])
   // The pinned profile bounds the targets (what the ASR can actually translate
@@ -122,12 +127,14 @@ export const TranslationPicker = ({ isDisabled }: TranslationPickerProps) => {
   const isSelected = (code: string) => selectedTranslations.includes(code)
   const toggle = (code: string) => {
     const current = lintoStore.selectedTranslations
-    lintoStore.selectedTranslations = current.includes(code)
-      ? current.filter((item) => item !== code)
-      : [...current, code]
+    if (current.includes(code)) {
+      lintoStore.selectedTranslations = current.filter((item) => item !== code)
+    } else if (!isFull) {
+      lintoStore.selectedTranslations = [...current, code]
+    }
   }
   const addFromSelect = (code: string) => {
-    if (code && !isSelected(code)) {
+    if (code && !isSelected(code) && !isFull) {
       lintoStore.selectedTranslations = [
         ...lintoStore.selectedTranslations,
         code,
@@ -147,9 +154,22 @@ export const TranslationPicker = ({ isDisabled }: TranslationPickerProps) => {
         gap: '0.5rem',
       })}
     >
-      <Text variant="sm" as="span">
-        {t('label')}
-      </Text>
+      <div
+        className={css({
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'baseline',
+        })}
+      >
+        <Text variant="sm" as="span">
+          {t('label')}
+        </Text>
+        {maxTranslations > 0 && (
+          <Text variant="smNote" as="span" data-testid="linto-target-max">
+            {t('max', { count: maxTranslations })}
+          </Text>
+        )}
+      </div>
       <div
         role="group"
         aria-label={t('label')}
@@ -173,15 +193,16 @@ export const TranslationPicker = ({ isDisabled }: TranslationPickerProps) => {
         </button>
         {shownChips.map((option) => {
           const on = isSelected(option.code)
+          const locked = isDisabled || (isFull && !on)
           return (
             <button
               key={option.code}
               type="button"
               data-testid={`linto-target-chip-${option.code}`}
               aria-pressed={on}
-              disabled={isDisabled}
+              disabled={locked}
               onClick={() => toggle(option.code)}
-              className={chipClass(on, isDisabled)}
+              className={chipClass(on, locked)}
             >
               {on && <RiCheckLine size={14} aria-hidden="true" />}
               {option.label}
@@ -198,7 +219,7 @@ export const TranslationPicker = ({ isDisabled }: TranslationPickerProps) => {
             data-testid="linto-target-more"
             className={selectClass}
             value=""
-            disabled={isDisabled}
+            disabled={isDisabled || isFull}
             onChange={(e) => {
               addFromSelect(e.target.value)
               e.target.value = ''

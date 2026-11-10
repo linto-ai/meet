@@ -177,6 +177,14 @@ class NoProfileError(BotTranscriptionException):
     """The organization has no live ASR profile to start a run with."""
 
 
+class TooManyTranslationsError(BotTranscriptionException):
+    """More translation languages than LINTO_LIVE_MAX_TRANSLATIONS."""
+
+    def __init__(self, limit):
+        super().__init__(f"at most {limit} translation languages")
+        self.limit = limit
+
+
 class StudioRefusedError(BotTranscriptionException):
     """Studio answered 402 or 403."""
 
@@ -643,12 +651,17 @@ class BotTranscriptionService:
             cache.delete(lock)
 
     def _start_run(self, room, data, user, origin):
-        headers, organization_id = self._acting_as(user)
-        profile_id = self._pick_profile(self._list_profiles(headers, organization_id))
         translations = data.get("translations")
         if not isinstance(translations, list):
             translations = []
-        translations = [code for code in translations if isinstance(code, str)]
+        translations = list(
+            dict.fromkeys(code for code in translations if isinstance(code, str))
+        )
+        limit = settings.LINTO_LIVE_MAX_TRANSLATIONS
+        if limit and len(translations) > limit:
+            raise TooManyTranslationsError(limit)
+        headers, organization_id = self._acting_as(user)
+        profile_id = self._pick_profile(self._list_profiles(headers, organization_id))
         channel = {
             "name": "Main",
             "transcriberProfileId": profile_id,

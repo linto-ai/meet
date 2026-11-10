@@ -36,6 +36,7 @@ from core.services.bot_transcription import (
     StudioAudioNotReady,
     StudioNotEntitled,
     StudioRefusedError,
+    TooManyTranslationsError,
     effective_token_source,
     normalize_profile,
 )
@@ -906,6 +907,7 @@ def run_settings(studio_settings):
     studio_settings.LINTO_BOT_PROVIDER = "visio"
     studio_settings.EMAIL_APP_BASE_URL = "https://meet.example"
     studio_settings.LINTO_STUDIO_MEMBERS_RIGHT = 0
+    studio_settings.LINTO_LIVE_MAX_TRANSLATIONS = 0
     studio_settings.CACHES = {
         "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}
     }
@@ -1184,6 +1186,42 @@ class TestStart:
         with pytest.raises(NoProfileError):
             BotTranscriptionService().start(room, {}, user=owner)
         assert not _calls("POST", SESSIONS_URL)
+
+    @responses.activate
+    @pytest.mark.parametrize(
+        ("limit", "asked", "sent"),
+        [
+            (0, ["en", "de", "es", "it", "nl"], ["en", "de", "es", "it", "nl"]),
+            (2, ["en", "de"], ["en", "de"]),
+            (2, ["en", "en", "de"], ["en", "de"]),
+            (1, [], []),
+        ],
+    )
+    def test_translations_within_the_limit(self, run_settings, limit, asked, sent):
+        run_settings.LINTO_LIVE_MAX_TRANSLATIONS = limit
+        room, owner = _owner_room()
+        _mock_studio_start()
+        BotTranscriptionService().start(room, {"translations": asked}, user=owner)
+        (create,) = _calls("POST", SESSIONS_URL)
+        assert json.loads(create.body)["channels"][0]["translations"] == sent
+
+    @responses.activate
+    def test_more_translations_than_the_limit_start_nothing(self, run_settings):
+        run_settings.LINTO_LIVE_MAX_TRANSLATIONS = 2
+        room, owner = _owner_room()
+        with pytest.raises(TooManyTranslationsError) as exc:
+            BotTranscriptionService().start(
+                room, {"translations": ["en", "de", "es"]}, user=owner
+            )
+        assert exc.value.limit == 2
+        assert not responses.calls
+        room.refresh_from_db()
+        assert not (room.configuration or {}).get("linto")
+        _mock_studio_start()
+        result = BotTranscriptionService().start(
+            room, {"translations": ["en", "de"]}, user=owner
+        )
+        assert result["status"] == "running"
 
     @responses.activate
     def test_a_bot_failure_stops_the_session_it_created(self, run_settings):

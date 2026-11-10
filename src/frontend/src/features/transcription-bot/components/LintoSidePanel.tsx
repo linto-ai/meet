@@ -120,7 +120,7 @@ export const LintoSidePanel = () => {
       onError: (err) => {
         const failure = lintoStartFailure(err)
         if (failure.kind === 'error') {
-          lintoStore.error = t(failure.messageKey)
+          lintoStore.error = t(failure.messageKey, failure.params)
           return
         }
         // The room already has a run: its metadata takes over.

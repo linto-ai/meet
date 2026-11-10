@@ -26,6 +26,7 @@ from core.services.bot_transcription import (
     RunConflictError,
     StudioNotEntitled,
     StudioRefusedError,
+    TooManyTranslationsError,
 )
 from core.utils import generate_token
 
@@ -318,6 +319,7 @@ class TestStart:
             (RunConflictError("already_running"), 409, "already_running"),
             (RunConflictError("already_starting"), 409, "already_starting"),
             (NoProfileError("none"), 409, "no_profile"),
+            (TooManyTranslationsError(2), 400, "too_many_translations"),
         ],
     )
     def test_refusals_carry_a_code(self, linto_settings, error, status, code):
@@ -328,6 +330,16 @@ class TestStart:
             res = _post(APIClient(), room, "start")
         assert res.status_code == status
         assert res.json()["code"] == code
+
+    def test_too_many_translations_carries_the_limit(self, linto_settings):
+        room = RoomFactory()
+        with mock.patch(
+            "core.api.viewsets.BotTranscriptionService.start",
+            side_effect=TooManyTranslationsError(3),
+        ):
+            res = _post(APIClient(), room, "start")
+        assert res.status_code == 400
+        assert res.json()["max_translations"] == 3
 
     def test_a_studio_refusal_is_a_403_the_panel_can_explain(self, linto_settings):
         room = RoomFactory()

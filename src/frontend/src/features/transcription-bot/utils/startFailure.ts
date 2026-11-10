@@ -5,7 +5,12 @@ export type LintoStartFailure =
   | { kind: 'already_starting' }
   | {
       kind: 'error'
-      messageKey: 'errors.studioRefused' | 'errors.noProfile' | 'errors.generic'
+      messageKey:
+        | 'errors.studioRefused'
+        | 'errors.noProfile'
+        | 'errors.tooManyTranslations'
+        | 'errors.generic'
+      params?: { count: number }
     }
 
 export const lintoStartFailure = (err: unknown): LintoStartFailure => {
@@ -22,6 +27,14 @@ export const lintoStartFailure = (err: unknown): LintoStartFailure => {
   }
   if (code === 'no_profile') {
     return { kind: 'error', messageKey: 'errors.noProfile' }
+  }
+  if (code === 'too_many_translations') {
+    const max = (body as Record<string, unknown>).max_translations
+    return {
+      kind: 'error',
+      messageKey: 'errors.tooManyTranslations',
+      params: { count: typeof max === 'number' ? max : 0 },
+    }
   }
   return { kind: 'error', messageKey: 'errors.generic' }
 }

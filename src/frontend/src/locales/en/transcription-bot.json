@@ -16,6 +16,7 @@
     },
     "translations": {
       "label": "Translate into",
+      "max": "{{count}} max",
       "none": "None",
       "other": "Other language",
       "otherPlaceholder": "Add a language…",
@@ -23,6 +24,7 @@
     },
     "errors": {
       "noProfile": "No transcription profile is set up for your organization. Ask an administrator to create one.",
+      "tooManyTranslations": "Too many translation languages (maximum: {{count}}).",
       "generic": "The transcription could not start. Try again.",
       "studioRefused": "LinTO refused to start the transcription: your LinTO organization is not allowed to (subscription, role or permissions). Contact your LinTO administrator.",
       "retry": "Try again"

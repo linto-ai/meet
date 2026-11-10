@@ -72,6 +72,7 @@ from core.services.bot_transcription import (
     RunConflictError,
     StudioNotEntitled,
     StudioRefusedError,
+    TooManyTranslationsError,
 )
 from core.services.invitation import InvitationService
 from core.services.jwt_token import JwtTokenService
@@ -1016,6 +1017,15 @@ class RoomViewSet(  # pylint: disable=too-many-public-methods
                 request.data,
                 user=request.user,
                 origin=request.headers.get("Origin"),
+            )
+        except TooManyTranslationsError as exc:
+            return drf_response.Response(
+                {
+                    "error": str(exc),
+                    "code": "too_many_translations",
+                    "max_translations": exc.limit,
+                },
+                status=drf_status.HTTP_400_BAD_REQUEST,
             )
         except BotTranscriptionException as exc:
             status, body = _linto_start_failure(room, exc)

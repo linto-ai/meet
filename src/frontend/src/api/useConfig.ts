@@ -22,6 +22,8 @@ export interface LintoRuntimeConfig {
   // Pinned ASR profile id (the panel never lets the user pick one); '' → the
   // first available profile is used.
   default_profile_id: string
+  // Most translation languages a live run may carry, 0 = no limit.
+  live_max_translations: number
 }
 
 export interface ApiConfig {

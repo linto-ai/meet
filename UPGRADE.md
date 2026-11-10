@@ -17,6 +17,17 @@ the following command inside your docker container:
 ## [Unreleased]
 
 
+### LinTO fork: a cap on the live translation languages
+
+- New backend variable `LINTO_LIVE_MAX_TRANSLATIONS` (default `0`: no limit),
+  the most translation languages a live transcription may carry. The panel
+  shows the cap next to "Translate into" and greys out the other languages once
+  it is reached; the backend refuses a start beyond it (400
+  `too_many_translations`).
+- Deploy the backend and the frontend together (the panel reads
+  `live_max_translations` from the config).
+
+
 ### LinTO fork: the late joiners' summary needs Studio's catch-up routes
 
 The "Before you arrived" summary a late joiner gets calls

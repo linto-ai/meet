@@ -102,6 +102,7 @@ def get_frontend_configuration(request):
             ),
             # Pinned ASR profile — the panel never lets the user pick one.
             "default_profile_id": settings.LINTO_STUDIO_DEFAULT_PROFILE_ID,
+            "live_max_translations": settings.LINTO_LIVE_MAX_TRANSLATIONS,
         },
         "diagnostics": {"connection_test_enabled": settings.CONNECTION_TEST_ENABLED},
         "livekit": {

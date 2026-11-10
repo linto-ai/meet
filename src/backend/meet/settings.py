@@ -1164,6 +1164,10 @@ class Base(Configuration):
     LINTO_LIVE_KEEP_AUDIO = values.BooleanValue(
         True, environ_name="LINTO_LIVE_KEEP_AUDIO", environ_prefix=None
     )
+    # Most translation languages a live run may carry, 0 = no limit.
+    LINTO_LIVE_MAX_TRANSLATIONS = values.PositiveIntegerValue(
+        0, environ_name="LINTO_LIVE_MAX_TRANSLATIONS", environ_prefix=None
+    )
     # Service auth to Studio (live sessions and bots need the Meeting Manager
     # role, and the SESSION and BOT permissions on the organization). Set
     # LINTO_STUDIO_AUTH_EMAIL/PASSWORD to a dedicated service account, or rely
