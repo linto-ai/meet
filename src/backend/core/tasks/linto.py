@@ -32,6 +32,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
 from django.core.mail import EmailMultiAlternatives
+from django.db import transaction
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.translation import get_language, override
@@ -1109,19 +1110,39 @@ _AUDIO_READY_ATTEMPTS = 36
 _AUDIO_READY_DELAY = 5  # seconds between two size checks
 
 
+def _store_linto_summary(room, payload):
+    """Write (or drop, with None) this delivery's ``linto_summary`` over the
+    stored configuration: a run started meanwhile keeps its ``linto``, and a
+    newer run's marker is left alone."""
+    session_id = ((room.configuration or {}).get("linto_summary") or {}).get(
+        "session_id"
+    )
+    with transaction.atomic():
+        stored = models.Room.objects.select_for_update().filter(pk=room.pk).first()
+        if stored is None:
+            return
+        config = dict(stored.configuration or {})
+        if (config.get("linto_summary") or {}).get("session_id") != session_id:
+            return
+        if payload is None:
+            config.pop("linto_summary", None)
+        else:
+            config["linto_summary"] = payload
+        stored.configuration = config
+        stored.save(update_fields=["configuration"])
+
+
 @sync_to_async
 def _save_room_config(room):
-    """Persist only the room ``configuration`` JSON field."""
-    room.save(update_fields=["configuration"])
+    """Persist the pending ``linto_summary`` marker."""
+    _store_linto_summary(room, (room.configuration or {}).get("linto_summary"))
 
 
 @sync_to_async
 def _clear_linto_summary(room):
     """Drop the pending ``linto_summary`` marker once delivery is complete."""
-    config = dict(room.configuration or {})
-    config.pop("linto_summary", None)
-    room.configuration = config
-    room.save(update_fields=["configuration"])
+    _store_linto_summary(room, None)
+    (room.configuration or {}).pop("linto_summary", None)
 
 
 def _room_summary_checkpoint(room):

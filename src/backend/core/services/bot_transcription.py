@@ -16,6 +16,7 @@ from logging import getLogger
 from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
+from django.db import transaction
 
 import requests
 
@@ -821,11 +822,11 @@ class BotTranscriptionService:
                 "steps": {},
                 "attempts": 0,
             }
-        config = {k: v for k, v in (room.configuration or {}).items() if k != "linto"}
-        if summary_payload is not None:
-            config["linto_summary"] = summary_payload
-        room.configuration = config
-        room.save(update_fields=["configuration"])
+        self._write_configuration(
+            room,
+            {} if summary_payload is None else {"linto_summary": summary_payload},
+            drop=("linto",),
+        )
 
         if summary_payload is not None:
             self._enqueue_summary(room)
@@ -917,8 +918,7 @@ class BotTranscriptionService:
             if recording_id:
                 linto["recording_id"] = recording_id
 
-        room.configuration = {**(room.configuration or {}), "linto": linto}
-        room.save(update_fields=["configuration"])
+        self._write_configuration(room, {"linto": linto})
         self._set_banner(room, True, user=user, linto=linto)
         logger.info(
             "LinTO run started for room %s (session=%s bot=%s summary=%s record=%s)",
@@ -929,6 +929,20 @@ class BotTranscriptionService:
             record,
         )
         return {"status": "running", **linto}
+
+    @staticmethod
+    def _write_configuration(room, update, drop=()):
+        """Update the stored configuration under a row lock: the delivery of
+        the previous run writes its ``linto_summary`` at the same time."""
+        with transaction.atomic():
+            stored = models.Room.objects.select_for_update().get(pk=room.pk)
+            config = {
+                k: v for k, v in (stored.configuration or {}).items() if k not in drop
+            }
+            config.update(update)
+            stored.configuration = config
+            stored.save(update_fields=["configuration"])
+        room.configuration = config
 
     def teardown(self, room):
         """Best-effort cleanup when a room ends with a run still active:

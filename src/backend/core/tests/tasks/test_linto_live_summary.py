@@ -18,6 +18,7 @@ from django.core import mail
 
 import aiohttp
 import pytest
+from asgiref.sync import sync_to_async
 
 from core import factories, models
 from core.services.bot_transcription import (
@@ -254,6 +255,50 @@ class TestConversationResolution:
         room.refresh_from_db()
         # Still pending: the retry resumes with the resolved conversation.
         assert room.configuration["linto_summary"]["conversation_id"] == "conv-1"
+
+
+def _during_delivery(room, configuration):
+    """An SDK side effect that rewrites the stored configuration mid-delivery."""
+
+    def _write():
+        models.Room.objects.filter(pk=room.pk).update(configuration=configuration)
+
+    async def _side_effect(*args, **kwargs):
+        await sync_to_async(_write)()
+        return "tag-1"
+
+    return _side_effect
+
+
+class TestConcurrentRuns:
+    """A run started while the previous one is being delivered."""
+
+    def test_a_run_started_meanwhile_keeps_its_state(self, no_twake, fast_resolve):
+        room = _make_room(recipient=factories.UserFactory(email="s@example.com"))
+        new_run = {"session_id": "sess-2", "bot_id": "bot-2"}
+        with contextlib.ExitStack() as stack:
+            sdk = _patch_sdk(stack)
+            _patch_service(stack)
+            sdk.ensure_tag.side_effect = _during_delivery(
+                room, {"linto_summary": {**PAYLOAD}, "linto": new_run}
+            )
+            linto_task._process_bot_live_summary_sync(str(room.id))
+        assert len(mail.outbox) == 1
+        room.refresh_from_db()
+        assert room.configuration == {"linto": new_run}
+
+    def test_a_newer_runs_marker_is_left_alone(self, no_twake, fast_resolve):
+        room = _make_room(recipient=factories.UserFactory(email="s@example.com"))
+        newer = {**PAYLOAD, "session_id": "sess-2", "conversation_name": "linto-2"}
+        with contextlib.ExitStack() as stack:
+            sdk = _patch_sdk(stack)
+            _patch_service(stack)
+            sdk.ensure_tag.side_effect = _during_delivery(
+                room, {"linto_summary": newer}
+            )
+            linto_task._process_bot_live_summary_sync(str(room.id))
+        room.refresh_from_db()
+        assert room.configuration == {"linto_summary": newer}
 
 
 class TestHappyPath:

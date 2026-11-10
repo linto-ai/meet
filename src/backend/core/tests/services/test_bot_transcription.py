@@ -117,6 +117,19 @@ class TestMarkStarted:
         self.banner.assert_called_once_with(room, True, user=owner, linto=linto)
         self.rec.assert_not_called()
 
+    def test_keeps_what_the_previous_delivery_wrote_meanwhile(self, studio_settings):
+        room, owner = _owner_room()
+        delivery = {"session_id": "sess-0", "steps": {"tag": True}}
+        models.Room.objects.filter(pk=room.pk).update(
+            configuration={"linto_summary": delivery}
+        )
+        BotTranscriptionService().mark_started(
+            room, {"session_id": "sess-1", "channel_id": "c"}, user=owner
+        )
+        room.refresh_from_db()
+        assert room.configuration["linto_summary"] == delivery
+        assert room.configuration["linto"]["session_id"] == "sess-1"
+
     def test_keeps_audio_when_the_instance_keeps_it(self, studio_settings):
         # LINTO_LIVE_KEEP_AUDIO on: the run keeps the audio, whatever the body.
         studio_settings.LINTO_LIVE_KEEP_AUDIO = True
