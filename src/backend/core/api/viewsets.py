@@ -8,11 +8,12 @@ from urllib.parse import unquote, urlparse
 from uuid import uuid4
 
 from django.conf import settings
+from django.core.cache import cache
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.files.storage import default_storage
 from django.db import IntegrityError, transaction
 from django.db.models import Q
-from django.http import Http404
+from django.http import Http404, StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.text import slugify
@@ -65,14 +66,17 @@ from core.recording.worker.mediator import (
     WorkerServiceMediator,
 )
 from core.services.bot_transcription import (
+    CATCHUP_RATE_LIMIT_SECONDS,
     BotTranscriptionException,
     BotTranscriptionService,
+    CatchUpUnavailable,
     NoProfileError,
     PermissionDeniedError,
     RunConflictError,
     StudioNotEntitled,
     StudioRefusedError,
     TooManyTranslationsError,
+    relay_catchup,
 )
 from core.services.invitation import InvitationService
 from core.services.jwt_token import JwtTokenService
@@ -1057,6 +1061,65 @@ class RoomViewSet(  # pylint: disable=too-many-public-methods
                 status=drf_status.HTTP_502_BAD_GATEWAY,
             )
         return drf_response.Response(result, status=drf_status.HTTP_200_OK)
+
+    @decorators.action(
+        detail=True,
+        methods=["get"],
+        url_path="linto/catchup/status",
+        permission_classes=[permissions.HasLiveKitRoomAccess],
+        authentication_classes=[LiveKitTokenAuthentication],
+    )
+    @FeatureFlag.require("linto")
+    def linto_catchup_status(self, request, pk=None):  # pylint: disable=unused-argument
+        """Whether a late joiner can get the "before you arrived" summary:
+        ``{"enabled": bool, "reason"?: str}``."""
+        room = self.get_object()
+        return drf_response.Response(
+            BotTranscriptionService().catchup_status(room),
+            status=drf_status.HTTP_200_OK,
+        )
+
+    @decorators.action(
+        detail=True,
+        methods=["post"],
+        url_path="linto/catchup",
+        permission_classes=[permissions.HasLiveKitRoomAccess],
+        authentication_classes=[LiveKitTokenAuthentication],
+    )
+    @FeatureFlag.require("linto")
+    def linto_catchup(self, request, pk=None):  # pylint: disable=unused-argument
+        """Relay Studio's summary of what was said before ``before`` (the
+        participant's join time) as a text/event-stream. The backend asks
+        with the run's Studio credential, which never reaches the browser."""
+        room = self.get_object()
+        before = request.data.get("before")
+        # A reload asks again with the same join time, which Studio's cache
+        # answers: only another join time counts against the limit.
+        identity = getattr(request.auth, "identity", "")
+        key = f"linto:catchup:{room.id}:{identity}"
+        previous = cache.get(key)
+        if previous is not None and previous != str(before):
+            return drf_response.Response(
+                {"code": "catchup_rate_limited"},
+                status=drf_status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+        cache.set(key, str(before), CATCHUP_RATE_LIMIT_SECONDS)
+        try:
+            upstream = BotTranscriptionService().catchup_stream(room, before)
+        except CatchUpUnavailable as exc:
+            logger.warning("LinTO catch-up unavailable for room %s: %s", room.id, exc)
+            return drf_response.Response(
+                {"code": "catchup_unavailable", "reason": str(exc)},
+                status=drf_status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        if upstream is None:
+            return drf_response.Response(status=drf_status.HTTP_204_NO_CONTENT)
+        response = StreamingHttpResponse(
+            relay_catchup(upstream), content_type="text/event-stream"
+        )
+        response["Cache-Control"] = "no-cache"
+        response["X-Accel-Buffering"] = "no"
+        return response
 
     @decorators.action(
         detail=True,

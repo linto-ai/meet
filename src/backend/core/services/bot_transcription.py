@@ -9,6 +9,7 @@ session routes.
 
 # pylint: disable=too-many-lines
 
+import json
 import time
 from datetime import datetime, timezone
 from logging import getLogger
@@ -37,6 +38,12 @@ AUDIO_DOWNLOAD_TIMEOUT = (DEFAULT_TIMEOUT, 300)
 # Studio waits for the last captions before it finalizes the conversation.
 STOP_TIMEOUT = (DEFAULT_TIMEOUT, 60)
 CATCHUP_CHECK_TIMEOUT = 5
+# A summary is relayed by a sync gunicorn worker (timeout 90 s): the whole
+# stream ends within the deadline plus one read timeout.
+CATCHUP_STREAM_DEADLINE = 60
+CATCHUP_STREAM_TIMEOUT = (DEFAULT_TIMEOUT, 25)
+# One summary per participant every 20 s: the run key serves them all.
+CATCHUP_RATE_LIMIT_SECONDS = 20
 START_LOCK_TTL = 120
 STOP_LOCK_TTL = 90
 
@@ -98,6 +105,40 @@ ROOM_METADATA_KEYS = [
     ROOM_METADATA_CATCHUP_KEY,
     ROOM_METADATA_KEEP_AUDIO_KEY,
 ]
+
+
+def _is_iso_datetime(value):
+    if not isinstance(value, str) or len(value) > 64:
+        return False
+    try:
+        datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return True
+
+
+def relay_catchup(upstream, deadline=CATCHUP_STREAM_DEADLINE):
+    """The bytes of Studio's summary stream, cut after ``deadline`` seconds
+    with a final error event. Closing the generator (the participant left)
+    closes the upstream request, which makes Studio abort the LLM call."""
+    started = time.monotonic()
+    try:
+        for chunk in upstream.iter_content(chunk_size=None):
+            if chunk:
+                yield chunk
+            if time.monotonic() - started > deadline:
+                yield _sse_error("LLM stream timed out")
+                return
+    except requests.RequestException as exc:
+        logger.warning("LinTO catch-up stream interrupted: %s", exc)
+        yield _sse_error("LLM stream interrupted")
+    finally:
+        upstream.close()
+
+
+def _sse_error(message):
+    # Leading blank line: ends a frame Studio may have left half written.
+    return f"\n\nevent: error\ndata: {json.dumps({'message': message})}\n\n".encode()
 
 
 def studio_session_name(room):
@@ -185,6 +226,10 @@ class TooManyTranslationsError(BotTranscriptionException):
     def __init__(self, limit):
         super().__init__(f"at most {limit} translation languages")
         self.limit = limit
+
+
+class CatchUpUnavailable(BotTranscriptionException):
+    """No "before you arrived" summary for this room right now."""
 
 
 class StudioRefusedError(BotTranscriptionException):
@@ -735,51 +780,110 @@ class BotTranscriptionService:
             self._stop_studio_run(headers, organization_id, session_id, bot_id)
             raise
         if run.get("catchup"):
-            self._check_catchup(room, headers, session_id)
+            self._check_catchup(room, headers, organization_id, session_id)
         return run
 
-    def _check_catchup(self, room, headers, session_id):
-        """Log why the late joiners of the run will get no summary, if so."""
-        path = f"/api/sessions/public/{session_id}/catchup/status"
-        try:
-            r = requests.get(
-                f"{self.studio_base}{path}",
-                headers=headers,
-                timeout=CATCHUP_CHECK_TIMEOUT,
-            )
-        except requests.RequestException as exc:
-            logger.warning(
-                "LinTO catch-up status unknown for room %s: GET %s failed: %s",
-                room.id,
-                path,
-                exc,
-            )
-            return
+    @staticmethod
+    def _catchup_path(organization_id, session_id):
+        return f"/api/organizations/{organization_id}/sessions/{session_id}/catchup"
+
+    def _catchup_status(self, headers, organization_id, session_id):
+        """Whether Studio can summarize the session: ``(True, None)`` or
+        ``(False, reason)``. Raises requests.RequestException."""
+        path = f"{self._catchup_path(organization_id, session_id)}/status"
+        r = requests.get(
+            f"{self.studio_base}{path}",
+            headers=headers,
+            timeout=CATCHUP_CHECK_TIMEOUT,
+        )
         try:
             body = r.json()
         except ValueError:
             body = None
         body = body if isinstance(body, dict) else {}
         if r.status_code == 200 and body.get("enabled"):
-            return
+            return True, None
         if r.status_code == 200:
-            reason = (
+            return False, (
                 "Studio resolves no LLM Gateway service for the catch-up "
                 "(LLM_CATCHUP_SERVICE, default visio-catchup, then "
-                "LLM_CHAT_SERVICE_ID)"
+                "LLM_CHAT_SERVICE_ID), or the SaaS plan of the organization "
+                "refuses ai.chat"
             )
-        elif r.status_code == 404 and not body.get("code"):
-            reason = f"Studio has no catch-up routes (GET {path} answered 404)"
-        else:
-            reason = (
-                f"GET {path} answered {r.status_code} "
-                f"{body.get('code') or r.text[:200]}"
-            )
-        logger.warning(
-            "LinTO catch-up unavailable for room %s, late joiners get no summary: %s",
-            room.id,
-            reason,
+        if r.status_code == 404 and not body.get("code"):
+            return False, f"Studio has no catch-up routes (GET {path} answered 404)"
+        return False, (
+            f"GET {path} answered {r.status_code} "
+            f"{body.get('code') or body.get('message') or r.text[:200]}"
         )
+
+    def _check_catchup(self, room, headers, organization_id, session_id):
+        """Log why the late joiners of the run will get no summary, if so."""
+        try:
+            enabled, reason = self._catchup_status(headers, organization_id, session_id)
+        except requests.RequestException as exc:
+            logger.warning(
+                "LinTO catch-up status unknown for room %s: %s", room.id, exc
+            )
+            return
+        if not enabled:
+            logger.warning(
+                "LinTO catch-up unavailable for room %s, late joiners get no summary: %s",
+                room.id,
+                reason,
+            )
+
+    @staticmethod
+    def _catchup_run(room):
+        linto = (room.configuration or {}).get("linto") or {}
+        if not linto:
+            raise CatchUpUnavailable("no live transcription runs in the room")
+        if not linto.get("catchup"):
+            raise CatchUpUnavailable("the run was started without the catch-up")
+        if not linto.get("org_id") or not linto.get("session_id"):
+            raise CatchUpUnavailable("the run has no Studio session")
+        return linto
+
+    def catchup_status(self, room):
+        """``{"enabled": True}``, or ``{"enabled": False, "reason": ...}``."""
+        try:
+            linto = self._catchup_run(room)
+            enabled, reason = self._catchup_status(
+                self._run_headers(linto), linto["org_id"], linto["session_id"]
+            )
+        except CatchUpUnavailable as exc:
+            return {"enabled": False, "reason": str(exc)}
+        except (BotTranscriptionException, requests.RequestException) as exc:
+            return {"enabled": False, "reason": f"Studio unreachable: {exc}"}
+        return {"enabled": True} if enabled else {"enabled": False, "reason": reason}
+
+    def catchup_stream(self, room, before=None):
+        """Ask Studio for the summary of what was said before ``before`` (ISO
+        8601). Returns the open streamed response, or None when there is
+        nothing to summarize yet. Raises CatchUpUnavailable."""
+        linto = self._catchup_run(room)
+        path = self._catchup_path(linto["org_id"], linto["session_id"])
+        body = {"channelIndex": LINTO_CHANNEL_INDEX}
+        if _is_iso_datetime(before):
+            body["before"] = before
+        try:
+            r = requests.post(
+                f"{self.studio_base}{path}",
+                headers=self._run_headers(linto),
+                json=body,
+                stream=True,
+                timeout=CATCHUP_STREAM_TIMEOUT,
+            )
+        except requests.RequestException as exc:
+            raise CatchUpUnavailable(f"POST {path} failed: {exc}") from exc
+        if r.status_code == 204:
+            r.close()
+            return None
+        if r.status_code != 200:
+            reason = f"POST {path} answered {r.status_code} {r.text[:200]}"
+            r.close()
+            raise CatchUpUnavailable(reason)
+        return r
 
     def _stop_studio_run(self, headers, organization_id, session_id, bot_id, name=None):
         if not organization_id:
@@ -947,7 +1051,7 @@ class BotTranscriptionService:
             "summary_service": summary_service,
             "record": record,
             # Late-joiner summary: advertised in the room metadata so the
-            # joiner's browser knows whether to ask Studio for it.
+            # joiner's browser knows whether to ask for it.
             "catchup": catchup,
             # Advertised in the room metadata: every participant sees the
             # recording indicator while the run keeps the meeting audio.

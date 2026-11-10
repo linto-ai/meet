@@ -31,6 +31,7 @@ from core.services.bot_transcription import (
     ROOM_METADATA_STATUS_KEY,
     BotTranscriptionException,
     BotTranscriptionService,
+    CatchUpUnavailable,
     NoProfileError,
     PermissionDeniedError,
     RunConflictError,
@@ -40,6 +41,7 @@ from core.services.bot_transcription import (
     TooManyTranslationsError,
     effective_token_source,
     normalize_profile,
+    relay_catchup,
 )
 
 pytestmark = pytest.mark.django_db
@@ -900,7 +902,7 @@ ORG = "org-1"
 PROFILES_URL = f"{STUDIO}/api/organizations/{ORG}/transcriber_profiles"
 SESSIONS_URL = f"{STUDIO}/api/organizations/{ORG}/sessions/"
 BOTS_URL = f"{STUDIO}/api/organizations/{ORG}/bots"
-CATCHUP_STATUS_URL = f"{STUDIO}/api/sessions/public/sess-1/catchup/status"
+CATCHUP_STATUS_URL = f"{STUDIO}/api/organizations/{ORG}/sessions/sess-1/catchup/status"
 PROFILES = [
     {
         "id": 220,
@@ -941,7 +943,7 @@ def _mock_studio_start(session_id="sess-1", channel_id=7, bot_id="bot-1", catchu
     responses.patch(f"{STUDIO}/api/organizations/{ORG}/sessions/{session_id}", json={})
     responses.post(BOTS_URL, json={"id": bot_id})
     responses.get(
-        f"{STUDIO}/api/sessions/public/{session_id}/catchup/status",
+        f"{STUDIO}/api/organizations/{ORG}/sessions/{session_id}/catchup/status",
         **(catchup or {"json": {"enabled": True}}),
     )
 
@@ -1510,3 +1512,188 @@ class TestStop:
         assert all(
             c.request.headers["Authorization"] == "Bearer starter-jwt" for c in deletes
         )
+
+
+def _catchup_room(**linto):
+    room = RoomFactory()
+    room.configuration = {
+        "linto": {
+            "catchup": True,
+            "org_id": ORG,
+            "session_id": "sess-1",
+            "user_id": None,
+            **linto,
+        }
+    }
+    room.save()
+    return room
+
+
+CATCHUP_URL = f"{STUDIO}/api/organizations/{ORG}/sessions/sess-1/catchup"
+
+
+class _Upstream:
+    """A streamed requests response, as relay_catchup reads it."""
+
+    def __init__(self, chunks=(), error=None):
+        self.chunks = list(chunks)
+        self.error = error
+        self.closed = False
+
+    def iter_content(self, chunk_size=None):  # pylint: disable=unused-argument
+        yield from self.chunks
+        if self.error:
+            raise self.error
+
+    def close(self):
+        self.closed = True
+
+
+class TestCatchUpRelay:
+    """The late joiner's summary, asked by the backend on Studio's
+    organization route with the run's credential."""
+
+    @responses.activate
+    def test_status_asks_the_organization_route_with_the_run_credential(
+        self, run_settings
+    ):
+        room = _catchup_room()
+        responses.get(f"{CATCHUP_URL}/status", json={"enabled": True})
+        assert BotTranscriptionService().catchup_status(room) == {"enabled": True}
+        (call,) = responses.calls
+        assert call.request.headers["Authorization"] == "Bearer static-token"
+
+    @pytest.mark.parametrize(
+        ("configuration", "reason"),
+        [
+            ({}, "no live transcription runs in the room"),
+            (
+                {"linto": {"catchup": False, "org_id": ORG, "session_id": "s"}},
+                "the run was started without the catch-up",
+            ),
+            ({"linto": {"catchup": True}}, "the run has no Studio session"),
+        ],
+    )
+    @responses.activate
+    def test_status_without_a_catchup_run_asks_nothing(
+        self, run_settings, configuration, reason
+    ):
+        room = RoomFactory()
+        room.configuration = configuration
+        room.save()
+        assert BotTranscriptionService().catchup_status(room) == {
+            "enabled": False,
+            "reason": reason,
+        }
+        assert not responses.calls
+
+    @pytest.mark.parametrize(
+        ("answer", "reason"),
+        [
+            ({"json": {"enabled": False}}, "no LLM Gateway service for the catch-up"),
+            ({"status": 404, "body": "Cannot GET"}, "Studio has no catch-up routes"),
+            ({"status": 403, "json": {"message": "nope"}}, "answered 403 nope"),
+            ({"body": requests.ConnectionError("refused")}, "Studio unreachable"),
+        ],
+    )
+    @responses.activate
+    def test_status_says_why_studio_cannot(self, run_settings, answer, reason):
+        room = _catchup_room()
+        responses.get(f"{CATCHUP_URL}/status", **answer)
+        status = BotTranscriptionService().catchup_status(room)
+        assert status["enabled"] is False
+        assert reason in status["reason"]
+
+    @responses.activate
+    def test_stream_posts_the_join_time_on_the_organization_route(self, run_settings):
+        room = _catchup_room()
+        responses.post(
+            CATCHUP_URL,
+            body=b'event: done\ndata: {"cached": false}\n\n',
+            content_type="text/event-stream",
+        )
+        upstream = BotTranscriptionService().catchup_stream(
+            room, "2026-11-10T14:00:00.000Z"
+        )
+        assert upstream.status_code == 200
+        (call,) = responses.calls
+        assert call.request.headers["Authorization"] == "Bearer static-token"
+        assert json.loads(call.request.body) == {
+            "channelIndex": 0,
+            "before": "2026-11-10T14:00:00.000Z",
+        }
+        upstream.close()
+
+    @pytest.mark.parametrize("before", [None, "", "yesterday", 12, "x" * 80])
+    @responses.activate
+    def test_stream_drops_a_join_time_that_is_not_a_date(self, run_settings, before):
+        room = _catchup_room()
+        responses.post(CATCHUP_URL, status=204)
+        BotTranscriptionService().catchup_stream(room, before)
+        (call,) = responses.calls
+        assert json.loads(call.request.body) == {"channelIndex": 0}
+
+    @responses.activate
+    def test_stream_nothing_to_summarize_yet_is_none(self, run_settings):
+        room = _catchup_room()
+        responses.post(CATCHUP_URL, status=204)
+        assert BotTranscriptionService().catchup_stream(room) is None
+
+    @pytest.mark.parametrize(
+        ("answer", "reason"),
+        [
+            (
+                {"status": 503, "json": {"code": "catchup_unavailable"}},
+                "answered 503",
+            ),
+            ({"status": 402, "json": {"reason": "quota"}}, "answered 402"),
+            ({"body": requests.ConnectionError("refused")}, "failed: refused"),
+        ],
+    )
+    @responses.activate
+    def test_stream_refused_by_studio_is_unavailable(
+        self, run_settings, answer, reason
+    ):
+        room = _catchup_room()
+        responses.post(CATCHUP_URL, **answer)
+        with pytest.raises(CatchUpUnavailable, match=reason):
+            BotTranscriptionService().catchup_stream(room)
+
+    def test_stream_without_a_catchup_run_is_unavailable(self, run_settings):
+        room = _catchup_room(catchup=False)
+        with pytest.raises(CatchUpUnavailable, match="without the catch-up"):
+            BotTranscriptionService().catchup_stream(room)
+
+    def test_relay_passes_the_bytes_through_and_closes_the_upstream(self):
+        upstream = _Upstream([b"event: token\n", b"", b'data: {"content": "a"}\n\n'])
+        assert b"".join(relay_catchup(upstream)) == (
+            b'event: token\ndata: {"content": "a"}\n\n'
+        )
+        assert upstream.closed
+
+    def test_relay_cuts_a_stream_past_its_deadline(self):
+        upstream = _Upstream([b"event: token\n", b"never relayed"])
+        relayed = b"".join(relay_catchup(upstream, deadline=-1))
+        assert relayed == (
+            b'event: token\n\n\nevent: error\ndata: {"message": '
+            b'"LLM stream timed out"}\n\n'
+        )
+        assert upstream.closed
+
+    def test_relay_ends_an_interrupted_stream_with_an_error_event(self):
+        upstream = _Upstream(
+            [b'event: token\ndata: {"content": "a"}\n\n'],
+            error=requests.ConnectionError("reset"),
+        )
+        relayed = b"".join(relay_catchup(upstream))
+        assert relayed.endswith(
+            b'event: error\ndata: {"message": "LLM stream interrupted"}\n\n'
+        )
+        assert upstream.closed
+
+    def test_a_participant_who_leaves_closes_the_upstream(self):
+        upstream = _Upstream([b"one", b"two"])
+        relay = relay_catchup(upstream)
+        assert next(relay) == b"one"
+        relay.close()
+        assert upstream.closed

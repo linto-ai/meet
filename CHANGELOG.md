@@ -10,6 +10,7 @@ and this project adheres to
 
 ### Added
 
+- ✨(backend) rooms/{id}/linto/catchup relays the late joiner's summary from Studio
 - ✨(frontend) add jittered exponential backoff to LiveKit reconnections
 - ✨(frontend) tell participants when a recording is interrupted
 - ✨(frontend) "Transcribe after the meeting": ASR language, summary and service

@@ -28,20 +28,31 @@ the following command inside your docker container:
   `live_max_translations` from the config).
 
 
-### LinTO fork: the late joiners' summary needs Studio's catch-up routes and a gateway service
+### LinTO fork: the late joiners' summary is relayed by the backend, on Studio's organization route
 
-The "Before you arrived" summary a late joiner gets calls
-`GET /api/sessions/public/{id}/catchup/status` and
-`POST /api/sessions/public/{id}/catchup` on Studio (the `feat/live-catchup`
-pull request), which asks the LLM Gateway service `LLM_CATCHUP_SERVICE`
-(default `visio-catchup`). When Studio has no such routes (404, the
-production Studio until that pull request is deployed) or no gateway service
-resolves, the block says that the catch-up service is not available and the
-history so far still shows.
+The "Before you arrived" summary a late joiner gets is asked to the Meet
+backend (`GET rooms/{id}/linto/catchup/status/` and
+`POST rooms/{id}/linto/catchup/`, LiveKit room token), which relays it with
+the run's Studio credential to
+`GET /api/organizations/{org}/sessions/{id}/catchup/status` and
+`POST /api/organizations/{org}/sessions/{id}/catchup` (the `feat/live-catchup`
+pull request of Studio). Studio asks the LLM Gateway service
+`LLM_CATCHUP_SERVICE` (default `visio-catchup`). The browser never calls
+Studio for the summary and never holds a Studio credential.
 
+- Studio must carry the organization catch-up routes. Without them (404) or
+  without a gateway service, the block says that the catch-up service is not
+  available and the history so far still shows.
+- The key's user is a member of the organization (it is Meeting Manager
+  already); a SaaS Studio counts each summary as an `ai.chat` use of that
+  organization.
 - The backend checks it when a run with the catch-up starts and logs the
   cause as a warning: `LinTO catch-up unavailable for room <id>, late joiners
   get no summary: <cause>`. The late joiner's browser console carries it too.
+- One summary per participant every 20 s (a reload with the same join time
+  passes). A summary holds a gunicorn worker while it streams, 60 s at most.
+- The reverse proxy must not buffer `text/event-stream` (the backend sends
+  `X-Accel-Buffering: no`, which nginx honours).
 - Nothing to set on the Meet side.
 
 

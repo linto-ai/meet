@@ -21,6 +21,7 @@ from core.factories import RoomFactory, UserFactory
 from core.services.bot_transcription import (
     BotTranscriptionException,
     BotTranscriptionService,
+    CatchUpUnavailable,
     NoProfileError,
     PermissionDeniedError,
     RunConflictError,
@@ -483,3 +484,151 @@ def test_no_answer_to_the_browser_carries_a_studio_credential(linto_settings, so
         body = answer.content.decode()
         assert STUDIO_KEY not in body
         assert USER_KEY_TOKEN not in body
+
+
+def _token_of(room, identity):
+    grants = VideoGrants(room=str(room.id), room_join=True)
+    return (
+        AccessToken(api_key=LK_KEY, api_secret=LK_SECRET)
+        .with_identity(identity)
+        .with_grants(grants)
+        .to_jwt()
+    )
+
+
+class _Upstream:
+    def __init__(self, chunks):
+        self.chunks = chunks
+        self.closed = False
+
+    def iter_content(self, chunk_size=None):  # pylint: disable=unused-argument
+        yield from self.chunks
+
+    def close(self):
+        self.closed = True
+
+
+@pytest.fixture
+def catchup_settings(linto_settings):
+    linto_settings.CACHES = {
+        "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}
+    }
+    from django.core.cache import cache  # noqa: PLC0415
+
+    cache.clear()
+    return linto_settings
+
+
+def _catchup(room, before="2026-11-10T14:00:00.000Z", identity="user-1"):
+    return APIClient().post(
+        f"/api/v1.0/rooms/{room.id}/linto/catchup/",
+        {"before": before},
+        format="json",
+        HTTP_AUTHORIZATION=_auth(_token_of(room, identity)),
+    )
+
+
+class TestCatchUp:
+    """The late joiner's summary, relayed by the backend: the browser holds
+    its room token only, never a Studio credential."""
+
+    def test_status_answers_for_a_room_participant(self, catchup_settings):
+        room = RoomFactory()
+        with mock.patch(
+            "core.api.viewsets.BotTranscriptionService.catchup_status",
+            return_value={"enabled": False, "reason": "no run"},
+        ) as status:
+            res = APIClient().get(
+                f"/api/v1.0/rooms/{room.id}/linto/catchup/status/",
+                HTTP_AUTHORIZATION=_auth(_room_token(room)),
+            )
+        assert res.status_code == 200
+        assert res.json() == {"enabled": False, "reason": "no run"}
+        assert status.call_args.args[0] == room
+
+    def test_the_summary_is_relayed_as_an_event_stream(self, catchup_settings):
+        room = RoomFactory()
+        frames = [b'event: token\ndata: {"content": "R"}\n\n', b"event: done\n"]
+        upstream = _Upstream(frames)
+        with mock.patch(
+            "core.api.viewsets.BotTranscriptionService.catchup_stream",
+            return_value=upstream,
+        ) as stream:
+            res = _catchup(room)
+            body = b"".join(res.streaming_content)
+        assert res.status_code == 200
+        assert res["Content-Type"] == "text/event-stream"
+        assert res["X-Accel-Buffering"] == "no"
+        assert body == b"".join(frames)
+        assert upstream.closed
+        assert stream.call_args.args == (room, "2026-11-10T14:00:00.000Z")
+
+    def test_nothing_to_summarize_yet_is_a_204(self, catchup_settings):
+        room = RoomFactory()
+        with mock.patch(
+            "core.api.viewsets.BotTranscriptionService.catchup_stream",
+            return_value=None,
+        ):
+            res = _catchup(room)
+        assert res.status_code == 204
+
+    def test_an_unavailable_summary_is_a_503_with_its_reason(self, catchup_settings):
+        room = RoomFactory()
+        with mock.patch(
+            "core.api.viewsets.BotTranscriptionService.catchup_stream",
+            side_effect=CatchUpUnavailable("POST /x answered 404 Cannot POST"),
+        ):
+            res = _catchup(room)
+        assert res.status_code == 503
+        assert res.json() == {
+            "code": "catchup_unavailable",
+            "reason": "POST /x answered 404 Cannot POST",
+        }
+
+    def test_one_join_time_per_participant_every_20_seconds(self, catchup_settings):
+        room = RoomFactory()
+        with mock.patch(
+            "core.api.viewsets.BotTranscriptionService.catchup_stream",
+            return_value=None,
+        ) as stream:
+            assert _catchup(room).status_code == 204
+            # A reload asks again with the same join time: Studio's cache answers.
+            assert _catchup(room).status_code == 204
+            refused = _catchup(room, before="2026-11-10T13:00:00.000Z")
+            assert _catchup(room, identity="user-2").status_code == 204
+        assert refused.status_code == 429
+        assert refused.json() == {"code": "catchup_rate_limited"}
+        assert stream.call_count == 3
+
+    def test_a_token_of_another_room_is_refused(self, catchup_settings):
+        room, other = RoomFactory(), RoomFactory()
+        with mock.patch(
+            "core.api.viewsets.BotTranscriptionService.catchup_stream"
+        ) as stream:
+            res = APIClient().post(
+                f"/api/v1.0/rooms/{room.id}/linto/catchup/",
+                {},
+                format="json",
+                HTTP_AUTHORIZATION=_auth(_room_token(other)),
+            )
+        assert res.status_code == 403
+        stream.assert_not_called()
+
+    def test_no_token_is_unauthorized(self, catchup_settings):
+        room = RoomFactory()
+        res = APIClient().post(
+            f"/api/v1.0/rooms/{room.id}/linto/catchup/", {}, format="json"
+        )
+        assert res.status_code in (401, 403)
+
+    @pytest.mark.parametrize(
+        ("method", "path"), [("get", "catchup/status"), ("post", "catchup")]
+    )
+    def test_feature_off_is_a_404(self, catchup_settings, method, path):
+        catchup_settings.LINTO_FEATURE_ENABLED = False
+        room = RoomFactory()
+        res = getattr(APIClient(), method)(
+            f"/api/v1.0/rooms/{room.id}/linto/{path}/",
+            HTTP_AUTHORIZATION=_auth(_room_token(room)),
+        )
+        assert res.status_code == 404
