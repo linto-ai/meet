@@ -11,6 +11,8 @@ and this project adheres to
 ### Added
 
 - ✨(frontend) add /embed/<uuid>, Meet joined by a host page with its token
+- 🐛(frontend) /embed/<uuid> says error alone when the join fails, left only after joined
+- 🙈(frontend) /embed/<uuid> options menu offers no picture-in-picture, transcript or screen recording
 - ✨(backend) rooms/{id}/linto/catchup relays the late joiner's summary from Studio
 - ✨(frontend) add jittered exponential backoff to LiveKit reconnections
 - ✨(frontend) tell participants when a recording is interrupted

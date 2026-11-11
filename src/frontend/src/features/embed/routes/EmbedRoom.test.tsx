@@ -480,4 +480,70 @@ describe('/embed/:uuid', () => {
       expect(posted().slice(1)).toEqual([msg('error', { code: 'unreachable' })])
     })
   })
+
+  /*
+   * LiveKit calls onDisconnected after a connection that failed, before or
+   * after onError. A failed join says error{code} alone: left only has a
+   * meaning once joined was said.
+   */
+  describe('a join that fails says error, never left', () => {
+    const notAllowed = () =>
+      new TestConnectionError(
+        'not allowed',
+        ConnectionErrorReason.NotAllowed,
+        401
+      )
+    const unreachable = () =>
+      new TestConnectionError(
+        'no server',
+        ConnectionErrorReason.ServerUnreachable
+      )
+
+    it.each([
+      ['a rejected token', notAllowed, 'token_rejected'],
+      ['an unreachable server', unreachable, 'unreachable'],
+    ])(
+      '%s: the disconnection that follows the error says nothing',
+      (_, make, code) => {
+        renderEmbed()
+        sendJoin()
+        act(() => lk().onError(make()))
+        act(() => lk().onDisconnected(undefined))
+        expect(posted().slice(1)).toEqual([msg('error', { code })])
+      }
+    )
+
+    it.each([
+      ['a rejected token', notAllowed, 'token_rejected'],
+      ['an unreachable server', unreachable, 'unreachable'],
+    ])(
+      '%s: the disconnection that comes before the error says nothing',
+      (_, make, code) => {
+        renderEmbed()
+        sendJoin()
+        act(() => lk().onDisconnected(undefined))
+        act(() => lk().onError(make()))
+        expect(posted().slice(1)).toEqual([msg('error', { code })])
+      }
+    )
+
+    it('a rejected token never posts left, whatever the disconnect reason', () => {
+      renderEmbed()
+      sendJoin()
+      act(() => lk().onError(notAllowed()))
+      act(() => lk().onDisconnected(DisconnectReason.CLIENT_INITIATED))
+      expect(postedTypes()).not.toContain('left')
+    })
+
+    it('after joined, a disconnection says left alone, no error', () => {
+      renderEmbed()
+      sendJoin()
+      act(() => lk().onConnected())
+      act(() => lk().onDisconnected(DisconnectReason.SERVER_SHUTDOWN))
+      expect(posted().slice(1)).toEqual([
+        msg('joined'),
+        msg('left', { reason: 'disconnected' }),
+      ])
+    })
+  })
 })

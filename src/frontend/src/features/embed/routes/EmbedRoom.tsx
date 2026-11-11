@@ -78,6 +78,9 @@ const EmbedRoom = () => {
   const { roomId } = useParams()
   const { join, isLeaving, bridge } = useHost()
   const { isOver, finish, onIdle } = useFinish(bridge)
+  // LiveKit also disconnects after a join that failed, which is an `error`,
+  // not a `left`: `left` only has a meaning once `joined` was said
+  const isJoined = useRef(false)
 
   if (!roomId || !join || isOver) return null
 
@@ -89,8 +92,13 @@ const EmbedRoom = () => {
         embed={{
           ...join,
           isLeaving,
-          onConnected: () => bridge.current?.joined(),
-          onDisconnected: (reason) => finish(toLeftReason(reason)),
+          onConnected: () => {
+            isJoined.current = true
+            bridge.current?.joined()
+          },
+          onDisconnected: (reason) => {
+            if (isJoined.current) finish(toLeftReason(reason))
+          },
           onError: (error) => bridge.current?.error(toErrorCode(error)),
         }}
       />
