@@ -8,6 +8,8 @@ interface ImportMetaEnv {
   readonly VITE_APP_TITLE: string
   readonly VITE_MEDIA_BASE_URL?: string
   readonly VITE_BRIDGE_TARGET_ORIGIN_ALLOWLIST?: string
+  // Exact origins (comma separated) allowed to frame /embed/<uuid>
+  readonly VITE_EMBED_ALLOWED_ORIGINS?: string
 }
 
 interface ImportMeta {

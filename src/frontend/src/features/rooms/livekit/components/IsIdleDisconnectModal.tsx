@@ -4,16 +4,27 @@ import { css } from '@/styled-system/css'
 import { useSnapshot } from 'valtio'
 import { connectionObserverStore } from '@/stores/connectionObserver'
 import { Stack } from '@/styled-system/jsx'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { navigateTo } from '@/navigation/navigateTo'
 import { useScreenReaderAnnounce } from '@/hooks/useScreenReaderAnnounce'
 import { SettingsDialogExtendedKey } from '@/features/settings/type'
 import { useHumanizeDuration } from '@/hooks/useHumanizeDuration'
 import { openSettingsDialog } from '@/stores/settings'
+import { useEmbedIdleLeave } from '@/features/embed/EmbedIdleContext'
 
 const IDLE_DISCONNECT_TIMEOUT_MS = 120000 // 2 minutes
 const COUNTDOWN_ANNOUNCEMENT_SECONDS = new Set([90, 60, 30])
 const FINAL_COUNTDOWN_SECONDS = 10
+
+// Leaves the call: the feedback page, or, framed by Chat, a message to it
+const useLeave = () => {
+  const embedLeave = useEmbedIdleLeave()
+  return useCallback(() => {
+    connectionObserverStore.isIdleDisconnectModalOpen = false
+    if (embedLeave) embedLeave()
+    else navigateTo('feedback', { duplicateIdentity: false })
+  }, [embedLeave])
+}
 
 const useSrCountdownAnnouncement = (seconds: number) => {
   const { t } = useTranslation('rooms', { keyPrefix: 'isIdleDisconnectModal' })
@@ -47,23 +58,21 @@ const VisualCountDown = () => {
   const seconds = remainingSeconds % 60
   const formattedTime = `${minutes}:${seconds.toString().padStart(2, '0')}`
 
+  const leave = useLeave()
+
   useSrCountdownAnnouncement(remainingSeconds)
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setTimeRemaining((prev) => {
-        if (prev <= 1000) {
-          clearInterval(interval)
-          connectionObserverStore.isIdleDisconnectModalOpen = false
-          navigateTo('feedback', { duplicateIdentity: false })
-          return 0
-        }
-        return prev - 1000
-      })
+      setTimeRemaining((prev) => Math.max(prev - 1000, 0))
     }, 1000)
 
     return () => clearInterval(interval)
   }, [])
+
+  useEffect(() => {
+    if (timeRemaining === 0) leave()
+  }, [timeRemaining, leave])
 
   return (
     <div
@@ -114,6 +123,7 @@ const Settings = () => {
 export const IsIdleDisconnectModal = () => {
   const { t } = useTranslation('rooms', { keyPrefix: 'isIdleDisconnectModal' })
   const connectionObserverSnap = useSnapshot(connectionObserverStore)
+  const leave = useLeave()
   return (
     <Dialog
       isOpen={connectionObserverSnap.isIdleDisconnectModalOpen}
@@ -139,14 +149,7 @@ export const IsIdleDisconnectModal = () => {
               align={{ base: 'stretch', xsm: 'center' }}
               marginTop="2rem"
             >
-              <Button
-                onPress={() => {
-                  connectionObserverStore.isIdleDisconnectModalOpen = false
-                  navigateTo('feedback', { duplicateIdentity: false })
-                }}
-                size="sm"
-                variant="secondary"
-              >
+              <Button onPress={leave} size="sm" variant="secondary">
                 {t('leaveButton')}
               </Button>
               <Button onPress={close} size="sm" variant="primary">

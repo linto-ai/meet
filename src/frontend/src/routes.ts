@@ -25,11 +25,14 @@ const ConnectionTestRoute = lazy(
   () => import('@/features/diagnostics/routes/ConnectionTest')
 )
 
+const EmbedRoomRoute = lazy(() => import('@/features/embed/routes/EmbedRoom'))
+
 const roomIdRegex = new RegExp(`^[/](?<roomId>${flexibleRoomIdPattern})$`)
 
 export const routes: Record<
   | 'home'
   | 'room'
+  | 'embedRoom'
   | 'feedback'
   | 'connectionTest'
   | 'legalTerms'
@@ -57,6 +60,12 @@ export const routes: Record<
     to: (roomId: string) => `/${roomId.trim()}`,
     path: roomIdRegex,
     Component: RoomRoute,
+  },
+  embedRoom: {
+    name: 'embedRoom',
+    path: /^\/embed\/(?<roomId>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/,
+    to: (roomId: string) => `/embed/${roomId.trim()}`,
+    Component: EmbedRoomRoute,
   },
   feedback: {
     name: 'feedback',
