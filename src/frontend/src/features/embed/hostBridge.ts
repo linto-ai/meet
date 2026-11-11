@@ -10,10 +10,7 @@ const SOURCE = 'twake-meet-embed'
 
 export type LeftReason = 'user' | 'idle' | 'removed' | 'disconnected'
 export type ErrorCode =
-  | 'unsupported'
-  | 'token_rejected'
-  | 'unreachable'
-  | 'unknown'
+  'unsupported' | 'token_rejected' | 'unreachable' | 'unknown'
 
 export type HostJoin = { token: string; audio: boolean; video: boolean }
 
@@ -74,13 +71,17 @@ const allowedParentOrigin = () => {
   return window.parent !== window && isAllowed ? origin : null
 }
 
-// Only the first valid `join` is handed over
+// Only the first valid `join` is handed over, and none after a `leave`
+// (the call is over: `hasJoined` then means "no more join")
 const dispatch = (
   message: HostMessage | null,
   { onJoin, onLeave }: Handlers,
   state: { hasJoined: boolean }
 ) => {
-  if (message?.type === 'leave') onLeave()
+  if (message?.type === 'leave') {
+    state.hasJoined = true
+    onLeave()
+  }
   if (message?.type !== 'join' || state.hasJoined) return
   state.hasJoined = true
   onJoin({ token: message.token, audio: message.audio, video: message.video })

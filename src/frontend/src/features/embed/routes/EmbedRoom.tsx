@@ -33,7 +33,10 @@ const useHost = () => {
       onLeave: () => setIsLeaving(true),
     })
     bridge.current = host
-    const timer = setTimeout(() => host?.error('unsupported'), JOIN_TIMEOUT_MS)
+    const timer = setTimeout(() => {
+      host?.error('unsupported')
+      host?.close() // a join after the error is ignored
+    }, JOIN_TIMEOUT_MS)
     return () => {
       clearTimeout(timer)
       host?.close()

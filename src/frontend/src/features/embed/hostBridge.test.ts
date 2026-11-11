@@ -287,6 +287,22 @@ describe('host bridge (twake-meet-embed v1)', () => {
       expect(posted()).toEqual([[msg('ready'), CHAT]])
     })
 
+    it('ignores a join after a leave: the call is over', () => {
+      start()
+      send(msg('leave'))
+      send(join())
+      expect(onJoin).not.toHaveBeenCalled()
+      expect(onLeave).toHaveBeenCalledTimes(1)
+    })
+
+    it('hangs up on a leave that follows a valid join', () => {
+      start()
+      send(join())
+      send(msg('leave'))
+      expect(onJoin).toHaveBeenCalledTimes(1)
+      expect(onLeave).toHaveBeenCalledTimes(1)
+    })
+
     it('ignores a leave from another origin or another window', () => {
       start()
       send(msg('leave'), { origin: 'https://evil.example.net' })

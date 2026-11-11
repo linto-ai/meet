@@ -214,6 +214,38 @@ describe('/embed/:uuid', () => {
       expect(screen.queryByTestId('livekit-room')).toBeNull()
     })
 
+    it('ignores a join that comes after the unsupported error', () => {
+      vi.useFakeTimers()
+      renderEmbed()
+      act(() => {
+        vi.advanceTimersByTime(JOIN_TIMEOUT_MS)
+      })
+      sendJoin()
+      expect(screen.queryByTestId('livekit-room')).toBeNull()
+      expect(lk().token).toBeUndefined()
+      expect(postedTypes()).toEqual(['ready', 'error'])
+    })
+
+    it('still joins with a join that comes just before the timeout', () => {
+      vi.useFakeTimers()
+      renderEmbed()
+      act(() => {
+        vi.advanceTimersByTime(JOIN_TIMEOUT_MS - 1)
+      })
+      sendJoin()
+      expect(screen.getByTestId('livekit-room')).toBeTruthy()
+      expect(lk().token).toBe(TOKEN)
+    })
+
+    it('never connects when the parent leaves before it joins', () => {
+      renderEmbed()
+      send(msg('leave'))
+      sendJoin()
+      expect(screen.queryByTestId('livekit-room')).toBeNull()
+      expect(lk().token).toBeUndefined()
+      expect(postedTypes()).not.toContain('joined')
+    })
+
     it('does not time out once the join has arrived', () => {
       vi.useFakeTimers()
       renderEmbed()
