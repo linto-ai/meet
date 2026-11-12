@@ -51,7 +51,7 @@ const StyledTooltip = styled(RACTooltip, {
     boxShadow: '0 var(--sizes-tooltip-spacing) 20px rgba(0 0 0 / 0.1)',
     borderRadius: '4px',
     backgroundColor: 'primaryDark.100',
-    color: 'gray.100',
+    color: 'greyscale.50',
     forcedColorAdjust: 'none',
     outline: 'none',
     padding: '2px var(--sizes-tooltip-spacing)',
