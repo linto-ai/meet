@@ -205,6 +205,40 @@ describe('/embed/:uuid', () => {
     window.history.pushState({}, '', '/')
   })
 
+  describe('theme of the parent (join.theme)', () => {
+    const page = () => document.documentElement
+    beforeEach(() => page().setAttribute('data-lk-theme', 'visio-light'))
+    afterEach(() => page().setAttribute('data-lk-theme', 'visio-light'))
+
+    it('shows the page dark when Chat is dark', () => {
+      renderEmbed()
+      sendJoin({ theme: 'dark' })
+      expect(page().getAttribute('data-lk-theme')).toBe('visio-dark')
+      expect(page().style.colorScheme).toBe('dark')
+    })
+
+    it('shows the page light when Chat is light', () => {
+      renderEmbed()
+      sendJoin({ theme: 'light' })
+      expect(page().getAttribute('data-lk-theme')).toBe('visio-light')
+      expect(page().style.colorScheme).toBe('light')
+    })
+
+    it('keeps today\'s page when the join has no theme', () => {
+      renderEmbed()
+      sendJoin()
+      expect(page().getAttribute('data-lk-theme')).toBe('visio-light')
+      expect(screen.getByTestId('livekit-room')).toBeTruthy()
+    })
+
+    it('keeps today\'s page, and joins, when the theme is unknown', () => {
+      renderEmbed()
+      sendJoin({ theme: 'sepia' })
+      expect(page().getAttribute('data-lk-theme')).toBe('visio-light')
+      expect(screen.getByTestId('livekit-room')).toBeTruthy()
+    })
+  })
+
   describe('before the parent sends join', () => {
     it('announces itself and shows no call, no join screen', () => {
       renderEmbed()

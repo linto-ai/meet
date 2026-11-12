@@ -157,6 +157,40 @@ describe('host bridge (twake-meet-embed v1)', () => {
       })
     })
 
+    it('hands over the theme of the parent when it is light or dark', () => {
+      start()
+      send(join({ theme: 'dark' }))
+      expect(onJoin).toHaveBeenCalledWith(
+        expect.objectContaining({ token: TOKEN, theme: 'dark' })
+      )
+    })
+
+    it('hands over a light theme as well', () => {
+      start()
+      send(join({ theme: 'light' }))
+      expect(onJoin).toHaveBeenCalledWith(
+        expect.objectContaining({ theme: 'light' })
+      )
+    })
+
+    it('still joins, with no theme, when the parent sends none (older Chat)', () => {
+      start()
+      send(join())
+      expect(onJoin).toHaveBeenCalledTimes(1)
+      expect(onJoin.mock.calls[0][0].theme).toBeUndefined()
+    })
+
+    it.each(['sepia', '', 'DARK', 1, null, true, {}])(
+      'ignores an unknown theme (%j) but still joins',
+      (theme) => {
+        start()
+        send(join({ theme }))
+        expect(onJoin).toHaveBeenCalledTimes(1)
+        expect(onJoin.mock.calls[0][0].theme).toBeUndefined()
+        expect(onJoin.mock.calls[0][0].token).toBe(TOKEN)
+      }
+    )
+
     it('accepts a join from the parent, spaces around its origin in the allow-list ignored', () => {
       setAllowedOrigins(`  ${CHAT}  ,${OTHER}`)
       start()
