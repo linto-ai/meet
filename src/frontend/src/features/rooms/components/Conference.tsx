@@ -248,6 +248,12 @@ export const Conference = ({
     () => createLiveKitRoom(roomOptions, apiConfig?.livekit.reconnect),
     [roomOptions, apiConfig?.livekit.reconnect]
   )
+  // The room is recreated when /config/ arrives; the one thrown away may still
+  // report its disconnection, which the embedding must not take for the call's
+  const currentRoom = useRef(room)
+  useEffect(() => {
+    currentRoom.current = room
+  }, [room])
 
   /*
    * Ensure stable WebSocket connection URL. This is critical for legacy browser compatibility
@@ -291,7 +297,10 @@ export const Conference = ({
 
   const handleDisconnected = useCallback(
     (reason?: DisconnectReason) => {
-      if (embed) return embed.onDisconnected(reason)
+      if (embed) {
+        if (room === currentRoom.current) embed.onDisconnected(reason)
+        return
+      }
       navigateTo(
         'feedback',
         {},
@@ -303,7 +312,7 @@ export const Conference = ({
         }
       )
     },
-    [roomId, embed]
+    [roomId, embed, room]
   )
 
   const handleLiveKitError = (e: Error) => {

@@ -5,6 +5,7 @@ import { EmbedIdleContext } from '../EmbedIdleContext'
 import { toErrorCode, toLeftReason } from '../embedEvents'
 import {
   type HostBridge,
+  type ErrorCode,
   type HostJoin,
   type LeftReason,
   startHostBridge,
@@ -81,6 +82,14 @@ const EmbedRoom = () => {
   // LiveKit also disconnects after a join that failed, which is an `error`,
   // not a `left`: `left` only has a meaning once `joined` was said
   const isJoined = useRef(false)
+  // One `error` per failed join: set by the first one posted
+  const isErrorPosted = useRef(false)
+
+  const postError = (code: ErrorCode) => {
+    if (isErrorPosted.current) return
+    isErrorPosted.current = true
+    bridge.current?.error(code)
+  }
 
   if (!roomId || !join || isOver) return null
 
@@ -97,9 +106,14 @@ const EmbedRoom = () => {
             bridge.current?.joined()
           },
           onDisconnected: (reason) => {
-            if (isJoined.current) finish(toLeftReason(reason))
+            if (isJoined.current) return finish(toLeftReason(reason))
+            // The host asked for it (leave): nothing to report
+            if (isLeaving) return
+            // A disconnection with no ConnectionError is a join that failed:
+            // wait a microtask for the precise onError that may follow
+            queueMicrotask(() => postError('unreachable'))
           },
-          onError: (error) => bridge.current?.error(toErrorCode(error)),
+          onError: (error) => postError(toErrorCode(error)),
         }}
       />
     </EmbedIdleContext.Provider>

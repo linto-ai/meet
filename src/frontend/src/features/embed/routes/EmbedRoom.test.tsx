@@ -35,6 +35,13 @@ const livekit = vi.hoisted(() => ({
     numParticipants: 1,
     localParticipant: { setMicrophoneEnabled: () => Promise.resolve() },
   },
+  // one room by default; a test replaces it to see a room recreated
+  create: null as null | (() => unknown),
+}))
+
+// What /config/ answers; undefined while it loads
+const apiConfig = vi.hoisted(() => ({
+  data: undefined as unknown,
 }))
 
 vi.mock('@livekit/components-react', async (importOriginal) => ({
@@ -54,7 +61,7 @@ vi.mock('@livekit/components-react', async (importOriginal) => ({
   }),
 }))
 vi.mock('@/features/rooms/livekit/utils/reconnectPolicy', () => ({
-  createLiveKitRoom: () => livekit.room,
+  createLiveKitRoom: () => livekit.create?.() ?? livekit.room,
 }))
 vi.mock('@/features/rooms/livekit/prefabs/VideoConference', () => ({
   VideoConference: () => {
@@ -86,23 +93,23 @@ vi.mock('@/features/analytics/telemetry', () => ({
   reportError: vi.fn(),
 }))
 vi.mock('@/api/useConfig', () => ({
-  useConfig: () => ({
-    data: {
-      auto_mute_on_join_threshold: 50,
-      livekit: {
-        url: 'wss://livekit.example.org',
-        force_wss_protocol: false,
-        enable_firefox_proxy_workaround: false,
-        default_sources: [],
-        default_video_codec: 'vp9',
-      },
-    },
-  }),
+  useConfig: () => ({ data: apiConfig.data }),
 }))
 vi.mock('@/api/fetchApi', () => ({
   fetchApi: vi.fn(() => Promise.reject(new Error('no network in this test'))),
 }))
 vi.mock('@/navigation/navigateTo', () => ({ navigateTo: vi.fn() }))
+
+const loadedConfig = (codec = 'vp9') => ({
+  auto_mute_on_join_threshold: 50,
+  livekit: {
+    url: 'wss://livekit.example.org',
+    force_wss_protocol: false,
+    enable_firefox_proxy_workaround: false,
+    default_sources: [],
+    default_video_codec: codec,
+  },
+})
 
 const UUID = '3f2b8c1e-9d4a-4e0b-8a57-6c1d2e9f0a11'
 const CHAT = 'https://chat.example.org'
@@ -168,6 +175,8 @@ describe('/embed/:uuid', () => {
   beforeEach(() => {
     parent.postMessage.mockReset()
     livekit.props = {}
+    livekit.create = null
+    apiConfig.data = loadedConfig()
     idle.leave = null
     livekit.room.disconnect = vi.fn(() => Promise.resolve())
     Object.defineProperty(window, 'parent', {
@@ -533,6 +542,110 @@ describe('/embed/:uuid', () => {
       act(() => lk().onError(notAllowed()))
       act(() => lk().onDisconnected(DisconnectReason.CLIENT_INITIATED))
       expect(postedTypes()).not.toContain('left')
+    })
+
+    /*
+     * D5 bis: LiveKit may close the signalling right after the first answer of
+     * the server, before joined, with no ConnectionError. The parent must not
+     * wait for its own timeout: one error{unreachable} (the closest code of
+     * the protocol: the server did not hold the connection), never left.
+     */
+    it.each([
+      ['no reason', undefined],
+      ['CLIENT_INITIATED', DisconnectReason.CLIENT_INITIATED],
+      ['SERVER_SHUTDOWN', DisconnectReason.SERVER_SHUTDOWN],
+      ['UNKNOWN_REASON', DisconnectReason.UNKNOWN_REASON],
+      ['JOIN_FAILURE', DisconnectReason.JOIN_FAILURE],
+      ['PARTICIPANT_REMOVED', DisconnectReason.PARTICIPANT_REMOVED],
+    ])(
+      'a disconnection before joined with %s, and no ConnectionError, says error unreachable and nothing else',
+      async (_, why) => {
+        renderEmbed()
+        sendJoin()
+        await act(async () => lk().onDisconnected(why))
+        expect(posted().slice(1)).toEqual([
+          msg('error', { code: 'unreachable' }),
+        ])
+      }
+    )
+
+    it('says the failed join once when LiveKit disconnects twice before joined', async () => {
+      renderEmbed()
+      sendJoin()
+      await act(async () => lk().onDisconnected(undefined))
+      await act(async () =>
+        lk().onDisconnected(DisconnectReason.SERVER_SHUTDOWN)
+      )
+      expect(posted().slice(1)).toEqual([msg('error', { code: 'unreachable' })])
+    })
+
+    it('does not double an unknown error with the disconnection that follows', () => {
+      renderEmbed()
+      sendJoin()
+      act(() => lk().onError(new Error('boom')))
+      act(() => lk().onDisconnected(undefined))
+      expect(posted().slice(1)).toEqual([msg('error', { code: 'unknown' })])
+    })
+
+    it('a benign device refusal does not count as the error of the disconnection', async () => {
+      renderEmbed()
+      sendJoin()
+      act(() =>
+        lk().onError(Object.assign(new Error('x'), { name: 'NotAllowedError' }))
+      )
+      await act(async () => lk().onDisconnected(undefined))
+      expect(posted().slice(1)).toEqual([msg('error', { code: 'unreachable' })])
+    })
+
+    it('the disconnection the parent asked for with leave, before joined, says nothing', async () => {
+      renderEmbed()
+      sendJoin()
+      send(msg('leave'))
+      await act(async () =>
+        lk().onDisconnected(DisconnectReason.CLIENT_INITIATED)
+      )
+      expect(livekit.room.disconnect).toHaveBeenCalled()
+      expect(posted().slice(1)).toEqual([])
+    })
+
+    /*
+     * <Conference> is mounted while /config/ loads and makes a new room when
+     * it arrives; the room thrown away may report CLIENT_INITIATED. Only the
+     * disconnection of the current room is a failed join.
+     */
+    describe('when the room is replaced as /config/ arrives', () => {
+      const replaceRoom = () => {
+        apiConfig.data = undefined
+        const create = vi.fn(() => ({ ...livekit.room, disconnect: vi.fn() }))
+        livekit.create = create
+        const view = renderEmbed()
+        sendJoin()
+        const stale = lk().onDisconnected
+        apiConfig.data = loadedConfig('h264')
+        view.rerender(
+          <QueryClientProvider client={queryClient}>
+            <Route path={routes.embedRoom.path}>
+              <EmbedRoom />
+            </Route>
+          </QueryClientProvider>
+        )
+        expect(create).toHaveBeenCalledTimes(2) // the room was replaced
+        return stale
+      }
+
+      it('says nothing for the disconnection of the replaced room', async () => {
+        const stale = replaceRoom()
+        await act(async () => stale(DisconnectReason.CLIENT_INITIATED))
+        expect(posted().slice(1)).toEqual([])
+      })
+
+      it('says error unreachable for the disconnection of the current room', async () => {
+        replaceRoom()
+        await act(async () => lk().onDisconnected(undefined))
+        expect(posted().slice(1)).toEqual([
+          msg('error', { code: 'unreachable' }),
+        ])
+      })
     })
 
     it('after joined, a disconnection says left alone, no error', () => {
