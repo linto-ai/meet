@@ -89,7 +89,7 @@ export const ParticipantsList = () => {
         className={css({
           fontSize: '0.875rem',
           fontWeight: 'bold',
-          color: 'greyscale.600',
+          color: 'default.subtle-text',
           padding: '0 1.5rem',
           marginBottom: '0.83em',
         })}
