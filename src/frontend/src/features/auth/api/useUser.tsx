@@ -4,6 +4,7 @@ import { fetchUser } from './fetchUser'
 import { type ApiUser } from './ApiUser'
 import { useMemo } from 'react'
 import { useConfig } from '@/api/useConfig'
+import { isEmbedPage } from '@/features/embed/isEmbedPage'
 
 const SILENT_LOGIN_PARAM = 'silentLogin'
 
@@ -33,7 +34,10 @@ export const useUser = (
     if (isConfigLoading) return
 
     const silentDisabled =
-      data?.is_silent_login_enabled !== true || disabledByUrl
+      data?.is_silent_login_enabled !== true ||
+      disabledByUrl ||
+      // an IdP redirect would break the iframe of /embed/<uuid>
+      isEmbedPage()
 
     if (silentDisabled) {
       return {

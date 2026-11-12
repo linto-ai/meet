@@ -146,7 +146,7 @@ const VisualOnlyTooltipInner = ({
               position: 'fixed',
               padding: '2px 8px',
               backgroundColor: 'primaryDark.100',
-              color: 'gray.100',
+              color: 'greyscale.50',
               borderRadius: '4px',
               fontSize: 14,
               whiteSpace: 'nowrap',

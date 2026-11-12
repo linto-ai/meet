@@ -20,6 +20,7 @@ import { Screen } from '@/layout/Screen'
 import { QueryAware } from '@/components/QueryAware'
 import { ErrorScreen } from '@/components/ErrorScreen'
 import { joinRoom } from '../api/joinRoom'
+import { type ApiRoom, ApiAccessLevel } from '../api/ApiRoom'
 import { useCreateRoom } from '../api/createRoom'
 import { InviteDialog } from './InviteDialog'
 import { VideoConference } from '../livekit/prefabs/VideoConference'
@@ -54,15 +55,21 @@ const connectOptions = {
   peerConnectionTimeout: 60000, // Default: 15s. Extended for slow TURN/TLS negotiation
 }
 
-const handleError = (e: Error) => {
+const isMediaDeviceError = (e: Error) => {
   const failure = getMediaDeviceFailure(e)
-  if (failure && failure !== MediaDeviceFailure.Other) return
+  return !!failure && failure !== MediaDeviceFailure.Other
+}
 
-  // connect() was aborted by a disconnect() before the join completed
-  if (
-    e instanceof ConnectionError &&
-    e.reason === ConnectionErrorReason.Cancelled
-  ) {
+// connect() was aborted by a disconnect() before the join completed
+const isCancelled = (e: Error) =>
+  e instanceof ConnectionError && e.reason === ConnectionErrorReason.Cancelled
+
+const isBenignError = (e: Error) => isMediaDeviceError(e) || isCancelled(e)
+
+const handleError = (e: Error) => {
+  if (isMediaDeviceError(e)) return
+
+  if (isCancelled(e)) {
     void captureEvent('connection-cancelled')
     return
   }
@@ -128,14 +135,38 @@ const getConnectionEndReason = (
   }
 }
 
+/**
+ * Set by /embed/<uuid>: the call is joined with the LiveKit token and the
+ * media choices of the Chat page that frames Meet, and reports to it.
+ */
+export type EmbedOptions = {
+  token: string
+  audio: boolean
+  video: boolean
+  isLeaving: boolean
+  onConnected: () => void
+  onDisconnected: (reason?: DisconnectReason) => void
+  onError: (error: Error) => void
+}
+
+const embedRoomData = (roomId: string, token: string): ApiRoom => ({
+  id: roomId,
+  name: roomId,
+  slug: roomId,
+  access_level: ApiAccessLevel.RESTRICTED,
+  livekit: { url: '', room: roomId, token },
+})
+
 export const Conference = ({
   roomId,
   mode = 'join',
   onLobbyRequired,
+  embed,
 }: {
   roomId: string
   mode?: 'join' | 'create'
   onLobbyRequired: () => void
+  embed?: EmbedOptions
 }) => {
   const { t } = useTranslation('rooms')
   const { data: apiConfig } = useConfig()
@@ -166,7 +197,13 @@ export const Conference = ({
         return joinRoom({ roomId, username })
       }),
     retry: false,
+    // Embedded: Chat already holds the token, the API is not asked
+    enabled: !embed,
+    initialData: embed && embedRoomData(roomId, embed.token),
   })
+
+  const audioEnabled = embed?.audio ?? userConfig.audioEnabled
+  const videoEnabled = embed?.video ?? userConfig.videoEnabled
 
   const isLobbyRequired =
     !!createRoomData && !createRoomData.livekit && !hasJoined
@@ -211,6 +248,12 @@ export const Conference = ({
     () => createLiveKitRoom(roomOptions, apiConfig?.livekit.reconnect),
     [roomOptions, apiConfig?.livekit.reconnect]
   )
+  // The room is recreated when /config/ arrives; the one thrown away may still
+  // report its disconnection, which the embedding must not take for the call's
+  const currentRoom = useRef(room)
+  useEffect(() => {
+    currentRoom.current = room
+  }, [room])
 
   /*
    * Ensure stable WebSocket connection URL. This is critical for legacy browser compatibility
@@ -232,7 +275,7 @@ export const Conference = ({
     if (
       userPreferencesSnap.is_auto_mute_large_room_enabled &&
       !hasAutoMutedRef.current &&
-      userConfig.audioEnabled &&
+      audioEnabled &&
       room.numParticipants > apiConfig.auto_mute_on_join_threshold
     ) {
       hasAutoMutedRef.current = true
@@ -242,12 +285,22 @@ export const Conference = ({
   }, [
     apiConfig,
     room,
-    userConfig.audioEnabled,
+    audioEnabled,
     userPreferencesSnap.is_auto_mute_large_room_enabled,
   ])
 
+  // Synchronous: the embedding reports as soon as LiveKit is connected
+  const onConnected = () => {
+    embed?.onConnected()
+    void handleConnected()
+  }
+
   const handleDisconnected = useCallback(
     (reason?: DisconnectReason) => {
+      if (embed) {
+        if (room === currentRoom.current) embed.onDisconnected(reason)
+        return
+      }
       navigateTo(
         'feedback',
         {},
@@ -259,12 +312,21 @@ export const Conference = ({
         }
       )
     },
-    [roomId]
+    [roomId, embed, room]
   )
 
+  const handleLiveKitError = (e: Error) => {
+    handleError(e)
+    if (embed && !isBenignError(e)) embed.onError(e)
+  }
+
   useEffect(() => {
-    void captureMediaEvent('visit-room', { slug: roomId })
-  }, [roomId])
+    if (!embed) void captureMediaEvent('visit-room', { slug: roomId })
+  }, [roomId, embed])
+
+  useEffect(() => {
+    if (embed?.isLeaving) void room.disconnect()
+  }, [embed?.isLeaving, room])
 
   useEffect(() => {
     if (createRoomData?.livekit) setHasJoined(true)
@@ -307,10 +369,10 @@ export const Conference = ({
           room={room}
           serverUrl={serverUrl}
           token={createRoomData?.livekit?.token}
-          connect={isConnectionWarmedUp}
-          audio={userConfig.audioEnabled}
+          connect={isConnectionWarmedUp && !embed?.isLeaving}
+          audio={audioEnabled}
           video={
-            userConfig.videoEnabled && {
+            videoEnabled && {
               processor: BackgroundProcessorFactory.fromProcessorConfig(
                 userConfig.processorConfig
               ),
@@ -320,14 +382,14 @@ export const Conference = ({
           className={css({
             backgroundColor: 'primaryDark.50 !important',
           })}
-          onError={handleError}
-          onConnected={handleConnected}
+          onError={handleLiveKitError}
+          onConnected={onConnected}
           onDisconnected={handleDisconnected}
         >
           <WatchMediaDeviceErrors />
           <VideoConference />
-          {!isMobile && <InviteDialog mode={mode} />}
-          <PictureInPictureConference />
+          {!isMobile && !embed && <InviteDialog mode={mode} />}
+          {!embed && <PictureInPictureConference />}
           <MeetDevtools />
         </LiveKitRoom>
       </Screen>

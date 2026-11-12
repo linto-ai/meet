@@ -1,6 +1,7 @@
 /* based on https://github.com/livekit/components-js/blob/main/packages/styles/scss/themes/default.scss
 */
-[data-lk-theme='visio-light'] {
+[data-lk-theme='visio-light'],
+[data-lk-theme='visio-dark'] {
   color-scheme: light;
   --lk-bg: var(--colors-white);
   --lk-room-bg: var(--colors-default-bg);
@@ -95,6 +96,47 @@
   --lk-control-border: var(--colors-danger-hover);
 }
 
+/* Dark theme of /embed (the Chat page is dark). The --lk-* variables above are
+   shared; only the semantic Panda colours they read are replaced, with the
+   app's dark palette (primaryDark, greyscale) so that every component styled
+   with those tokens follows. Contrast: text #F6F6F6 on #161622 ~ 17:1, on
+   control #2D2D46 ~ 12:1; primary text #161622 on #C1C1FB ~ 10:1. */
+[data-lk-theme='visio-dark'] {
+  color-scheme: dark;
+  --lk-bg: var(--colors-primary-dark-75);
+  --colors-default-bg: var(--colors-primary-dark-50);
+  --colors-default-text: var(--colors-greyscale-50);
+  --colors-text: var(--colors-greyscale-50);
+  --colors-default-subtle: var(--colors-primary-dark-100);
+  --colors-default-subtle-text: var(--colors-greyscale-300);
+  --colors-box-bg: var(--colors-primary-dark-75);
+  --colors-box-text: var(--colors-greyscale-50);
+  --colors-box-border: var(--colors-primary-dark-200);
+  --colors-control: var(--colors-primary-dark-100);
+  --colors-control-hover: var(--colors-primary-dark-200);
+  --colors-control-active: var(--colors-primary-dark-300);
+  --colors-control-text: var(--colors-greyscale-50);
+  --colors-control-border: var(--colors-primary-dark-300);
+  --colors-control-subtle: var(--colors-primary-dark-300);
+  --colors-primary: var(--colors-primary-dark-action);
+  --colors-primary-hover: var(--colors-primary-300);
+  --colors-primary-active: var(--colors-primary-400);
+  --colors-primary-text: var(--colors-primary-dark-50);
+  --colors-gray-100: var(--colors-primary-dark-100);
+  --colors-gray-200: var(--colors-primary-dark-200);
+  --colors-gray-300: var(--colors-primary-dark-300);
+  --colors-gray-400: var(--colors-primary-dark-300);
+  --lk-fg5: var(--colors-greyscale-300);
+  /* tertiaryText buttons (close of the side panel) read primary.900, #21213F */
+  --colors-primary-900: var(--colors-primary-dark-900);
+}
+
+/* The room fills the frame in the dark page: its height is 0 otherwise and
+   the page colour shows around the tiles */
+[data-lk-theme='visio-dark'] .lk-room-container {
+  min-height: 100dvh;
+}
+
 [data-lk-theme] .lk-disconnect-button:not(:disabled):hover {
   --lk-control-hover-bg: var(--lk-danger-hover-bg);
 }
@@ -103,14 +145,12 @@
   background-color: var(--lk-danger-active-bg);
 }
 
-[data-lk-theme='visio-light'] .lk-close-button path {
+[data-lk-theme] .lk-close-button path {
   fill: var(--lk-fg);
 }
 
-[data-lk-theme='visio-light'] .lk-participant-metadata-item,
-[data-lk-theme='visio-light']
-  .lk-participant-tile
-  .lk-focus-toggle-button:not(:hover) {
+[data-lk-theme] .lk-participant-metadata-item,
+[data-lk-theme] .lk-participant-tile .lk-focus-toggle-button:not(:hover) {
   color: white;
 }
 

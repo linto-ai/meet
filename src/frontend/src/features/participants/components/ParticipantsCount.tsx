@@ -11,7 +11,7 @@ const badgeStyles = css({
   right: '-.25rem',
   width: '1.25rem',
   height: '1.25rem',
-  backgroundColor: 'gray',
+  backgroundColor: 'greyscale.600',
   borderRadius: '50%',
   color: 'white',
   fontSize: '0.75rem',
