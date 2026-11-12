@@ -4,6 +4,7 @@ import { useSyncUserPreferencesWithBackend } from '@/features/auth/api/useSyncUs
 import { useEffect } from 'react'
 import { CozyBridge } from 'cozy-external-bridge'
 import { getEnv } from '@/utils/getEnv'
+import { isEmbedPage } from '@/features/embed/isEmbedPage'
 
 const isOriginAllowed = (parentOrigin: string): boolean => {
   const allowlist = getEnv('VITE_BRIDGE_TARGET_ORIGIN_ALLOWLIST')
@@ -17,13 +18,16 @@ const isOriginAllowed = (parentOrigin: string): boolean => {
 
 export const AppInitialization = () => {
   const { data } = useConfig()
+  // No cookies, consent or cozy bridge in the frame of another site
+  const isEmbed = isEmbedPage()
   useSyncUserPreferencesWithBackend()
 
   const { analytics = {}, custom_css_url = '' } = data ?? {}
 
-  useAnalytics(analytics)
+  useAnalytics(isEmbed ? { isDisabled: true } : analytics)
 
   useEffect(() => {
+    if (isEmbed) return
     const setupBridge = async () => {
       const bridge = new CozyBridge()
       if (!bridge.isInIframe()) return
@@ -36,7 +40,7 @@ export const AppInitialization = () => {
       window.twake = { twakeOrigin: `${parentOrigin}/#/bridge` }
     }
     setupBridge()
-  }, [])
+  }, [isEmbed])
 
   useEffect(() => {
     if (custom_css_url) {
