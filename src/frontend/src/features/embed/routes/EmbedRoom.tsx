@@ -14,6 +14,10 @@ import {
 // Without a join by then, the parent does not speak this protocol
 const JOIN_TIMEOUT_MS = 10_000
 
+// A bare disconnection before `joined` waits this long for the precise
+// ConnectionError, which reaches us later by the network
+const DISCONNECT_GRACE_MS = 1_000
+
 /**
  * Connects to the parent page for the life of the component (an Effect: the
  * bridge is a listener on `window`, outside React). Returns the join request
@@ -71,6 +75,28 @@ const useFinish = (bridge: RefObject<HostBridge | null>) => {
 }
 
 /**
+ * The grace period of a bare disconnection before `joined`: `startGrace` arms
+ * one timer (a second call does not restart it), `cancelGrace` clears it. The
+ * timer is also cleared on unmount and once the host asked to leave (an Effect:
+ * a timer lives outside React). Used by: EmbedRoom.
+ */
+const useGrace = (isLeaving: boolean) => {
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const cancelGrace = () => {
+    clearTimeout(timer.current)
+    timer.current = undefined
+  }
+  const startGrace = (onExpire: () => void) => {
+    timer.current ??= setTimeout(onExpire, DISCONNECT_GRACE_MS)
+  }
+  useEffect(() => {
+    if (isLeaving) cancelGrace()
+    return cancelGrace
+  }, [isLeaving])
+  return { startGrace, cancelGrace }
+}
+
+/**
  * Meet in an iframe of Chat: waits for the `join` message of the parent, then
  * enters the call with its LiveKit token. No Meet session, no pre-join
  * screen, nothing shown once the call is over.
@@ -85,7 +111,10 @@ const EmbedRoom = () => {
   // One `error` per failed join: set by the first one posted
   const isErrorPosted = useRef(false)
 
+  const { startGrace, cancelGrace } = useGrace(isLeaving)
+
   const postError = (code: ErrorCode) => {
+    cancelGrace()
     if (isErrorPosted.current) return
     isErrorPosted.current = true
     bridge.current?.error(code)
@@ -103,6 +132,7 @@ const EmbedRoom = () => {
           isLeaving,
           onConnected: () => {
             isJoined.current = true
+            cancelGrace()
             bridge.current?.joined()
           },
           onDisconnected: (reason) => {
@@ -110,8 +140,9 @@ const EmbedRoom = () => {
             // The host asked for it (leave): nothing to report
             if (isLeaving) return
             // A disconnection with no ConnectionError is a join that failed:
-            // wait a microtask for the precise onError that may follow
-            queueMicrotask(() => postError('unreachable'))
+            // wait a grace period (one, a second disconnection does not
+            // restart it) for the precise onError that may follow
+            startGrace(() => postError('unreachable'))
           },
           onError: (error) => postError(toErrorCode(error)),
         }}

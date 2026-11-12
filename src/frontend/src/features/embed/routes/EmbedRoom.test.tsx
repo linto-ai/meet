@@ -115,6 +115,9 @@ const UUID = '3f2b8c1e-9d4a-4e0b-8a57-6c1d2e9f0a11'
 const CHAT = 'https://chat.example.org'
 const TOKEN = 'eyJ.secret-livekit-token.sig'
 const JOIN_TIMEOUT_MS = 10_000
+// DISCONNECT_GRACE_MS of EmbedRoom: a bare disconnection before joined waits
+// this long for the precise error that LiveKit may still send
+const DISCONNECT_GRACE_MS = 1_000
 
 const parent = { postMessage: vi.fn() }
 
@@ -507,6 +510,20 @@ describe('/embed/:uuid', () => {
         'no server',
         ConnectionErrorReason.ServerUnreachable
       )
+    // A bare disconnection starts a grace period (fake clock): nothing is
+    // posted before it ends, a single error{unreachable} after
+    const bareDisconnect = (why?: DisconnectReason) =>
+      act(async () => lk().onDisconnected(why))
+    const advance = (ms: number) =>
+      act(async () => {
+        await vi.advanceTimersByTimeAsync(ms)
+      })
+    const expectOnlyUnreachableAfterGrace = async () => {
+      await advance(DISCONNECT_GRACE_MS - 1)
+      expect(posted().slice(1)).toEqual([])
+      await advance(1)
+      expect(posted().slice(1)).toEqual([msg('error', { code: 'unreachable' })])
+    }
 
     it.each([
       ['a rejected token', notAllowed, 'token_rejected'],
@@ -560,23 +577,81 @@ describe('/embed/:uuid', () => {
     ])(
       'a disconnection before joined with %s, and no ConnectionError, says error unreachable and nothing else',
       async (_, why) => {
+        vi.useFakeTimers()
         renderEmbed()
         sendJoin()
-        await act(async () => lk().onDisconnected(why))
-        expect(posted().slice(1)).toEqual([
-          msg('error', { code: 'unreachable' }),
-        ])
+        await bareDisconnect(why)
+        await expectOnlyUnreachableAfterGrace()
+        await advance(60_000)
+        expect(posted().slice(1)).toHaveLength(1)
       }
     )
 
     it('says the failed join once when LiveKit disconnects twice before joined', async () => {
+      vi.useFakeTimers()
       renderEmbed()
       sendJoin()
-      await act(async () => lk().onDisconnected(undefined))
-      await act(async () =>
-        lk().onDisconnected(DisconnectReason.SERVER_SHUTDOWN)
-      )
+      await bareDisconnect(undefined)
+      await advance(DISCONNECT_GRACE_MS / 2)
+      await bareDisconnect(DisconnectReason.SERVER_SHUTDOWN)
+      // the grace of the first disconnection decides, the second adds none
+      await advance(DISCONNECT_GRACE_MS / 2 - 1)
+      expect(posted().slice(1)).toEqual([])
+      await advance(1)
       expect(posted().slice(1)).toEqual([msg('error', { code: 'unreachable' })])
+      await advance(60_000)
+      expect(posted().slice(1)).toHaveLength(1)
+    })
+
+    /*
+     * The precise ConnectionError comes from the network, after the bare
+     * disconnection: the first message wins, so the page waits for it.
+     */
+    it('a rejected token that arrives during the grace is the only message, token_rejected', async () => {
+      vi.useFakeTimers()
+      renderEmbed()
+      sendJoin()
+      await bareDisconnect(undefined)
+      await advance(DISCONNECT_GRACE_MS / 2)
+      act(() => lk().onError(notAllowed()))
+      expect(posted().slice(1)).toEqual([
+        msg('error', { code: 'token_rejected' }),
+      ])
+      await advance(DISCONNECT_GRACE_MS * 10)
+      expect(posted().slice(1)).toEqual([
+        msg('error', { code: 'token_rejected' }),
+      ])
+    })
+
+    it('joined during the grace cancels it: no error, now or later', async () => {
+      vi.useFakeTimers()
+      renderEmbed()
+      sendJoin()
+      await bareDisconnect(undefined)
+      await advance(DISCONNECT_GRACE_MS / 2)
+      act(() => lk().onConnected())
+      await advance(DISCONNECT_GRACE_MS * 10)
+      expect(postedTypes().slice(1)).toEqual(['joined'])
+    })
+
+    it('leave from the parent during the grace cancels it: nothing is posted because of it', async () => {
+      vi.useFakeTimers()
+      renderEmbed()
+      sendJoin()
+      await bareDisconnect(undefined)
+      send(msg('leave'))
+      await advance(DISCONNECT_GRACE_MS * 10)
+      expect(posted().slice(1)).toEqual([])
+    })
+
+    it('unmounting during the grace cancels it: nothing is posted', async () => {
+      vi.useFakeTimers()
+      const view = renderEmbed()
+      sendJoin()
+      await bareDisconnect(undefined)
+      view.unmount()
+      await advance(DISCONNECT_GRACE_MS * 10)
+      expect(posted().slice(1)).toEqual([])
     })
 
     it('does not double an unknown error with the disconnection that follows', () => {
@@ -588,16 +663,18 @@ describe('/embed/:uuid', () => {
     })
 
     it('a benign device refusal does not count as the error of the disconnection', async () => {
+      vi.useFakeTimers()
       renderEmbed()
       sendJoin()
       act(() =>
         lk().onError(Object.assign(new Error('x'), { name: 'NotAllowedError' }))
       )
-      await act(async () => lk().onDisconnected(undefined))
-      expect(posted().slice(1)).toEqual([msg('error', { code: 'unreachable' })])
+      await bareDisconnect(undefined)
+      await expectOnlyUnreachableAfterGrace()
     })
 
     it('the disconnection the parent asked for with leave, before joined, says nothing', async () => {
+      vi.useFakeTimers()
       renderEmbed()
       sendJoin()
       send(msg('leave'))
@@ -605,6 +682,7 @@ describe('/embed/:uuid', () => {
         lk().onDisconnected(DisconnectReason.CLIENT_INITIATED)
       )
       expect(livekit.room.disconnect).toHaveBeenCalled()
+      await advance(DISCONNECT_GRACE_MS * 10)
       expect(posted().slice(1)).toEqual([])
     })
 
@@ -633,18 +711,19 @@ describe('/embed/:uuid', () => {
         return stale
       }
 
-      it('says nothing for the disconnection of the replaced room', async () => {
+      it('says nothing for the disconnection of the replaced room, grace included', async () => {
+        vi.useFakeTimers()
         const stale = replaceRoom()
         await act(async () => stale(DisconnectReason.CLIENT_INITIATED))
+        await advance(DISCONNECT_GRACE_MS * 10)
         expect(posted().slice(1)).toEqual([])
       })
 
-      it('says error unreachable for the disconnection of the current room', async () => {
+      it('says error unreachable, after the grace, for the disconnection of the current room', async () => {
+        vi.useFakeTimers()
         replaceRoom()
-        await act(async () => lk().onDisconnected(undefined))
-        expect(posted().slice(1)).toEqual([
-          msg('error', { code: 'unreachable' }),
-        ])
+        await bareDisconnect(undefined)
+        await expectOnlyUnreachableAfterGrace()
       })
     })
 
