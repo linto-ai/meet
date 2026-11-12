@@ -57,7 +57,15 @@ const resolveVar = (name: string, mode: Mode): string => {
   return resolveValue(valueOfVar(name), mode)
 }
 
+// CSS named colours the Panda config uses as plain values
+const namedColors: Record<string, string> = {
+  white: '#ffffff',
+  black: '#000000',
+  gray: '#808080',
+}
+
 const resolveValue = (value: string, mode: Mode): string => {
+  if (namedColors[value]) return namedColors[value]
   const ref = /^var\((--colors-[\w-]+)\)$/.exec(value)
   if (ref) return resolveVar(ref[1], mode)
   if (/^#[0-9a-f]{3}$/i.test(value)) {
@@ -71,6 +79,7 @@ export type Mode = 'light' | 'dark'
 
 export const resolveColor = (name: string, mode: Mode): string => {
   const raw = tokenValue(`colors.${name}`)
+  if (raw === undefined && namedColors[name]) return namedColors[name]
   if (raw === undefined) throw new Error(`unknown colour token "${name}"`)
   // the variable of the token itself is the one the theme may redefine
   const varName = `--colors-${name
