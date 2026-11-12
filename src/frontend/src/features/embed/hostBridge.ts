@@ -10,7 +10,10 @@ const SOURCE = 'twake-meet-embed'
 
 export type LeftReason = 'user' | 'idle' | 'removed' | 'disconnected'
 export type ErrorCode =
-  'unsupported' | 'token_rejected' | 'unreachable' | 'unknown'
+  | 'unsupported'
+  | 'token_rejected'
+  | 'unreachable'
+  | 'unknown'
 
 export type HostJoin = { token: string; audio: boolean; video: boolean }
 
