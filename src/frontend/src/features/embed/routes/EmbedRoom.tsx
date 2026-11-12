@@ -8,6 +8,7 @@ import {
   type HostBridge,
   type ErrorCode,
   type HostJoin,
+  type HostTheme,
   type LeftReason,
   startHostBridge,
 } from '../hostBridge'
@@ -56,6 +57,29 @@ const useHost = () => {
   }, [])
 
   return { join, isLeaving, isLeavingRef, bridge }
+}
+
+/**
+ * Dresses the page in the theme of the parent for the life of the component
+ * (an Effect: the attributes are on <html>, outside React). Nothing changes
+ * when the parent sent none. Used by: EmbedRoom.
+ */
+const useHostTheme = (theme: HostTheme | undefined) => {
+  useEffect(() => {
+    if (!theme) return
+    const page = document.documentElement
+    const previous = {
+      lk: page.getAttribute('data-lk-theme'),
+      scheme: page.style.colorScheme,
+    }
+    page.setAttribute('data-lk-theme', `visio-${theme}`)
+    page.style.colorScheme = theme
+    return () => {
+      if (previous.lk === null) page.removeAttribute('data-lk-theme')
+      else page.setAttribute('data-lk-theme', previous.lk)
+      page.style.colorScheme = previous.scheme
+    }
+  }, [theme])
 }
 
 /**
@@ -160,6 +184,7 @@ const EmbedRoom = () => {
   const { join, isLeaving, isLeavingRef, bridge } = useHost()
   const { isOver, finish, onIdle } = useFinish(bridge)
   const events = useCallEvents(bridge, isLeaving, isLeavingRef, finish)
+  useHostTheme(join?.theme)
 
   if (!roomId || !join || isOver) return null
 

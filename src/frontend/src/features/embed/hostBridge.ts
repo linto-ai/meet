@@ -15,7 +15,14 @@ export type ErrorCode =
   | 'unreachable'
   | 'unknown'
 
-export type HostJoin = { token: string; audio: boolean; video: boolean }
+export type HostTheme = 'light' | 'dark'
+
+export type HostJoin = {
+  token: string
+  audio: boolean
+  video: boolean
+  theme?: HostTheme
+}
 
 export type HostBridge = {
   joined: () => void
@@ -49,7 +56,10 @@ const parseJoin = (data: Record<string, unknown>): HostMessage | null => {
   const { token, audio, video } = data
   if (typeof token !== 'string' || !token.trim()) return null
   if (typeof audio !== 'boolean' || typeof video !== 'boolean') return null
-  return { type: 'join', token, audio, video }
+  // An unknown theme is ignored, the join still goes through
+  const theme =
+    data.theme === 'light' || data.theme === 'dark' ? data.theme : undefined
+  return { type: 'join', token, audio, video, theme }
 }
 
 const parseMessage = (data: unknown): HostMessage | null => {
@@ -87,7 +97,12 @@ const dispatch = (
   }
   if (message?.type !== 'join' || state.hasJoined) return
   state.hasJoined = true
-  onJoin({ token: message.token, audio: message.audio, video: message.video })
+  onJoin({
+    token: message.token,
+    audio: message.audio,
+    video: message.video,
+    theme: message.theme,
+  })
 }
 
 const makeListener = (
