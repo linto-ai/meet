@@ -41,6 +41,10 @@ export function ResponsiveMenu({
           borderRadius: '20px',
           flexGrow: 1,
           padding: '1.5rem',
+          // a frame can be shorter than the menu (242 px): the sheet scrolls
+          // within the viewport minus the overlay padding (1.5rem + 1rem)
+          maxHeight: 'calc(100dvh - 2.5rem)',
+          overflowY: 'auto',
           '&[data-entering]': {
             animation: 'slide-full 200ms',
           },

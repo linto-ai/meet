@@ -127,6 +127,14 @@
   --colors-gray-300: var(--colors-primary-dark-300);
   --colors-gray-400: var(--colors-primary-dark-300);
   --lk-fg5: var(--colors-greyscale-300);
+  /* tertiaryText buttons (close of the side panel) read primary.900, #21213F */
+  --colors-primary-900: var(--colors-primary-dark-900);
+}
+
+/* The room fills the frame in the dark page: its height is 0 otherwise and
+   the page colour shows around the tiles */
+[data-lk-theme='visio-dark'] .lk-room-container {
+  min-height: 100dvh;
 }
 
 [data-lk-theme] .lk-disconnect-button:not(:disabled):hover {

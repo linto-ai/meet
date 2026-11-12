@@ -14,7 +14,7 @@ and this project adheres to
 - 🐛(frontend) /embed/<uuid> says one error alone when the join fails (a bare disconnection before joined is error unreachable after a 1 s grace that a precise error cancels, none after a leave or from a replaced room), left only after joined
 - 🐛(frontend) /embed/<uuid> drops the connection under way when the host leaves between join and joined: no joined, no left
 - 🙈(frontend) /embed/<uuid> options menu offers no picture-in-picture, transcript or screen recording
-- 💄(frontend) /embed/<uuid> follows the theme of the host (light or dark, new visio-dark theme) and uses the compact control bar when the frame is 500 px wide or less
+- 💄(frontend) /embed/<uuid> follows the theme of the host (light or dark, new visio-dark theme) and uses the compact control bar when the frame is 600 px wide or less; its menu sheet scrolls in a short frame; dark theme page, chat notice, message placeholder and panel close button readable
 - ✨(backend) rooms/{id}/linto/catchup relays the late joiner's summary from Studio
 - ✨(frontend) add jittered exponential backoff to LiveKit reconnections
 - ✨(frontend) tell participants when a recording is interrupted
