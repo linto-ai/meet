@@ -64,4 +64,26 @@ describe('useIsMobile', () => {
     })
     expect(result.current).toBe(true)
   })
+
+  /*
+   * The full control bar is 569 px wide plus 18 px of margin on each side:
+   * 605 px at least. Narrower than that, 'More Options' and 'Leave' leave
+   * the frame, so those widths must get the compact bar.
+   */
+  it.each([500, 501, 550, 569, 595, 600])(
+    'is compact in a %i px wide frame',
+    (width) => {
+      vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(DESKTOP_UA)
+      setWidth(width)
+      const { result } = renderHook(() => useIsMobile())
+      expect(result.current).toBe(true)
+    }
+  )
+
+  it.each([601, 640, 769])('is not compact in a %i px wide frame', (width) => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(DESKTOP_UA)
+    setWidth(width)
+    const { result } = renderHook(() => useIsMobile())
+    expect(result.current).toBe(false)
+  })
 })

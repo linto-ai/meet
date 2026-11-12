@@ -63,4 +63,21 @@ describe('ControlBar', () => {
     expect(screen.getByTestId('full-control-bar')).toBeTruthy()
     expect(screen.queryByTestId('compact-control-bar')).toBeNull()
   })
+
+  it.each([501, 550, 600])(
+    'is the compact bar in a %i px frame: the full bar would overflow it',
+    (width) => {
+      setWidth(width)
+      render(<ControlBar />)
+      expect(screen.getByTestId('compact-control-bar')).toBeTruthy()
+      expect(screen.queryByTestId('full-control-bar')).toBeNull()
+    }
+  )
+
+  it('is the full bar from 601 px up', () => {
+    setWidth(601)
+    render(<ControlBar />)
+    expect(screen.getByTestId('full-control-bar')).toBeTruthy()
+    expect(screen.queryByTestId('compact-control-bar')).toBeNull()
+  })
 })
