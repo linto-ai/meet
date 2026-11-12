@@ -224,14 +224,14 @@ describe('/embed/:uuid', () => {
       expect(page().style.colorScheme).toBe('light')
     })
 
-    it('keeps today\'s page when the join has no theme', () => {
+    it("keeps today's page when the join has no theme", () => {
       renderEmbed()
       sendJoin()
       expect(page().getAttribute('data-lk-theme')).toBe('visio-light')
       expect(screen.getByTestId('livekit-room')).toBeTruthy()
     })
 
-    it('keeps today\'s page, and joins, when the theme is unknown', () => {
+    it("keeps today's page, and joins, when the theme is unknown", () => {
       renderEmbed()
       sendJoin({ theme: 'sepia' })
       expect(page().getAttribute('data-lk-theme')).toBe('visio-light')

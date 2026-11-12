@@ -41,7 +41,7 @@ const setWidth = (width: number) => {
       addListener: () => {},
       removeListener: () => {},
     }
-  }) as typeof window.matchMedia
+  }) as unknown as typeof window.matchMedia
 }
 
 describe('ControlBar', () => {
