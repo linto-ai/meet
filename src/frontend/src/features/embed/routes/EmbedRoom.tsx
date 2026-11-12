@@ -27,6 +27,9 @@ const DISCONNECT_GRACE_MS = 1_000
 const useHost = () => {
   const [join, setJoin] = useState<HostJoin | null>(null)
   const [isLeaving, setIsLeaving] = useState(false)
+  // Set in the handler itself: a LiveKit callback running before the next
+  // render must already see the leave
+  const isLeavingRef = useRef(false)
   const bridge = useRef<HostBridge | null>(null)
 
   useEffect(() => {
@@ -35,7 +38,10 @@ const useHost = () => {
         clearTimeout(timer)
         setJoin(request)
       },
-      onLeave: () => setIsLeaving(true),
+      onLeave: () => {
+        isLeavingRef.current = true
+        setIsLeaving(true)
+      },
     })
     bridge.current = host
     const timer = setTimeout(() => {
@@ -48,7 +54,7 @@ const useHost = () => {
     }
   }, [])
 
-  return { join, isLeaving, bridge }
+  return { join, isLeaving, isLeavingRef, bridge }
 }
 
 /**
@@ -103,7 +109,7 @@ const useGrace = (isLeaving: boolean) => {
  */
 const EmbedRoom = () => {
   const { roomId } = useParams()
-  const { join, isLeaving, bridge } = useHost()
+  const { join, isLeaving, isLeavingRef, bridge } = useHost()
   const { isOver, finish, onIdle } = useFinish(bridge)
   // LiveKit also disconnects after a join that failed, which is an `error`,
   // not a `left`: `left` only has a meaning once `joined` was said
@@ -131,14 +137,17 @@ const EmbedRoom = () => {
           ...join,
           isLeaving,
           onConnected: () => {
+            // The host left while the connection was under way: not joined
+            if (isLeavingRef.current) return
             isJoined.current = true
             cancelGrace()
             bridge.current?.joined()
           },
           onDisconnected: (reason) => {
+            // The host asked for it (leave): nothing to report, even when
+            // `joined` was never said
+            if (isLeavingRef.current && !isJoined.current) return
             if (isJoined.current) return finish(toLeftReason(reason))
-            // The host asked for it (leave): nothing to report
-            if (isLeaving) return
             // A disconnection with no ConnectionError is a join that failed:
             // wait a grace period (one, a second disconnection does not
             // restart it) for the precise onError that may follow

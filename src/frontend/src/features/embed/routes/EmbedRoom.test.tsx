@@ -169,6 +169,7 @@ const lk = () =>
     serverUrl?: string
     audio?: unknown
     video?: unknown
+    connect?: boolean
     onConnected: () => void
     onDisconnected: (reason?: DisconnectReason) => void
     onError: (error: Error) => void
@@ -367,6 +368,55 @@ describe('/embed/:uuid', () => {
       expect(posted().filter((m) => m.type === 'left')).toEqual([
         msg('left', { reason: 'user' }),
       ])
+    })
+
+    /*
+     * leave between join and joined: the connection in progress is dropped.
+     * LiveKit may still report onConnected afterwards (the connect was not
+     * aborted in time); the page must not enter the room nor say joined.
+     */
+    describe('a leave that arrives between join and joined', () => {
+      it('abandons the connection in progress', async () => {
+        renderEmbed()
+        sendJoin()
+        // the connection is warmed up, then really under way
+        await act(async () => {})
+        expect(lk().connect).toBe(true)
+        send(msg('leave'))
+        expect(livekit.room.disconnect).toHaveBeenCalled()
+        expect(lk().connect).toBe(false)
+      })
+
+      it('never says joined, even if LiveKit connects after the leave', () => {
+        renderEmbed()
+        sendJoin()
+        send(msg('leave'))
+        act(() => lk().onConnected?.())
+        expect(postedTypes()).toEqual(['ready'])
+      })
+
+      it('says neither left nor error when LiveKit connects, then disconnects', async () => {
+        vi.useFakeTimers()
+        renderEmbed()
+        sendJoin()
+        send(msg('leave'))
+        act(() => lk().onConnected?.())
+        act(() => lk().onDisconnected?.(DisconnectReason.CLIENT_INITIATED))
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(DISCONNECT_GRACE_MS * 10)
+        })
+        expect(postedTypes()).toEqual(['ready'])
+      })
+
+      it('ignores a join that comes after the leave', () => {
+        renderEmbed()
+        sendJoin()
+        send(msg('leave'))
+        sendJoin({ token: 'other.token.value' })
+        act(() => lk().onConnected?.())
+        expect(lk().token).not.toBe('other.token.value')
+        expect(postedTypes()).not.toContain('joined')
+      })
     })
 
     it('does nothing on a leave that arrives before the join', () => {

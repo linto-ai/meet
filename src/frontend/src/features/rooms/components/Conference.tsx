@@ -369,7 +369,7 @@ export const Conference = ({
           room={room}
           serverUrl={serverUrl}
           token={createRoomData?.livekit?.token}
-          connect={isConnectionWarmedUp}
+          connect={isConnectionWarmedUp && !embed?.isLeaving}
           audio={audioEnabled}
           video={
             videoEnabled && {
