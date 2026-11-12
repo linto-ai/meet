@@ -1,4 +1,5 @@
 import { type RefObject, useCallback, useEffect, useRef, useState } from 'react'
+import { type DisconnectReason } from 'livekit-client'
 import { useParams } from 'wouter'
 import { Conference } from '@/features/rooms/components/Conference'
 import { EmbedIdleContext } from '../EmbedIdleContext'
@@ -103,20 +104,22 @@ const useGrace = (isLeaving: boolean) => {
 }
 
 /**
- * Meet in an iframe of Chat: waits for the `join` message of the parent, then
- * enters the call with its LiveKit token. No Meet session, no pre-join
- * screen, nothing shown once the call is over.
+ * The LiveKit events that make the parent speak: `joined` once connected,
+ * `left` after it, `error` for a join that failed (a bare disconnection waits
+ * the grace for the precise error). Nothing is said about a connection the
+ * host abandoned with `leave`. Used by: EmbedRoom.
  */
-const EmbedRoom = () => {
-  const { roomId } = useParams()
-  const { join, isLeaving, isLeavingRef, bridge } = useHost()
-  const { isOver, finish, onIdle } = useFinish(bridge)
+const useCallEvents = (
+  bridge: RefObject<HostBridge | null>,
+  isLeaving: boolean,
+  isLeavingRef: RefObject<boolean>,
+  finish: (reason: LeftReason) => void
+) => {
   // LiveKit also disconnects after a join that failed, which is an `error`,
   // not a `left`: `left` only has a meaning once `joined` was said
   const isJoined = useRef(false)
   // One `error` per failed join: set by the first one posted
   const isErrorPosted = useRef(false)
-
   const { startGrace, cancelGrace } = useGrace(isLeaving)
 
   const postError = (code: ErrorCode) => {
@@ -126,6 +129,38 @@ const EmbedRoom = () => {
     bridge.current?.error(code)
   }
 
+  return {
+    onConnected: () => {
+      // The host left while the connection was under way: not joined
+      if (isLeavingRef.current) return
+      isJoined.current = true
+      cancelGrace()
+      bridge.current?.joined()
+    },
+    onDisconnected: (reason?: DisconnectReason) => {
+      if (isJoined.current) return finish(toLeftReason(reason))
+      // The host asked for it (leave) before `joined`: nothing to report
+      if (isLeavingRef.current) return
+      // A disconnection with no ConnectionError is a join that failed:
+      // wait a grace period (one, a second disconnection does not
+      // restart it) for the precise onError that may follow
+      startGrace(() => postError('unreachable'))
+    },
+    onError: (error: Error) => postError(toErrorCode(error)),
+  }
+}
+
+/**
+ * Meet in an iframe of Chat: waits for the `join` message of the parent, then
+ * enters the call with its LiveKit token. No Meet session, no pre-join
+ * screen, nothing shown once the call is over.
+ */
+const EmbedRoom = () => {
+  const { roomId } = useParams()
+  const { join, isLeaving, isLeavingRef, bridge } = useHost()
+  const { isOver, finish, onIdle } = useFinish(bridge)
+  const events = useCallEvents(bridge, isLeaving, isLeavingRef, finish)
+
   if (!roomId || !join || isOver) return null
 
   return (
@@ -133,28 +168,7 @@ const EmbedRoom = () => {
       <Conference
         roomId={roomId}
         onLobbyRequired={() => {}}
-        embed={{
-          ...join,
-          isLeaving,
-          onConnected: () => {
-            // The host left while the connection was under way: not joined
-            if (isLeavingRef.current) return
-            isJoined.current = true
-            cancelGrace()
-            bridge.current?.joined()
-          },
-          onDisconnected: (reason) => {
-            // The host asked for it (leave): nothing to report, even when
-            // `joined` was never said
-            if (isLeavingRef.current && !isJoined.current) return
-            if (isJoined.current) return finish(toLeftReason(reason))
-            // A disconnection with no ConnectionError is a join that failed:
-            // wait a grace period (one, a second disconnection does not
-            // restart it) for the precise onError that may follow
-            startGrace(() => postError('unreachable'))
-          },
-          onError: (error) => postError(toErrorCode(error)),
-        }}
+        embed={{ ...join, isLeaving, ...events }}
       />
     </EmbedIdleContext.Provider>
   )
