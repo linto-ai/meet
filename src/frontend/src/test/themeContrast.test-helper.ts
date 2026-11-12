@@ -26,13 +26,15 @@ const valueOfVar = (name: string): string => {
       if (mask & (1 << i)) groups.push([part])
       else groups[groups.length - 1].push(part)
     })
-    const path = groups
-      .map((g) =>
-        g.map((w, i) => (i ? w[0].toUpperCase() + w.slice(1) : w)).join('')
-      )
-      .join('.')
-    const value = tokenValue(`colors.${path}`)
-    if (value !== undefined) return value
+    // a group is a camelCase segment (primaryDark) or a hyphenated one (subtle-text)
+    for (const join of [
+      (g: string[]) =>
+        g.map((w, i) => (i ? w[0].toUpperCase() + w.slice(1) : w)).join(''),
+      (g: string[]) => g.join('-'),
+    ]) {
+      const value = tokenValue(`colors.${groups.map(join).join('.')}`)
+      if (value !== undefined) return value
+    }
   }
   throw new Error(`unknown colour variable ${name}`)
 }
@@ -77,10 +79,25 @@ const resolveValue = (value: string, mode: Mode): string => {
 
 export type Mode = 'light' | 'dark'
 
+// Panda class names write `default.subtle-text` as `default.subtle.text`
+const tokenNameOf = (name: string): string | undefined => {
+  const parts = name.split('.')
+  for (let mask = 0; mask < 1 << (parts.length - 1); mask++) {
+    const candidate = parts.reduce(
+      (acc, part, i) => acc + (mask & (1 << (i - 1)) ? '-' : '.') + part
+    )
+    if (tokenValue(`colors.${candidate}`) !== undefined) return candidate
+  }
+  return undefined
+}
+
 export const resolveColor = (name: string, mode: Mode): string => {
-  const raw = tokenValue(`colors.${name}`)
-  if (raw === undefined && namedColors[name]) return namedColors[name]
-  if (raw === undefined) throw new Error(`unknown colour token "${name}"`)
+  if (namedColors[name] && tokenValue(`colors.${name}`) === undefined) {
+    return namedColors[name]
+  }
+  const found = tokenNameOf(name)
+  if (found === undefined) throw new Error(`unknown colour token "${name}"`)
+  name = found
   // the variable of the token itself is the one the theme may redefine
   const varName = `--colors-${name
     .replace(/([a-z])([A-Z])/g, '$1-$2')
