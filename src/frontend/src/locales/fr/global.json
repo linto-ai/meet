@@ -2,6 +2,17 @@
   "backToHome": "Retour à l'accueil",
   "cancel": "Annuler",
   "closeDialog": "Fermer la fenêtre modale",
+  "embed": {
+    "intent": {
+      "error": {
+        "unauthenticated": "Vous n’êtes pas connecté à Meet.",
+        "popup_blocked": "La fenêtre de connexion a été bloquée par le navigateur.",
+        "unreachable": "Meet est injoignable.",
+        "unsupported": "Cette page n’a pas été ouverte par une application compatible."
+      },
+      "signIn": "Se connecter à Meet"
+    }
+  },
   "error": {
     "heading": "Une erreur est survenue lors du chargement de la page"
   },

@@ -47,6 +47,8 @@ Authentication relies on [django-lasuite](https://github.com/suitenumerique/djan
 | FRONTEND_IS_SILENT_LOGIN_ENABLED          | Silent login allows La Suite Meet to authenticate users automatically without showing a login prompt, providing a seamless experience when an active session already exists with the OIDC provider. It works by replaying the authentication request with prompt=none: if the user has a valid session, login succeeds silently; otherwise, it fails gracefully and redirects the user to the initial page. Silent login is optional and enabled by default in standard deployments. The app retries silent login after any 401 response, with at least a 30-second interval between attempts (not configurable via environment variables). Controlled by the backend parameter. /!\ Your OIDC provider must support `prompt=none`. | `false`                        |
 
 
+`POST /api/v1.0/stack-token/` exchanges the session id token for a Twake stack access token: the SSO client of a deployment using it must request the `workplaceFqdn` scope (`OIDC_RP_SCOPES`), so that `twake_instance` is filled.
+
 ## Sessions
 
 * After login, users receive a **Django session cookie** to maintain authentication across requests.

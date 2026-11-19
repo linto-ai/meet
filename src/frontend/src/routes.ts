@@ -25,11 +25,20 @@ const ConnectionTestRoute = lazy(
   () => import('@/features/diagnostics/routes/ConnectionTest')
 )
 
+const IntentServiceRoute = lazy(
+  () => import('@/features/embed/routes/IntentService')
+)
+const IntentSignedInRoute = lazy(
+  () => import('@/features/embed/routes/IntentSignedIn')
+)
+
 const roomIdRegex = new RegExp(`^[/](?<roomId>${flexibleRoomIdPattern})$`)
 
 export const routes: Record<
   | 'home'
   | 'room'
+  | 'intentService'
+  | 'intentSignedIn'
   | 'feedback'
   | 'connectionTest'
   | 'legalTerms'
@@ -57,6 +66,17 @@ export const routes: Record<
     to: (roomId: string) => `/${roomId.trim()}`,
     path: roomIdRegex,
     Component: RoomRoute,
+  },
+  intentService: {
+    name: 'intentService',
+    path: '/intents',
+    to: () => '/intents',
+    Component: IntentServiceRoute,
+  },
+  intentSignedIn: {
+    name: 'intentSignedIn',
+    path: '/intents/signed-in',
+    Component: IntentSignedInRoute,
   },
   feedback: {
     name: 'feedback',

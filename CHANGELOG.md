@@ -10,6 +10,8 @@ and this project adheres to
 
 ### Added
 
+- ✨(frontend) add /intents, Meet as the service of a cozy intent (cozy-interapp), with a sign-in popup on /intents/signed-in
+- ✨(backend) POST stack-token/ exchanges the session id token for a Twake stack access token
 - ✨(backend) rooms/{id}/linto/catchup relays the late joiner's summary from Studio
 - ✨(frontend) add jittered exponential backoff to LiveKit reconnections
 - ✨(frontend) tell participants when a recording is interrupted
