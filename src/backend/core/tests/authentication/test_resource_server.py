@@ -466,12 +466,8 @@ def test_session_still_authenticates_without_introspection(resource_server):
 @responses.activate
 def test_livekit_token_still_reaches_its_backend(resource_server):
     """start-recording lists the default backends BEFORE LiveKitTokenAuthentication.
-    A LiveKit room token is not an access token of the provider: it must be
-    deferred to LiveKitTokenAuthentication, not refused on the way."""
+    A LiveKit room token, under its own scheme, must reach it untouched."""
     resource_server.RECORDING_ENABLE = True
-    responses.add(
-        responses.POST, INTROSPECTION_URL, json={"iss": OP_URL, "active": False}
-    )
     user = UserFactory()
     room = RoomFactory(configuration={"screen_recording_permission": "authenticated"})
     livekit_token = utils.generate_token(
@@ -484,7 +480,9 @@ def test_livekit_token_still_reaches_its_backend(resource_server):
         mock.patch("core.api.permissions.ParticipantsManagement") as presence,
     ):
         presence.return_value.check_if_in_meeting.return_value = True
-        response = bearer(livekit_token).post(
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION=f"X-LiveKit-Token {livekit_token}")
+        response = client.post(
             f"/api/v1.0/rooms/{room.id}/start-recording/",
             {"mode": "screen_recording"},
             format="json",
@@ -493,5 +491,4 @@ def test_livekit_token_still_reaches_its_backend(resource_server):
     assert response.status_code == 201
     assert Recording.objects.filter(room=room).count() == 1
     mediator.return_value.start.assert_called_once()
-    # The token was offered to the provider first, and refused there.
-    assert len(responses.calls) == 1
+    assert len(responses.calls) == 0

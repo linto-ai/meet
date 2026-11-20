@@ -24,10 +24,9 @@ class CoreAPIResourceServerAuthentication(ResourceServerAuthentication):
     accepted: otherwise any token of the provider with one of OIDC_RS_SCOPES
     would open the core API, whichever application it was issued to.
 
-    A refused Bearer token is deferred to the next backend, not failed:
-    start-recording and stop-recording also take a LiveKit room token as
-    Bearer. With no backend left, DRF answers 401, where lasuite would let
-    Django answer 400; a native app refreshes its token on 401 only.
+    A refused Bearer token is deferred to the next backend, not failed. With
+    no backend left, DRF answers 401, where lasuite would let Django answer
+    400; a native app refreshes its token on 401 only.
     """
 
     def __init__(self):

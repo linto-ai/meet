@@ -97,10 +97,9 @@ OIDC_RS_SCOPES=openid
 Behaviour worth knowing:
 
 * A Bearer token that is not an active token of an allowed client is passed
-  on to the next authentication backend rather than refused on the spot: some
-  endpoints (`start-recording`, `stop-recording`) also take a LiveKit room
-  token as Bearer. When nothing authenticates the request, the answer is
-  `401`, including for an expired token, so that the app refreshes it.
+  on to the next authentication backend rather than refused on the spot. When
+  nothing authenticates the request, the answer is `401`, including for an
+  expired token, so that the app refreshes it.
 * Each such request costs one introspection call to the provider; responses
   are not cached.
 * A `sub` Meet does not know yet costs one more call, to the userinfo endpoint
