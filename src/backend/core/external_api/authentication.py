@@ -3,13 +3,17 @@
 # pylint: disable=R0913,R0917
 # ruff: noqa: PLR0913
 
+import hashlib
 import logging
+import time
 from dataclasses import asdict
 from functools import lru_cache
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.core.exceptions import SuspiciousOperation, ValidationError
+from django.utils import timezone
 
 import requests
 from lasuite.oidc_resource_server.backend import ResourceServerBackend as LaSuiteBackend
@@ -18,6 +22,7 @@ from menshen_client.exceptions import ResponseParsingError
 from rest_framework import authentication, exceptions
 
 from core import audit, auditing
+from core.authentication.backends import OIDCAuthenticationBackend
 from core.models import Application, ApplicationScope
 from core.services import jwt_token
 from core.validators import sub_validator
@@ -490,6 +495,19 @@ class ResourceServerBackend(LaSuiteBackend):
             SuspiciousOperation: If user info validation fails
         """
 
+        # The settings that open the core API to the app also open the
+        # external API: there too, only the tokens of the listed clients are
+        # taken, checked before any user is looked up or created.
+        if (
+            settings.OIDC_RS_CORE_API_ENABLED
+            and self.token_origin_audience
+            not in settings.OIDC_RS_CORE_API_ALLOWED_AUDIENCES
+        ):
+            raise SuspiciousOperation(
+                f"Access token issued to {self.token_origin_audience!r} refused: "
+                "not in OIDC_RS_CORE_API_ALLOWED_AUDIENCES"
+            )
+
         sub = payload.get("sub")
 
         if sub is None:
@@ -497,6 +515,107 @@ class ResourceServerBackend(LaSuiteBackend):
             logger.debug(message)
             raise SuspiciousOperation(message)
 
-        return get_or_create_user_by_sub(
-            sub, auth_method="resource_server", client_id=payload.get("client_id")
+        if not settings.OIDC_RS_CORE_API_ENABLED:
+            return get_or_create_user_by_sub(
+                sub, auth_method="resource_server", client_id=payload.get("client_id")
+            )
+
+        return sign_in_with_userinfo(access_token, str(sub), payload)
+
+
+USERINFO_REFRESH_TTL = 3600
+
+
+def userinfo_cache_key(access_token):
+    """The cache key marking an access token whose userinfo was read."""
+    return f"oidc-rs-userinfo:{hashlib.sha256(access_token.encode()).hexdigest()}"
+
+
+def sign_in_with_userinfo(access_token, sub, payload):
+    """Sign in the user of an access token, completed from userinfo like the web.
+
+    The introspection response carries no email nor names: userinfo does,
+    called with the token itself. A new or linked user gets them before the
+    request is served; a known one has them refreshed once per access token,
+    as the web sign-in refreshes them once per session.
+    """
+    backend = OIDCAuthenticationBackend()
+    client_id = payload.get("client_id")
+    first_use = cache.add(
+        userinfo_cache_key(access_token),
+        True,
+        timeout=max(int(payload.get("exp", 0) - time.time()), USERINFO_REFRESH_TTL),
+    )
+
+    if User.objects.filter(sub=sub).exists():
+        user = get_or_create_user_by_sub(
+            sub, auth_method="resource_server", client_id=client_id
         )
+        if first_use:
+            try:
+                user_info = _userinfo(backend, access_token)
+                backend.update_user_from_userinfo(user, user_info, is_new_user=False)
+            except SuspiciousOperation as exc:
+                logger.warning("Userinfo refresh failed for user %s: %s", user.pk, exc)
+        return user
+
+    user_info = _userinfo(backend, access_token)
+    email = user_info.get("email")
+    user = (
+        _link_provisional_user(sub, email, client_id)
+        if settings.OIDC_RS_LINK_USERS_BY_EMAIL and _email_verified(user_info)
+        else None
+    )
+    is_new_user = user is None
+    if is_new_user:
+        user = get_or_create_user_by_sub(
+            sub, email, auth_method="resource_server", client_id=client_id
+        )
+        if user is None:
+            return None
+    elif not user.is_active:
+        raise SuspiciousOperation("User account is disabled.")
+
+    backend.update_user_from_userinfo(user, user_info, is_new_user=is_new_user)
+    return user
+
+
+def _userinfo(backend, access_token):
+    try:
+        return backend.get_userinfo(access_token, None, None)
+    except requests.RequestException as exc:
+        raise SuspiciousOperation("Could not fetch userinfo") from exc
+
+
+def _email_verified(user_info):
+    """Only a verified email may claim an account: an absent claim is no proof."""
+    return user_info.get("email_verified") in (True, "true")
+
+
+def _link_provisional_user(sub, email, client_id):
+    """Give the sub to the user provisioned with this email, if any.
+
+    Unique: the provisional users' emails are (unique_email_when_sub_is_null).
+    The write is conditional, so two first tokens of different subs cannot
+    both take the account.
+    """
+    user = (
+        User.objects.filter(email__iexact=email, sub__isnull=True).first()
+        if email
+        else None
+    )
+    if user is None or not User.objects.filter(pk=user.pk, sub__isnull=True).update(
+        sub=sub, updated_at=timezone.now()
+    ):
+        return None
+
+    user.refresh_from_db()
+    audit.log(
+        auditing.USER_PROVISION,
+        actor=None,
+        auth_method="resource_server",
+        client_id=client_id,
+        target=user,
+        linked_by="email",
+    )
+    return user

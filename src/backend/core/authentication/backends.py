@@ -88,6 +88,13 @@ class OIDCAuthenticationBackend(LaSuiteOIDCAuthenticationBackend):
                 email_domain,
             )
 
+    def update_user_from_userinfo(self, user, user_info, is_new_user):
+        """Update a user from userinfo and run the sign-in hooks, as the web
+        sign-in does: for the users of an access token (core.external_api)."""
+        claims = {"email": user_info.get("email"), **self.get_extra_claims(user_info)}
+        self.update_user_if_needed(user, claims)
+        self.post_get_or_create_user(user, claims, is_new_user)
+
     @staticmethod
     def signup_to_marketing_email(email):
         """Add the user to the newsletter list on sign-in.

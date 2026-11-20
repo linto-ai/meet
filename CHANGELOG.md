@@ -10,6 +10,7 @@ and this project adheres to
 
 ### Added
 
+- ✨(backend) accept OIDC access tokens on the core API for native apps, opt-in and per client
 - ✨(frontend) "before you arrived" opens the side panel, from a live run or the recording
 - ✨(backend) late joiners' brief from the recording's audio, through Studio's standard API
 - ✨(frontend) live captions on top of a recording, outliving it if needed

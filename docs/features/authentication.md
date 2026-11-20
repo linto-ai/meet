@@ -52,3 +52,71 @@ Authentication relies on [django-lasuite](https://github.com/suitenumerique/djan
 * After login, users receive a **Django session cookie** to maintain authentication across requests.
 * Default session duration is 12 hours (`SESSION_COOKIE_AGE = 60 * 60 * 12`).
 * Ensure your session policy matches your security requirements.
+
+
+## Native apps: access tokens on the core API
+
+A native app (e.g. the Twake Visio mobile app) cannot hold the session cookie
+without embedding a WebView, which [RFC 8252](https://www.rfc-editor.org/rfc/rfc8252)
+rules out. It runs its own Authorization Code + PKCE flow against the OIDC
+provider, as a public client, and calls the core API (`/api/v1.0/`) with the
+access token as `Authorization: Bearer <token>`. Meet then acts as an OAuth 2.0
+resource server: it introspects the token ([RFC 7662](https://www.rfc-editor.org/rfc/rfc7662))
+and serves the request as the token's user, with the same role-based
+permissions as a session.
+
+This is **off by default**.
+
+| Option                             | Description                                                                                                                                                                       | Default |
+|------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
+| OIDC_RS_CORE_API_ENABLED           | Accept OIDC access tokens on the core API                                                                                                                                         | `false` |
+| OIDC_RS_CORE_API_ALLOWED_AUDIENCES | Client ids whose tokens are accepted, read from the `OIDC_RS_AUDIENCE_CLAIM` of the introspection response (`client_id` by default). Checked before any user is looked up or created. Empty: no token is accepted. Applies to the external API too while `OIDC_RS_CORE_API_ENABLED` is set: list there every client that uses it | `[]`    |
+| OIDC_RS_LINK_USERS_BY_EMAIL        | If a user has the email of userinfo and no `sub` (provisioned by an application), the first token of an unknown `sub` signs in to that user, who keeps the `sub`. Only when userinfo says `email_verified: true`: a false or absent claim links nothing. Applies to the external API's resource server too | `false` |
+
+It reuses the resource server settings, which must all be set:
+
+| Option                         | Value                                                                                                                                  |
+|--------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| OIDC_OP_INTROSPECTION_ENDPOINT | The provider's introspection endpoint                                                                                                   |
+| OIDC_OP_URL                    | The provider's issuer, **exactly** as in its discovery document: an introspection response whose `iss` differs is refused               |
+| OIDC_RS_CLIENT_ID / _SECRET    | The credentials Meet introspects with, usually its own client (`OIDC_RP_CLIENT_ID`). The provider must let it introspect the app's tokens |
+| OIDC_RS_SCOPES                 | At least one scope the app requests, e.g. `openid`                                                                                      |
+| OIDC_OP_USER_ENDPOINT          | The provider's userinfo endpoint, called with the app's token: without it, a user Meet does not know yet is refused                      |
+
+The provider's client of the app must export the claims the web sign-in reads
+(`email`, the `OIDC_USERINFO_FULLNAME_FIELDS` and `OIDC_USERINFO_SHORTNAME_FIELD`
+names, the `OIDC_USERINFO_TWAKE_INSTANCE_FIELD` instance, `workplaceFqdn` by
+default) and, for `OIDC_RS_LINK_USERS_BY_EMAIL`, `email_verified`. On
+LemonLDAP::NG, `email_verified` is sent only when the client exports it.
+
+Example, for an app registered as `twake-visio` on a LemonLDAP::NG provider:
+
+```
+OIDC_RS_CORE_API_ENABLED=True
+OIDC_RS_CORE_API_ALLOWED_AUDIENCES=twake-visio
+OIDC_OP_URL=https://sso.example.com
+OIDC_OP_INTROSPECTION_ENDPOINT=https://sso.example.com/oauth2/introspect
+OIDC_OP_USER_ENDPOINT=https://sso.example.com/oauth2/userinfo
+OIDC_RS_CLIENT_ID=meet
+OIDC_RS_CLIENT_SECRET=<the secret of the meet client>
+OIDC_RS_SCOPES=openid
+```
+
+Behaviour worth knowing:
+
+* A Bearer token that is not an active token of an allowed client is passed
+  on to the next authentication backend rather than refused on the spot. When
+  nothing authenticates the request, the answer is `401`, including for an
+  expired token, so that the app refreshes it.
+* Each such request costs one introspection call to the provider; responses
+  are not cached.
+* A `sub` Meet does not know yet costs one call to userinfo, then signs in as
+  the web does: with `OIDC_CREATE_USER`, the user is created with the email,
+  names and Twake instance of userinfo, and the sign-in hooks run (entitlements
+  cache). If userinfo fails, the request answers `401` and nobody is created.
+* A known user is refreshed from userinfo at the first request of each access
+  token, as the web refreshes it at each sign-in. A failed refresh is logged
+  and the request is still served.
+* The app must get the same `sub` as the web client, or the same person gets
+  two accounts: check that both clients use the same user attribute on the
+  provider.
