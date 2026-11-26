@@ -33,7 +33,7 @@ import { isLateArrival } from '../utils/catchUpView'
  * It runs ONCE per (room, session), and never for the starter — who has seen
  * the whole meeting and needs neither the history nor the summary. The summary
  * is for a late joiner only (the threshold the recording's brief uses too):
- * the side panel then opens by itself, the brief on top of the Tools panel.
+ * the brief's own side panel then opens by itself.
  */
 
 // The history comes from Studio's public session route, without credential;
@@ -160,12 +160,12 @@ export const useLintoCatchUp = () => {
   // Read through refs: `useSidePanel` hands out new function identities on
   // every render, and the hydration effect below must NOT re-run (its cleanup
   // cancels the fetch in flight) for that.
-  const { isToolsOpen, isSidePanelOpen, openLinto } = useSidePanel()
+  const { isCatchUpOpen, isSidePanelOpen, openCatchUp } = useSidePanel()
   const isMobile = useIsMobile()
-  const isToolsOpenRef = useRef(isToolsOpen)
-  isToolsOpenRef.current = isToolsOpen
-  const openLintoRef = useRef(openLinto)
-  openLintoRef.current = openLinto
+  const isCatchUpOpenRef = useRef(isCatchUpOpen)
+  isCatchUpOpenRef.current = isCatchUpOpen
+  const openCatchUpRef = useRef(openCatchUp)
+  openCatchUpRef.current = openCatchUp
   // The panel opens by itself, never over another one nor on a phone.
   const mayOpenPanelRef = useRef(false)
   mayOpenPanelRef.current = !isSidePanelOpen && !isMobile
@@ -190,8 +190,8 @@ export const useLintoCatchUp = () => {
   )
 
   /** Stream the "before you arrived" summary into the store. It is computed
-   *  ONCE per run: no refresh, and the block can be closed for good. When it
-   *  lands while the Tools panel is closed, a discreet toast offers it. */
+   *  ONCE per run: no refresh. When it
+   *  lands while its panel is closed, a discreet toast offers it. */
   const runSummary = useCallback(
     async (meetRoomId: string, token: string, joinedAt: number) => {
       abortRef.current?.abort()
@@ -216,7 +216,7 @@ export const useLintoCatchUp = () => {
           return
         }
         // Only now that a summary will come: the panel opens by itself.
-        if (mayOpenPanelRef.current) openLintoRef.current()
+        if (mayOpenPanelRef.current) openCatchUpRef.current()
         const { text } = await streamLintoCatchUp({
           roomId: meetRoomId,
           token,
@@ -239,8 +239,8 @@ export const useLintoCatchUp = () => {
           updatedAt: Date.now(),
           dismissed: false,
         }
-        if (text.trim() && !isToolsOpenRef.current) {
-          notifyLintoCatchUpReady(() => openLintoRef.current())
+        if (text.trim() && !isCatchUpOpenRef.current) {
+          notifyLintoCatchUpReady(() => openCatchUpRef.current())
         }
       } catch (err) {
         if (controller.signal.aborted) return

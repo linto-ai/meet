@@ -437,7 +437,8 @@
       "tools": "Outils de réunion",
       "info": "Informations sur la réunion",
       "linto": "Transcrire en direct",
-      "lintoCaptions": "Sous-titres en direct"
+      "lintoCaptions": "Sous-titres en direct",
+      "catchUp": "Avant votre arrivée"
     },
     "content": {
       "participants": "les participants",
@@ -449,7 +450,8 @@
       "tools": "outils de réunion",
       "info": "informations sur la réunion",
       "linto": "la transcription en direct",
-      "lintoCaptions": "les sous-titres en direct"
+      "lintoCaptions": "les sous-titres en direct",
+      "catchUp": "le résumé de votre arrivée"
     },
     "closeButton": "Masquer {{content}} (Échap)",
     "escapeHint": "Appuyez sur Échap pour fermer"

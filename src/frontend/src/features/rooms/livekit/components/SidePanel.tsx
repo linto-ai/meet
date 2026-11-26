@@ -14,6 +14,7 @@ import { Effects } from './effects/Effects'
 import { Admin } from './Admin'
 import { Tools } from './Tools'
 import { Info } from './Info'
+import { CatchUpPanel } from '@/features/transcription-bot/components/CatchUpPanel'
 import { HStack } from '@/styled-system/jsx'
 import { useReactionsToolbar } from '@/features/reactions/hooks/useReactionsToolbar'
 import { useRestoreFocus } from '@/hooks/useRestoreFocus'
@@ -135,6 +136,7 @@ const StyledSidePanel = React.forwardRef<HTMLElement, StyledSidePanelProps>(
           variant="tertiaryText"
           size="xs"
           onPress={onClose}
+          data-testid="side-panel-close"
           aria-label={closeButtonTooltip}
           tooltip={closeButtonTooltip}
         >
@@ -176,6 +178,7 @@ export const SidePanel = () => {
     isToolsOpen,
     isAdminOpen,
     isInfoOpen,
+    isCatchUpOpen,
     isSubPanelOpen,
     activeSubPanelId,
   } = useSidePanel()
@@ -199,7 +202,9 @@ export const SidePanel = () => {
   }, [])
 
   const handlePanelOpened = useCallback(() => {
-    if (activePanelId === PanelId.CHAT) return
+    // The brief opens by itself at a late arrival: it takes no focus.
+    if (activePanelId === PanelId.CHAT || activePanelId === PanelId.CATCH_UP)
+      return
     focusAside()
   }, [activePanelId, focusAside])
 
@@ -244,6 +249,9 @@ export const SidePanel = () => {
       </Panel>
       <Panel isOpen={isInfoOpen}>
         <Info />
+      </Panel>
+      <Panel isOpen={isCatchUpOpen}>
+        <CatchUpPanel />
       </Panel>
     </StyledSidePanel>
   )

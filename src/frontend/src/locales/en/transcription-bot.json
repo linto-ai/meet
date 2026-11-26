@@ -41,11 +41,16 @@
       "newLines_other": "{{count}} new lines"
     },
     "catchup": {
-      "heading": "Before you arrived",
       "loading": "Preparing the summary…",
       "unavailable": "The catch-up service is not available.",
-      "close": "Close the summary",
-      "joined": "You joined the meeting at {{time}}"
+      "joined": "You joined the meeting at {{time}}",
+      "empty": "No summary yet.",
+      "source": {
+        "live": "Summary of what was said before you arrived, from the live transcription.",
+        "audio": "Summary of what was said before you arrived, from the meeting recording."
+      },
+      "disclaimer": "Automatically generated summary, it may contain errors.",
+      "openLive": "See the live transcription"
     },
     "audioCatchup": {
       "step": {
@@ -98,7 +103,15 @@
       "title": "Transcribe after the meeting",
       "body": "Recording transcribed and summarized once the meeting ends."
     },
-    "running": "Running"
+    "running": "Running",
+    "catchUp": {
+      "title": "Before you arrived",
+      "body": "The summary of what you missed.",
+      "preparing": "Summary being prepared…",
+      "tooShort": "Too little was said before you arrived.",
+      "failed": "The summary could not be prepared.",
+      "ready": "ready"
+    }
   },
   "captions": {
     "label": "Captions available",

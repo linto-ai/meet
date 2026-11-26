@@ -437,7 +437,8 @@
       "tools": "Weitere Tools",
       "info": "Meeting-Informationen",
       "linto": "Live transkribieren",
-      "lintoCaptions": "Live-Untertitel"
+      "lintoCaptions": "Live-Untertitel",
+      "catchUp": "Vor deiner Ankunft"
     },
     "content": {
       "participants": "Teilnehmende",

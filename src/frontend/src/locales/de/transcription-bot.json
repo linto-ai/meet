@@ -41,10 +41,8 @@
       "newLines_other": "{{count}} neue Zeilen"
     },
     "catchup": {
-      "heading": "Vor deiner Ankunft",
       "loading": "Zusammenfassung wird vorbereitet…",
       "unavailable": "Der Nachhol-Dienst ist nicht verfügbar.",
-      "close": "Zusammenfassung schließen",
       "joined": "Du bist dem Meeting um {{time}} beigetreten"
     }
   },

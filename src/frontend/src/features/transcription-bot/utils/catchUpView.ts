@@ -9,7 +9,7 @@ import {
  *  of its own, or the audio of a transcribed recording. */
 export type CatchUpSource = 'live' | 'audio'
 
-/** What the block on top of the Tools panel shows, whatever the source. */
+/** What the brief's panel shows, whatever the source. */
 export type CatchUpView = {
   source: CatchUpSource
   // The source's own status, exposed as `data-status`.

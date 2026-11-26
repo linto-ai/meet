@@ -437,7 +437,8 @@
       "tools": "More tools",
       "info": "Meeting information",
       "linto": "Transcribe live",
-      "lintoCaptions": "Live captions"
+      "lintoCaptions": "Live captions",
+      "catchUp": "Before you arrived"
     },
     "content": {
       "participants": "participants",
@@ -449,7 +450,8 @@
       "tools": "more tools",
       "info": "meeting information",
       "linto": "live transcription",
-      "lintoCaptions": "live captions"
+      "lintoCaptions": "live captions",
+      "catchUp": "the summary of what you missed"
     },
     "closeButton": "Hide {{content}} (Escape)",
     "escapeHint": "Press Escape to close"

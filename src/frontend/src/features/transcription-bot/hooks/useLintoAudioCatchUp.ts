@@ -84,7 +84,7 @@ const apply = (body: ApiAudioCatchUp, generation: number) => {
 }
 
 /** Ask for the brief of what was said before my arrival, once per arrival.
- *  A late joiner gets the side panel opened by itself, the brief on top. */
+ *  A late joiner gets the brief's panel opened by itself. */
 export const requestAudioCatchUpBrief = async (
   roomId: string,
   token: string
@@ -131,15 +131,13 @@ export const useLintoAudioCatchUp = () => {
   // recording's brief does.
   const liveServes = useLiveServesCatchUp()
   const { catchUp } = useSnapshot(audioCatchUpStore)
-  // The brief tops the Tools panel, whichever tool view is shown; opening it
-  // lands on the running tool. Never over another panel, nor on a phone.
-  const { isToolsOpen, isSidePanelOpen, toggleTools } = useSidePanel()
+  // The brief has its own panel. It opens by itself, never over another
+  // panel nor on a phone.
+  const { isCatchUpOpen, isSidePanelOpen, openCatchUp } = useSidePanel()
   const isMobile = useIsMobile()
-  controller.isPanelOpen = () => isToolsOpen
+  controller.isPanelOpen = () => isCatchUpOpen
   controller.mayOpenPanel = () => !isSidePanelOpen && !isMobile
-  controller.openPanel = () => {
-    if (!isToolsOpen) toggleTools()
-  }
+  controller.openPanel = openCatchUp
 
   const roomId = apiRoomData?.livekit?.room || ''
   const token = apiRoomData?.livekit?.token || ''

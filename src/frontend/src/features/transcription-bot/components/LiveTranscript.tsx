@@ -152,7 +152,7 @@ export const LiveTranscript = () => {
 
   // Catch-up: everything said BEFORE I joined is history, shown dimmed above a
   // "you joined at HH:MM" divider. The starter saw it all and gets neither.
-  // The summary of that history shows on top of the Tools panel (CatchUpBlock).
+  // The summary of that history shows in its own panel (CatchUpPanel).
   // The divider sits right before the first line received live (or at the tail
   // when the whole journal is still history).
   const markerIndex = useMemo(() => {

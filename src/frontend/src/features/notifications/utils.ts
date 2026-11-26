@@ -122,7 +122,7 @@ export const notifyLintoSummarySaving = ({
 
 /**
  * LinTO "what was said before you arrived is ready" toast (fork), whatever the
- * brief's source: shown to a late joiner whose Tools panel did not open by
+ * brief's source: shown to a late joiner whose brief panel did not open by
  * itself when the brief lands. Pressing it opens the panel (`open`); it goes
  * away by itself.
  */

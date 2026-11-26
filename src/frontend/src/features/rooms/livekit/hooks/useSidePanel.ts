@@ -8,6 +8,8 @@ export enum PanelId {
   TOOLS = 'tools',
   ADMIN = 'admin',
   INFO = 'info',
+  // "Before you arrived": a late joiner's brief, live or recorded (fork).
+  CATCH_UP = 'catchUp',
 }
 
 export enum SubPanelId {
@@ -28,6 +30,7 @@ export const useSidePanel = () => {
   const isToolsOpen = activePanelId == PanelId.TOOLS
   const isAdminOpen = activePanelId == PanelId.ADMIN
   const isInfoOpen = activePanelId == PanelId.INFO
+  const isCatchUpOpen = activePanelId == PanelId.CATCH_UP
   const isTranscriptOpen = activeSubPanelId == SubPanelId.TRANSCRIPT
   const isScreenRecordingOpen = activeSubPanelId == SubPanelId.SCREEN_RECORDING
   const isLintoOpen = activeSubPanelId == SubPanelId.LINTO
@@ -64,9 +67,16 @@ export const useSidePanel = () => {
     layoutStore.activePanelId = PanelId.TOOLS
   }
 
+  const openCatchUp = () => {
+    layoutStore.activeSubPanelId = null
+    layoutStore.activePanelId = PanelId.CATCH_UP
+  }
+
   return {
     openLinto,
     isLintoOpen,
+    openCatchUp,
+    isCatchUpOpen,
     activePanelId,
     activeSubPanelId,
     toggleParticipants,

@@ -41,10 +41,8 @@
       "newLines_other": "{{count}} nieuwe regels"
     },
     "catchup": {
-      "heading": "Voordat je erbij kwam",
       "loading": "Samenvatting wordt voorbereid…",
       "unavailable": "De inhaaldienst is niet beschikbaar.",
-      "close": "Samenvatting sluiten",
       "joined": "Je bent om {{time}} bij de vergadering gekomen"
     }
   },

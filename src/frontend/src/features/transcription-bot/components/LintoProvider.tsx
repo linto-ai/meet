@@ -1,6 +1,7 @@
 import { useLintoConfig } from '../hooks/useLintoConfig'
 import { useLintoCatchUp } from '../hooks/useLintoCatchUp'
 import { useLintoAudioCatchUp } from '../hooks/useLintoAudioCatchUp'
+import { useCatchUpTooShortDismiss } from '../hooks/useCatchUpView'
 import { useLintoTranscriptFeed } from '../hooks/useLintoTranscriptFeed'
 import { useSyncLintoStatus } from '../hooks/useLintoStatus'
 import { LintoBanner } from './LintoBanner'
@@ -16,6 +17,7 @@ const LintoRuntime = () => {
   // Late joiner of a transcribed recording with no live run: brief built from
   // the recording's audio by the Meet backend and LinTO.
   useLintoAudioCatchUp()
+  useCatchUpTooShortDismiss()
   return <LintoBanner />
 }
 

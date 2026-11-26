@@ -41,11 +41,16 @@
       "newLines_other": "{{count}} nouvelles lignes"
     },
     "catchup": {
-      "heading": "Avant votre arrivée",
       "loading": "Résumé en préparation…",
       "unavailable": "Le service de rattrapage n'est pas disponible.",
-      "close": "Fermer le résumé",
-      "joined": "Vous avez rejoint la réunion à {{time}}"
+      "joined": "Vous avez rejoint la réunion à {{time}}",
+      "empty": "Aucun résumé pour le moment.",
+      "source": {
+        "live": "Résumé de ce qui s'est dit avant votre arrivée, d'après la transcription en direct.",
+        "audio": "Résumé de ce qui s'est dit avant votre arrivée, d'après l'enregistrement de la réunion."
+      },
+      "disclaimer": "Résumé généré automatiquement, il peut contenir des erreurs.",
+      "openLive": "Voir la transcription en direct"
     },
     "audioCatchup": {
       "step": {
@@ -98,7 +103,15 @@
       "title": "Transcrire après la réunion",
       "body": "Enregistrement transcrit et compte rendu une fois la réunion terminée."
     },
-    "running": "En cours"
+    "running": "En cours",
+    "catchUp": {
+      "title": "Avant votre arrivée",
+      "body": "Le résumé de ce que vous avez manqué.",
+      "preparing": "Résumé en préparation…",
+      "tooShort": "Trop peu de paroles avant votre arrivée.",
+      "failed": "Le résumé n'a pas pu être préparé.",
+      "ready": "prêt"
+    }
   },
   "captions": {
     "label": "Sous-titres disponibles",

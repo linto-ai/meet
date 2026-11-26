@@ -330,7 +330,8 @@
       "tools": "Thêm công cụ",
       "info": "Thông tin cuộc họp",
       "linto": "Chép lời trực tiếp",
-      "lintoCaptions": "Phụ đề trực tiếp"
+      "lintoCaptions": "Phụ đề trực tiếp",
+      "catchUp": "Trước khi bạn tham gia"
     },
     "content": {
       "participants": "người tham gia",
