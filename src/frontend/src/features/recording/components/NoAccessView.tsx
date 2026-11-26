@@ -35,6 +35,8 @@ export const NoAccessView = ({
 }: NoAccessViewProps) => {
   const { isLoggedIn } = useUser()
   const { t } = useTranslation('rooms', { keyPrefix: i18nKeyPrefix })
+  // Running already: nothing to start, so no login nor request prompt (fork).
+  const textKey = isActive ? 'active' : i18nKey
 
   return (
     <Div
@@ -66,7 +68,7 @@ export const NoAccessView = ({
       />
       <VStack gap={0} marginBottom={0}>
         <H lvl={1} margin={'sm'} fullWidth centered>
-          {t(`${i18nKey}.heading`)}
+          {t(`${textKey}.heading`)}
         </H>
         <Text
           variant="note"
@@ -80,8 +82,8 @@ export const NoAccessView = ({
             },
           })}
         >
-          {t(`${i18nKey}.body`)}
-          {helpArticle && (
+          {t(`${textKey}.body`)}
+          {helpArticle && !isActive && (
             <>
               {' '}
               <A
@@ -98,7 +100,7 @@ export const NoAccessView = ({
           )}
         </Text>
       </VStack>
-      {!isLoggedIn && (
+      {!isLoggedIn && !isActive && (
         <LoginPrompt
           heading={t(`${i18nKey}.login.heading`)}
           body={t(`${i18nKey}.login.body`)}

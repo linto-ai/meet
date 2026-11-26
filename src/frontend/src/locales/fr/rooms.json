@@ -555,6 +555,10 @@
         "buttonLabel": "Demander"
       },
       "linkAriaLabel": "Ouvrir la documentation sur la fonctionnalité avancée - ouvre dans une nouvelle fenêtre"
+    },
+    "active": {
+      "heading": "Transcription en cours",
+      "body": "Cette réunion est en cours de transcription."
     }
   },
   "screenRecording": {
@@ -628,7 +632,11 @@
       },
       "linkAriaLabel": "Ouvrir la documentation sur la fonctionnalité avancée - ouvre dans une nouvelle fenêtre"
     },
-    "durationMessage": "(limité à {{max_duration}}) "
+    "durationMessage": "(limité à {{max_duration}}) ",
+    "active": {
+      "heading": "Enregistrement en cours",
+      "body": "Cette réunion est en cours d'enregistrement."
+    }
   },
   "errorRecordingAlertDialog": {
     "title": "Échec de l'enregistrement",

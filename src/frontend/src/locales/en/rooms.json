@@ -555,6 +555,10 @@
         "body": "The host will be notified and can enable transcription for you.",
         "buttonLabel": "Request"
       }
+    },
+    "active": {
+      "heading": "Transcription in progress",
+      "body": "This meeting is being transcribed."
     }
   },
   "screenRecording": {
@@ -628,7 +632,11 @@
         "buttonLabel": "Request"
       }
     },
-    "durationMessage": "(limited to {{max_duration}}) "
+    "durationMessage": "(limited to {{max_duration}}) ",
+    "active": {
+      "heading": "Recording in progress",
+      "body": "This meeting is being recorded."
+    }
   },
   "errorRecordingAlertDialog": {
     "title": "Recording Failed",

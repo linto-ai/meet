@@ -56,6 +56,7 @@ and this project adheres to
 
 ### Fixed
 
+- 🐛(frontend) a running transcription or recording no longer asks guests to log in
 - 🐛(backend) a missing catch-up summary service ends the job at once, with a warning
 - 🐛(frontend) the live catch-up opens the side panel once its summary starts
 - 🐛(backend) recordings, transcripts and summaries go to the room owner
