@@ -22,6 +22,7 @@ a Celery retry.
 # pylint: disable=too-many-lines
 
 import asyncio
+import json
 import logging
 import smtplib
 from datetime import datetime
@@ -57,7 +58,7 @@ from core.services.twake_drive import (
     build_transcript_document_filename,
     build_transcript_filename,
 )
-from core.tasks._base import NotificationTask
+from core.tasks._base import LiveSummaryTask, NotificationTask
 from core.tasks._errors import TransientError, classify_external
 from core.tasks._state import (
     ensure_state,
@@ -80,6 +81,11 @@ async def _await_media(handle, recording_id) -> dict:
     failure) is captured and RE-RAISED so the caller's ``classify_external``
     block converts it into a :class:`TransientError` → Celery retry. These two
     failure kinds are kept distinct on purpose.
+
+    The SDK emits ``"error"`` without any detail, so on that event the
+    transcription job is read back from Studio and returned as
+    ``result["job"]`` (best effort, ``None`` when it cannot be read): it is
+    the only place the engine's reason is visible.
     """
     done_event = asyncio.Event()
     result = {}
@@ -120,7 +126,35 @@ async def _await_media(handle, recording_id) -> dict:
         # surrounding classify_external(...) maps it to TransientError → retry.
         raise captured["exc"]
 
+    if result.get("success") is False:
+        result["job"] = await _read_transcription_job(handle, recording_id)
+
     return result
+
+
+async def _read_transcription_job(handle, recording_id):
+    """Return the Studio transcription job of a failed conversation, or None."""
+    try:
+        status = await handle.api_service.get_media_status(mediaId=handle.media_id)
+        return (status or {}).get("jobs", {}).get("transcription")
+    except Exception:  # diagnostics must not mask the failure
+        logger.warning(
+            "Could not read the failed LinTO job of recording %s",
+            recording_id,
+            exc_info=True,
+        )
+        return None
+
+
+def _describe_job(job, limit=1000):
+    """Render a Studio job for logs and the admin email, truncated."""
+    if not job:
+        return "no job detail from Studio"
+    try:
+        text = json.dumps(job, default=str, ensure_ascii=False)
+    except (TypeError, ValueError):
+        text = repr(job)
+    return text if len(text) <= limit else f"{text[:limit]}…"
 
 
 _RETRY_KWARGS = {
@@ -969,8 +1003,17 @@ async def _process_linto_transcription_sync(recording_id):  # noqa: PLR0915
         if not result.get("success"):
             # Transcription engine reported an error: this is a terminal,
             # non-retryable outcome for this conversation.
+            job = _describe_job(result.get("job"))
+            logger.error(
+                "LinTO Studio transcription failed for recording %s "
+                "(conversation %s): %s",
+                recording_id,
+                conversation_id,
+                job,
+            )
             raise RuntimeError(
-                f"LinTO Studio transcription failed for recording {recording_id}"
+                f"LinTO Studio transcription failed for recording {recording_id} "
+                f"(conversation {conversation_id}): {job}"
             )
 
         media = result["media"]
@@ -1315,7 +1358,7 @@ def _live_audio_files(service, conversation_id, meeting, language, log_id):
     return _provide
 
 
-@task(**_RETRY_KWARGS)
+@task(**{**_RETRY_KWARGS, "base": LiveSummaryTask})
 def process_bot_live_summary(self, room_id):
     """Summarize + deliver a LinTO bot's OWN live-transcription conversation.
 

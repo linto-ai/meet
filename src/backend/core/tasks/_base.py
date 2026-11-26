@@ -272,4 +272,25 @@ class NotificationTask(_CeleryTask):
             )
 
 
-__all__ = ("NotificationTask", "handle_pipeline_failure")
+class LiveSummaryTask(_CeleryTask):
+    """Celery base task of the bot live summary, which is keyed by room.
+
+    ``process_bot_live_summary(room_id)`` has no ``Recording``: the recording
+    failure path (status, admin and creator emails) does not apply to it and
+    would look the room id up as a recording. A terminal failure is logged
+    with the room id instead.
+    """
+
+    def on_failure(self, exc, task_id, args, kwargs, einfo):
+        """Run when retries are exhausted or a permanent error propagates."""
+        room_id = args[0] if args else kwargs.get("room_id")
+        logger.error(
+            "Live summary task %s failed terminally for room %s: %s: %s",
+            task_id,
+            room_id,
+            type(exc).__name__,
+            exc,
+        )
+
+
+__all__ = ("LiveSummaryTask", "NotificationTask", "handle_pipeline_failure")

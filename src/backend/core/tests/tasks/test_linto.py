@@ -10,6 +10,7 @@ running the whole (soft-failing) downstream pipeline.
 
 # pylint: disable=redefined-outer-name,protected-access,no-member
 
+import asyncio
 import contextlib
 from unittest import mock
 
@@ -17,6 +18,7 @@ from django.core import mail
 
 import aiohttp
 import pytest
+from linto.services.pollingService import PollingService
 
 from core import factories, models
 from core.recording.enums import FileExtension
@@ -643,3 +645,67 @@ class TestDelivery:
         assert all("Decisions" not in m.body for m in shared)
         rec.refresh_from_db()
         assert len(rec.linto_state["steps"]["shared"]) == 2
+
+
+class _FakeStudio:
+    """Studio API stand-in for the SDK's real ``PollingService``."""
+
+    def __init__(self, job, fail_after=None):
+        self.job = job
+        self.fail_after = fail_after
+        self.calls = 0
+
+    async def get_media_status(self, mediaId):
+        self.calls += 1
+        if self.fail_after is not None and self.calls > self.fail_after:
+            raise aiohttp.ClientError("studio down")
+        return {"jobs": {"transcription": self.job}}
+
+
+class TestEngineErrorDetail:
+    """The SDK's "error" event carries nothing: the job is read back."""
+
+    def _await(self, studio):
+        async def run():
+            handle = PollingService("conv-e", studio, interval=0.01)
+            return await linto_task._await_media(handle, "rec-e")
+
+        return asyncio.run(run())
+
+    def test_the_failed_job_is_returned(self):
+        job = {"state": "error", "error": "unsupported codec"}
+        result = self._await(_FakeStudio(job))
+        assert result == {"success": False, "job": job}
+
+    def test_an_unreadable_job_does_not_mask_the_failure(self):
+        result = self._await(_FakeStudio({"state": "error"}, fail_after=1))
+        assert result == {"success": False, "job": None}
+
+    def test_the_job_is_described_and_truncated(self):
+        assert linto_task._describe_job(None) == "no job detail from Studio"
+        assert linto_task._describe_job({"state": "error"}) == '{"state": "error"}'
+        long = linto_task._describe_job({"error": "x" * 2000}, limit=50)
+        assert len(long) == 51
+        assert long.endswith("…")
+
+    def test_the_reason_reaches_the_terminal_error(self, settings):
+        settings.CLOUDERY_URL = None
+        settings.CLOUDERY_TOKEN = None
+        rec = _make_recording(
+            models.RecordingModeChoices.TRANSCRIPT,
+            linto_state={"conversation_id": "conv-1", "steps": {}, "attempts": 1},
+        )
+        failed = {"success": False, "job": {"state": "error", "error": "bad audio"}}
+
+        with contextlib.ExitStack() as stack:
+            _patch_storage(stack, b"OggS raw")
+            sdk = _patch_sdk(stack)
+            sdk.poll_media = mock.AsyncMock()
+            stack.enter_context(
+                mock.patch.object(
+                    linto_task, "_await_media", mock.AsyncMock(return_value=failed)
+                )
+            )
+
+            with pytest.raises(RuntimeError, match="conv-1.*bad audio"):
+                linto_task._process_linto_transcription_sync(str(rec.id))

@@ -9,6 +9,7 @@ import pytest
 
 from core import factories, models
 from core.tasks import _base
+from core.tasks import linto as linto_task
 
 pytestmark = pytest.mark.django_db
 
@@ -164,3 +165,29 @@ class TestNotificationTaskOnFailure:
                 stub_self, RuntimeError("x"), "task-id", (), {}, _einfo()
             )
         handler.assert_not_called()
+
+
+class TestLiveSummaryFailure:
+    """The live summary is keyed by room: no recording lookup on failure."""
+
+    def test_on_failure_logs_the_room_without_the_recording_path(self, caplog):
+        stub_self = types.SimpleNamespace(request=types.SimpleNamespace(retries=4))
+        with mock.patch.object(_base, "handle_pipeline_failure") as handler:
+            _base.LiveSummaryTask.on_failure(
+                stub_self, RuntimeError("x"), "task-id", ("room-9",), {}, _einfo()
+            )
+        handler.assert_not_called()
+        assert "failed terminally for room room-9" in caplog.text
+
+    def test_the_inline_task_uses_the_room_handler(self, caplog):
+        with (
+            mock.patch.object(_base, "handle_pipeline_failure") as handler,
+            mock.patch.object(
+                linto_task,
+                "_process_bot_live_summary_sync",
+                side_effect=RuntimeError("conversation not found yet"),
+            ),
+        ):
+            linto_task.process_bot_live_summary.delay("room-9")
+        handler.assert_not_called()
+        assert "failed terminally for room room-9" in caplog.text

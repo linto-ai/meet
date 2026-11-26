@@ -57,23 +57,33 @@ def task(*d_args, **d_kwargs):
 
     If not, returns a synchronous fallback exposing ``.delay()``/
     ``.apply_async()``. The fallback honours ``bind=True`` (passing an
-    ``_InlineTask`` as the first argument) and, on failure, routes directly to
-    ``core.tasks._base.handle_pipeline_failure`` (which is self-protecting and
-    extracts the recording_id from the call args) so the failure notification
-    still fires in the Celery-disabled dev mode. ``autoretry_for`` is NOT
-    honoured inline (there is no broker): a transient error simply reaches the
-    failure handler like any other.
+    ``_InlineTask`` as the first argument) and, on failure, calls the
+    ``base``'s ``on_failure`` like Celery would, or without a base routes
+    directly to ``core.tasks._base.handle_pipeline_failure`` (which is
+    self-protecting and extracts the recording_id from the call args), so the
+    failure notification still fires in the Celery-disabled dev mode.
+    ``autoretry_for`` is NOT honoured inline (there is no broker): a transient
+    error simply reaches the failure handler like any other.
 
     Notes:
         Mostly LLM-generated.
     """
 
-    def _fallback_wrap(func, *, bind=False):
+    def _fallback_wrap(func, *, bind=False, base=None):
         def _run(args, kwargs):
-            call_args = (_InlineTask(), *args) if bind else args
+            inline_self = _InlineTask()
+            call_args = (inline_self, *args) if bind else args
             try:
                 return func(*call_args, **kwargs)
             except Exception as exc:  # noqa: BLE001 - route every failure to the handler
+                if base is not None and hasattr(base, "on_failure"):
+                    # Same hook as Celery: the base knows what its first
+                    # argument is (a recording, a room...).
+                    base.on_failure(
+                        inline_self, exc, None, args, kwargs, _SimpleExcInfo(exc)
+                    )
+                    return None
+
                 from core.tasks._base import handle_pipeline_failure
 
                 # handle_pipeline_failure extracts the recording_id from args
@@ -109,7 +119,11 @@ def task(*d_args, **d_kwargs):
             from meet.celery_app import app as _celery_app
 
             return _celery_app.task(*d_args, **d_kwargs)(func)
-        return _fallback_wrap(func, bind=bool(d_kwargs.get("bind", False)))
+        return _fallback_wrap(
+            func,
+            bind=bool(d_kwargs.get("bind", False)),
+            base=d_kwargs.get("base"),
+        )
 
     return _decorate
 
