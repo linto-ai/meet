@@ -3,6 +3,7 @@
 import logging
 
 from core.models import Recording, RecordingStatusChoices
+from core.services import linto_catchup
 from core.services.room_management import (
     RoomManagement,
     RoomManagementException,
@@ -114,6 +115,9 @@ class WorkerServiceMediator:
             raise RecordingStopError() from e
         else:
             recording.status = RecordingStatusChoices[response]
+            # Fork: a recording written as segments keeps what it recorded.
+            if response == "FAILED" and linto_catchup.has_segments(recording):
+                recording.status = RecordingStatusChoices.STOPPED
         finally:
             recording.save()
 

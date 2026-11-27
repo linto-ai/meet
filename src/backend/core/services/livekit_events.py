@@ -267,6 +267,10 @@ class LiveKitEventsService:
             ) from err
 
         event = to_ended_recording_event(data.egress_info)
+        if event == RecordingWorkerEvent.FAILED and linto_catchup.has_segments(
+            recording
+        ):
+            event = RecordingWorkerEvent.INTERRUPTED
         self._audit_recording_end(recording, event, data.egress_info.error_code)
 
         # Log if/why the recording failed

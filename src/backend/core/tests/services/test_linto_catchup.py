@@ -12,10 +12,12 @@ from unittest import mock
 from django.core.cache import cache
 
 import aiohttp
+import botocore
 import pytest
 from livekit import api
 
 from core.factories import RecordingFactory
+from core.recording.enums import RecordingWorkerEvent
 from core.services import linto_catchup
 from core.services.livekit_events import LiveKitEventsService
 from core.tasks.linto_catchup import reconcile_linto_catchup
@@ -1384,6 +1386,39 @@ def test_the_reconcile_task_does_nothing_when_off(settings):
     reconcile.assert_not_called()
 
 
+def _bucket(key_count=0, error=None):
+    client = mock.MagicMock()
+    client.list_objects_v2.side_effect = error
+    client.list_objects_v2.return_value = {
+        "Contents": [{"Key": "seg_00000.ts"}] * key_count
+    }
+    return mock.patch.object(linto_catchup, "_s3", return_value=client)
+
+
+def test_has_segments_reads_the_bucket():
+    """A segmented recording has segments once one reached the bucket; a
+    listing error does not give its audio up."""
+    recording = RecordingFactory(mode="transcript", options={"segments": True})
+    with _bucket(1) as s3:
+        assert linto_catchup.has_segments(recording) is True
+    assert s3.return_value.list_objects_v2.call_args.kwargs["Prefix"] == (
+        f"catchup/{recording.id}/seg_"
+    )
+    with _bucket(0):
+        assert linto_catchup.has_segments(recording) is False
+    error = botocore.exceptions.EndpointConnectionError(endpoint_url="http://s3")
+    with _bucket(error=error):
+        assert linto_catchup.has_segments(recording) is True
+
+
+def test_a_recording_with_its_own_file_has_no_segments():
+    """A recording written as one file is not looked up in the bucket."""
+    recording = RecordingFactory(mode="transcript")
+    with _bucket(1) as s3:
+        assert linto_catchup.has_segments(recording) is False
+    s3.assert_not_called()
+
+
 # ── Webhooks ────────────────────────────────────────────────────────────────
 
 
@@ -1492,3 +1527,63 @@ def test_main_egress_ended_stops_capture(mock_ended, _metadata, events_service):
 
     mock_ended.assert_called_once()
     assert mock_ended.call_args.args[0].id == recording.id
+
+
+def _end_segmented(events_service, status, segments):
+    """A segmented recording's egress ends with `status`, segments in the bucket or not."""
+    recording = RecordingFactory(
+        worker_id="EG_rec",
+        mode="transcript",
+        status="active",
+        options={"segments": True},
+    )
+    data = mock.MagicMock()
+    data.egress_info.egress_id = recording.worker_id
+    data.egress_info.status = status
+    with (
+        mock.patch.object(linto_catchup, "has_segments", return_value=segments),
+        mock.patch.object(linto_catchup, "on_recording_ended"),
+    ):
+        events_service._handle_egress_ended(data)
+    recording.refresh_from_db()
+    return recording
+
+
+@mock.patch("core.services.room_management.RoomManagement.update_metadata")
+@mock.patch("core.recording.services.recording_events.utils.notify_participants")
+@mock.patch(
+    "core.recording.services.recording_events.notification_service"
+    ".notify_and_update_status"
+)
+def test_a_failed_segmented_recording_keeps_its_segments(
+    notify, participants, _metadata, events_service
+):
+    """The egress failed after writing segments: the recording is interrupted,
+    saved and transcribed up to the failure."""
+    recording = _end_segmented(events_service, api.EgressStatus.EGRESS_FAILED, True)
+
+    assert recording.status == "stopped"
+    notify.assert_called_once()
+    assert participants.call_args.kwargs["notification_data"] == {
+        "type": "transcriptionInterrupted"
+    }
+
+
+@pytest.mark.parametrize(
+    ("status", "segments", "event"),
+    (
+        (api.EgressStatus.EGRESS_FAILED, False, RecordingWorkerEvent.FAILED),
+        (api.EgressStatus.EGRESS_ABORTED, True, RecordingWorkerEvent.ABORTED),
+        (api.EgressStatus.EGRESS_COMPLETE, True, RecordingWorkerEvent.COMPLETED),
+    ),
+)
+@mock.patch("core.services.room_management.RoomManagement.update_metadata")
+def test_only_a_failure_after_segments_is_interrupted(
+    _metadata, status, segments, event, events_service
+):
+    """Without segments a failure stays a failure; other ends are unchanged."""
+    events_service.recording_events = mock.MagicMock()
+    _end_segmented(events_service, status, segments)
+    events_service.recording_events.handle_terminal_event.assert_called_once_with(
+        mock.ANY, event
+    )

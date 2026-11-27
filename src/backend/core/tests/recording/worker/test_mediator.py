@@ -187,6 +187,39 @@ def test_mediator_stop_recording_aborted(mediator, mock_worker_service):
     assert mock_recording.status == RecordingStatusChoices.ABORTED
 
 
+@pytest.mark.parametrize(
+    ("options", "segments", "status"),
+    (
+        ({"segments": True}, True, RecordingStatusChoices.STOPPED),
+        ({"segments": True}, False, RecordingStatusChoices.FAILED),
+        ({}, True, RecordingStatusChoices.FAILED),
+    ),
+)
+def test_mediator_stop_recording_failed(
+    mediator, mock_worker_service, options, segments, status
+):
+    """Stopped as its egress fails, a recording written as segments keeps them (fork)."""
+    mock_recording = RecordingFactory(
+        status=RecordingStatusChoices.ACTIVE,
+        worker_id="test-worker-123",
+        options=options,
+    )
+    mock_worker_service.stop.return_value = "FAILED"
+
+    with mock.patch(
+        "core.services.linto_catchup._s3",
+        return_value=mock.Mock(
+            list_objects_v2=mock.Mock(
+                return_value={"Contents": [{"Key": "seg_00000.ts"}] if segments else []}
+            )
+        ),
+    ):
+        mediator.stop(mock_recording)
+
+    mock_recording.refresh_from_db()
+    assert mock_recording.status == status
+
+
 @pytest.mark.parametrize("error_class", [WorkerConnectionError, WorkerResponseError])
 def test_mediator_stop_recording_worker_errors(
     mediator, mock_worker_service, error_class

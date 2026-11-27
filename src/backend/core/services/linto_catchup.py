@@ -520,6 +520,22 @@ def segments_between(
     return result
 
 
+def has_segments(recording: models.Recording) -> bool:
+    """The recording is written as segments and some reached the bucket, or
+    the bucket cannot tell: its audio is not given up on a listing error."""
+    if not is_segmented(recording):
+        return False
+    prefix = f"{recording_prefix(recording.id)}/{SEGMENT_PREFIX}_"
+    try:
+        page = _s3().list_objects_v2(
+            Bucket=default_storage.bucket_name, Prefix=prefix, MaxKeys=1
+        )
+    except (botocore.exceptions.BotoCoreError, botocore.exceptions.ClientError):
+        logger.exception("Catch-up segments of %s not listed", recording.id)
+        return True
+    return bool(page.get("Contents"))
+
+
 def segments_closed_at(recording_id) -> Optional[datetime]:
     """When the egress closed a recording's playlist, or None while it writes it."""
     key = f"{recording_prefix(recording_id)}/{PLAYLIST_NAME}"

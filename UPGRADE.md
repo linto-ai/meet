@@ -39,6 +39,9 @@ Studio nothing changes.
 - The segments of a recording written as segments whose deferred
   transcription failed now stay two days, like the others: its audio file may
   not be written yet.
+- A recording written as segments whose egress fails after writing some, or
+  is stopped as it fails, is kept: saved, transcribed and delivered up to the
+  failure.
 - The late joiners' audio goes to Studio as M4A (the segments' AAC remuxed,
   not encoded again), a third lighter than their MPEG-TS.
 
