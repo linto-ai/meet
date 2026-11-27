@@ -17,6 +17,7 @@ from django.core import mail
 
 import aiohttp
 import pytest
+from asgiref.sync import async_to_sync
 
 from core import factories, models
 from core.recording.enums import FileExtension
@@ -643,3 +644,131 @@ class TestDelivery:
         assert all("Decisions" not in m.body for m in shared)
         rec.refresh_from_db()
         assert len(rec.linto_state["steps"]["shared"]) == 2
+
+
+class TestNoSpeech:
+    """A recording without speech: no transcript nor summary, the recording goes
+    to Twake Drive and the owner gets a no-speech email, not a failure."""
+
+    NO_SPEECH_JOB = {
+        "jobs": {
+            "transcription": {
+                "state": "error",
+                "error": {"code": "NO_SPEECH", "status": 422},
+            }
+        }
+    }
+
+    def _run(self, settings, *, linto_state, poll=None, status=None):
+        settings.CLOUDERY_URL = "https://cloudery.example.com"
+        settings.CLOUDERY_TOKEN = "cloudery-token"
+        owner = factories.UserFactory(email="owner@example.com", language="en-us")
+        room = factories.RoomFactory(users=[(owner, models.RoleChoices.OWNER)])
+        rec = factories.RecordingFactory(
+            room=room, mode=models.RecordingModeChoices.TRANSCRIPT
+        )
+        rec.linto_state = linto_state
+        rec.save(update_fields=["linto_state"])
+        with contextlib.ExitStack() as stack:
+            _patch_storage(stack, b"OggS raw")
+            sdk = _patch_sdk(stack)
+            sdk.poll_media = mock.AsyncMock()
+            sdk.api_service.get_media_status = mock.AsyncMock(return_value=status)
+            stack.enter_context(
+                mock.patch.object(
+                    linto_task, "_await_media", mock.AsyncMock(return_value=poll)
+                )
+            )
+            twake = stack.enter_context(
+                mock.patch.object(
+                    linto_task,
+                    "_deliver_to_twake",
+                    mock.AsyncMock(return_value="https://drive.example.com/#/d1"),
+                )
+            )
+            summarize = stack.enter_context(
+                mock.patch.object(linto_task, "_summarize_conversation")
+            )
+            release = stack.enter_context(
+                mock.patch.object(linto_task, "_release_segments", mock.AsyncMock())
+            )
+            linto_task._process_linto_transcription_sync(str(rec.id))
+        summarize.assert_not_called()
+        release.assert_awaited_once()
+        rec.refresh_from_db()
+        return rec, sdk, twake
+
+    def _assert_no_speech_delivery(self, rec, twake):
+        kwargs = twake.call_args.kwargs
+        assert kwargs["transcript_text"] is None
+        assert kwargs["conversation_id"] is None
+        assert kwargs["pdf_content"] is None
+        files = async_to_sync(kwargs["extra_files_provider"])()
+        assert [(f[1], f[2]) for f in files] == [(b"OggS raw", "audio/ogg")]
+        assert [m.to for m in mail.outbox] == [["owner@example.com"]]
+        message = mail.outbox[0]
+        assert message.subject == "No speech was detected in your meeting"
+        for text in (message.body, message.alternatives[0][0]):
+            assert "No speech was detected in the recording of" in text
+            assert "drive.example.com" in text
+        assert rec.linto_state["no_speech"] is True
+        assert rec.linto_state["steps"]["email"] is True
+        assert "transcription" not in rec.linto_state["steps"]
+        assert rec.status != models.RecordingStatusChoices.NOTIFICATION_FAILED
+
+    def test_a_no_speech_error_delivers_the_recording(self, settings):
+        """Studio's NO_SPEECH code: the recording and a no-speech email."""
+        rec, sdk, twake = self._run(
+            settings,
+            linto_state={"conversation_id": "conv-1", "attempts": 0},
+            poll={"success": False},
+            status=self.NO_SPEECH_JOB,
+        )
+        sdk.api_service.get_media_status.assert_awaited_once_with(mediaId="conv-1")
+        self._assert_no_speech_delivery(rec, twake)
+
+    def test_an_empty_conversation_is_no_speech(self, settings):
+        """The late joiners' conversation ends done without any turn."""
+        empty = mock.Mock(turns=[], full_text="")
+        rec, sdk, twake = self._run(
+            settings,
+            linto_state={"conversation_id": "conv-1", "attempts": 0},
+            poll={"success": True, "media": empty},
+        )
+        sdk.api_service.get_media_status.assert_not_called()
+        self._assert_no_speech_delivery(rec, twake)
+
+    def test_a_resume_does_not_poll_again(self, settings):
+        """A no-speech outcome checkpointed: the delivery resumes, no polling."""
+        rec, sdk, twake = self._run(
+            settings,
+            linto_state={"conversation_id": "conv-1", "no_speech": True, "steps": {}},
+        )
+        sdk.poll_media.assert_not_called()
+        self._assert_no_speech_delivery(rec, twake)
+
+    def test_another_transcription_error_still_fails(self):
+        """An error without the NO_SPEECH code stays a pipeline failure."""
+        rec = _make_recording(
+            models.RecordingModeChoices.TRANSCRIPT,
+            linto_state={"conversation_id": "conv-1", "attempts": 0},
+        )
+        with contextlib.ExitStack() as stack:
+            _patch_storage(stack, b"OggS raw")
+            sdk = _patch_sdk(stack)
+            sdk.poll_media = mock.AsyncMock()
+            sdk.api_service.get_media_status = mock.AsyncMock(
+                return_value={"jobs": {"transcription": {"state": "error"}}}
+            )
+            stack.enter_context(
+                mock.patch.object(
+                    linto_task,
+                    "_await_media",
+                    mock.AsyncMock(return_value={"success": False}),
+                )
+            )
+            with pytest.raises(RuntimeError, match="transcription failed"):
+                linto_task._process_linto_transcription_sync(str(rec.id))
+        rec.refresh_from_db()
+        assert "no_speech" not in rec.linto_state
+        assert not mail.outbox

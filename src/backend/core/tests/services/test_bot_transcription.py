@@ -293,7 +293,9 @@ class TestMarkStarted:
             assert room.configuration["linto"]["summary"] is False
         # The run is still delivered at stop, without the summary step.
         with (
-            mock.patch.object(BotTranscriptionService, "_stop_studio_run"),
+            mock.patch.object(
+                BotTranscriptionService, "_stop_studio_run", return_value=False
+            ),
             mock.patch.object(BotTranscriptionService, "_enqueue_summary") as enqueue,
         ):
             BotTranscriptionService().stop(room, user=owner)
@@ -335,7 +337,9 @@ class TestMarkStarted:
             result = BotTranscriptionService().mark_started(room, data, user=owner)
         assert result["summary"] is True
         with (
-            mock.patch.object(BotTranscriptionService, "_stop_studio_run"),
+            mock.patch.object(
+                BotTranscriptionService, "_stop_studio_run", return_value=False
+            ),
             mock.patch.object(BotTranscriptionService, "_enqueue_summary") as enqueue,
         ):
             BotTranscriptionService().stop(room, user=owner)
@@ -1617,6 +1621,16 @@ class TestStart:
         assert all(c.request.url.startswith(EXCHANGE) for c in responses.calls)
 
 
+NO_SPEECH_STOP = {
+    "success": True,
+    "error": {
+        "code": "NO_SPEECH",
+        "status": 422,
+        "message": "No speech was transcribed during the session",
+    },
+}
+
+
 class TestStop:
     @pytest.fixture(autouse=True)
     def _no_livekit(self):
@@ -1655,6 +1669,7 @@ class TestStop:
             "status": "stopped",
             "summary": True,
             "share_summary": False,
+            "no_speech": False,
             "recipient_is_you": True,
         }
         assert del_bot.call_count == 1
@@ -1669,6 +1684,25 @@ class TestStop:
         assert not any("/quickMeeting/" in c.request.url for c in responses.calls)
         self.banner.assert_called_once_with(room, False)
         self.enqueue.assert_called_once_with(room)
+
+    @responses.activate
+    def test_a_run_without_speech_delivers_nothing(self, run_settings):
+        """Studio stored no conversation: no summary task, no pending marker."""
+        room = RoomFactory()
+        starter = UserFactory()
+        self._running(room, str(starter.id))
+        responses.delete(f"{BOTS_URL}/bot-1", json={})
+        responses.delete(
+            f"{STUDIO}/api/organizations/{ORG}/sessions/sess-1", json=NO_SPEECH_STOP
+        )
+        result = BotTranscriptionService().stop(room, user=starter)
+        assert result["status"] == "stopped"
+        assert result["no_speech"] is True
+        room.refresh_from_db()
+        assert "linto" not in room.configuration
+        assert "linto_summary" not in room.configuration
+        self.banner.assert_called_once_with(room, False)
+        self.enqueue.assert_not_called()
 
     @responses.activate
     def test_the_room_owner_receives_the_delivery(self, run_settings):
@@ -1784,6 +1818,24 @@ class TestStop:
         result = BotTranscriptionService().stop(room, user=starter)
         assert result == {"status": "stopped", "captions_only": True}
         assert not _calls("DELETE", f"{STUDIO}/api/conversations/")
+        self.enqueue.assert_not_called()
+
+    @responses.activate
+    def test_a_captions_only_run_without_speech_looks_nothing_up(self, run_settings):
+        """Studio says it stored nothing: no lookup of a stored conversation."""
+        room = RoomFactory()
+        starter = UserFactory()
+        self._running_captions(room, str(starter.id))
+        responses.delete(f"{BOTS_URL}/bot-1", json={})
+        responses.put(
+            f"{STUDIO}/api/organizations/{ORG}/sessions/sess-1/clear", json={}
+        )
+        responses.delete(
+            f"{STUDIO}/api/organizations/{ORG}/sessions/sess-1", json=NO_SPEECH_STOP
+        )
+        result = BotTranscriptionService().stop(room, user=starter)
+        assert result == {"status": "stopped", "captions_only": True}
+        assert not _calls("GET", f"{STUDIO}/api/organizations/{ORG}/conversations")
         self.enqueue.assert_not_called()
 
     @responses.activate

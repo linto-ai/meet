@@ -47,6 +47,8 @@ CATCHUP_STREAM_TIMEOUT = (DEFAULT_TIMEOUT, 25)
 CATCHUP_RATE_LIMIT_SECONDS = 20
 START_LOCK_TTL = 120
 STOP_LOCK_TTL = 90
+# The code Studio gives a stopped session that left no conversation.
+NO_SPEECH = "NO_SPEECH"
 
 # ``LINTO_STUDIO_TOKEN_SOURCE`` values — where the backend's Studio credential
 # comes from.
@@ -637,6 +639,7 @@ class BotTranscriptionService:
             return {}
 
     def _studio_delete(self, path, headers, what, timeout=DEFAULT_TIMEOUT, **kwargs):
+        """Soft DELETE: the answer's JSON body on success, else None."""
         try:
             r = requests.delete(
                 f"{self.studio_base}{path}",
@@ -646,9 +649,17 @@ class BotTranscriptionService:
             )
         except requests.RequestException as exc:
             logger.warning("LinTO %s failed: %s", what, exc)
-            return
-        if r.status_code >= 400 and r.status_code != 404:
-            logger.warning("LinTO %s returned %s %s", what, r.status_code, r.text[:200])
+            return None
+        if r.status_code >= 400:
+            if r.status_code != 404:
+                logger.warning(
+                    "LinTO %s returned %s %s", what, r.status_code, r.text[:200]
+                )
+            return None
+        try:
+            return r.json()
+        except ValueError:
+            return None
 
     def quick_meeting_profiles(self, user):
         """The live ASR profiles of the organization ``user`` starts a run in."""
@@ -939,9 +950,10 @@ class BotTranscriptionService:
         """Stop the bot and the session. Studio stores a stopped session as a
         conversation; with ``discard`` the run leaves none: its captions are
         cleared first, and a conversation stored anyway (a caption committed
-        in between) is deleted."""
+        in between) is deleted. True when Studio says no speech was
+        transcribed, so no conversation was stored."""
         if not organization_id:
-            return
+            return False
         if bot_id:
             self._studio_delete(
                 f"/api/organizations/{organization_id}/bots/{bot_id}",
@@ -949,7 +961,7 @@ class BotTranscriptionService:
                 "bot stop",
             )
         if not session_id:
-            return
+            return False
         session_path = f"/api/organizations/{organization_id}/sessions/{session_id}"
         if discard:
             try:
@@ -959,15 +971,18 @@ class BotTranscriptionService:
         params = {"force": "true"}
         if name:
             params["name"] = name
-        self._studio_delete(
+        stopped = self._studio_delete(
             session_path,
             headers,
             "session stop",
             timeout=STOP_TIMEOUT,
             params=params,
         )
-        if discard and name:
+        error = stopped.get("error") if isinstance(stopped, dict) else None
+        no_speech = isinstance(error, dict) and error.get("code") == NO_SPEECH
+        if discard and name and not no_speech:
             self._delete_stored_conversation(headers, organization_id, name)
+        return no_speech
 
     def _delete_stored_conversation(self, headers, organization_id, name):
         """Delete the conversation Studio stored under ``name``, if any (with its
@@ -1012,12 +1027,13 @@ class BotTranscriptionService:
                 self._check_may_stop(room, linto, user)
             captions_only = bool(linto.get("captions_only"))
             conversation_name = f"linto-{room.id}-{int(time.time())}"
+            no_speech = False
             try:
                 headers = self._run_headers(linto, user)
             except BotTranscriptionException as exc:
                 logger.warning("LinTO: no Studio credential to stop the run: %s", exc)
             else:
-                self._stop_studio_run(
+                no_speech = self._stop_studio_run(
                     headers,
                     linto.get("org_id"),
                     linto.get("session_id"),
@@ -1027,7 +1043,7 @@ class BotTranscriptionService:
                 )
             if captions_only:
                 return self._close_captions_run(room)
-            result = self._close_run(room, linto, conversation_name)
+            result = self._close_run(room, linto, conversation_name, no_speech)
             result["recipient_is_you"] = self._is_recipient(room, linto, user)
             return result
         finally:
@@ -1063,7 +1079,7 @@ class BotTranscriptionService:
         logger.info("LinTO captions-only run stopped for room %s", room.id)
         return {"status": "stopped", "captions_only": True}
 
-    def _close_run(self, room, linto, conversation_name):
+    def _close_run(self, room, linto, conversation_name, no_speech=False):
         self._set_banner(room, False)
         recording_id = linto.get("recording_id")
         if recording_id:
@@ -1076,7 +1092,9 @@ class BotTranscriptionService:
         # The delivery (document, Twake Drive, recap email) follows every run
         # with a session; `summary` only says whether the LLM step runs in it.
         summary_payload = None
-        if org_id and session_id:
+        if no_speech:
+            logger.info("LinTO run of room %s stopped without speech", room.id)
+        elif org_id and session_id:
             summary_payload = {
                 "org_id": org_id,
                 "session_id": session_id,
@@ -1101,7 +1119,12 @@ class BotTranscriptionService:
         if summary_payload is not None:
             self._enqueue_summary(room)
         logger.info("LinTO run stopped for room %s (summary=%s)", room.id, summary)
-        return {"status": "stopped", "summary": summary, "share_summary": share_summary}
+        return {
+            "status": "stopped",
+            "summary": summary,
+            "share_summary": share_summary,
+            "no_speech": no_speech,
+        }
 
     def mark_started(self, room, data, user=None):
         """Record a started run and light the room-wide state.

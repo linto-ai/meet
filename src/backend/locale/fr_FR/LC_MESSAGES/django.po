@@ -714,6 +714,29 @@ msgstr "Espagnol"
 msgid "Your meeting transcription is ready"
 msgstr "Votre transcription de réunion est prête"
 
+#: core/tasks/linto.py:704
+#: core/templates/mail/html/no_speech.html:180
+#: core/templates/mail/text/no_speech.txt:7
+msgid "No speech was detected in your meeting"
+msgstr "Aucune parole n'a été détectée dans votre réunion"
+
+#: core/templates/mail/html/no_speech.html:187
+#: core/templates/mail/text/no_speech.txt:9
+#, python-format
+msgid ""
+" No speech was detected in the recording of \"%(room_name)s\" on "
+"%(recording_date)s at %(recording_time)s: there is no transcription nor "
+"summary. "
+msgstr ""
+" Aucune parole n'a été détectée dans l'enregistrement de \"%(room_name)s\" du "
+"%(recording_date)s à %(recording_time)s : il n'y a ni transcription ni "
+"compte rendu. "
+
+#: core/templates/mail/html/no_speech.html:191
+#: core/templates/mail/text/no_speech.txt:11
+msgid " The recording is available in your Twake Drive. "
+msgstr " L'enregistrement est disponible dans votre Twake Drive. "
+
 #: core/tasks/linto.py:762
 #: core/templates/mail/html/summary_shared.html:188
 #: core/templates/mail/text/summary_shared.txt:6

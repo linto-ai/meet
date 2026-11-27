@@ -10,6 +10,7 @@ and this project adheres to
 
 ### Added
 
+- ✨(backend) a recording without speech goes to Drive, with a no-speech email
 - ✨(frontend) "before you arrived" gets its own side panel, offered again in Tools
 - ✨(backend) one Studio conversation per meeting for the late joiners' brief, the transcript at the end
 - ✨(frontend) the brief's wait shows from the arrival, says when it runs late or fails, over the previous brief

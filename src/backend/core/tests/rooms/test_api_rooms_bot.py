@@ -478,6 +478,7 @@ def test_no_answer_to_the_browser_carries_a_studio_credential(linto_settings, so
         "status": "stopped",
         "summary": True,
         "share_summary": False,
+        "no_speech": False,
         "recipient_is_you": True,
     }
     studio_calls = [c for c in responses.calls if "/organizations/" in c.request.url]

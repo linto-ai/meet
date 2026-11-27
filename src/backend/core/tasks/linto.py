@@ -123,6 +123,18 @@ async def _await_media(handle, recording_id) -> dict:
     return result
 
 
+# The code Studio gives a transcription that ended without any word.
+NO_SPEECH = "NO_SPEECH"
+
+
+async def _transcription_error_code(linto, conversation_id):
+    """The code Studio gave the conversation's failed transcription, or None."""
+    with classify_external("read the LinTO transcription error"):
+        status = await linto.api_service.get_media_status(mediaId=conversation_id)
+    job = ((status or {}).get("jobs") or {}).get("transcription") or {}
+    return (job.get("error") or {}).get("code")
+
+
 _RETRY_KWARGS = {
     "bind": True,
     "base": NotificationTask,
@@ -482,6 +494,7 @@ async def _deliver_to_twake(  # noqa: PLR0913 - delivery needs the full context
     flow the ogg of the audio Studio kept). Returns the Twake Drive folder link (on
     a resume, the one a previous attempt checkpointed, so the email still links
     the files), or ``None`` when Twake is not configured or the upload failed.
+    A ``transcript_text`` of ``None`` leaves the transcript note out.
     """
     twake_configured = getattr(settings, "CLOUDERY_URL", None) and getattr(
         settings, "CLOUDERY_TOKEN", None
@@ -513,14 +526,15 @@ async def _deliver_to_twake(  # noqa: PLR0913 - delivery needs the full context
                 instance, drive_token, meeting, language=language
             )
 
-            await save_file(
-                instance=instance,
-                token=drive_token,
-                dir_id=dir_id,
-                filename=build_transcript_filename(meeting, language),
-                content=transcript_text or "",
-                content_type="text/vnd.cozy.note+markdown",
-            )
+            if transcript_text is not None:
+                await save_file(
+                    instance=instance,
+                    token=drive_token,
+                    dir_id=dir_id,
+                    filename=build_transcript_filename(meeting, language),
+                    content=transcript_text,
+                    content_type="text/vnd.cozy.note+markdown",
+                )
 
             # Original media bytes (the recording, or the live run's audio).
             if extra_files_provider is not None:
@@ -664,6 +678,41 @@ async def _send_recap_emails(  # noqa: PLR0913 - recap email needs the full cont
 
     if not email_failures:
         await checkpoint.mark("email")
+
+
+async def _send_no_speech_email(
+    recording, recipient_user, twake_drive_link, checkpoint
+):
+    """Tell the recipient the recording holds no speech, with the Drive link."""
+    if checkpoint.done("email"):
+        return
+    if not (recipient_user and recipient_user.email):
+        logger.warning(
+            "No recipient with email for %s, no-speech email skipped", recording.id
+        )
+        return
+    context = _mail_context(
+        recipient_user,
+        recording.room.name or "Meeting",
+        recording.created_at,
+        twake_drive_link=twake_drive_link,
+    )
+    try:
+        await _send_mail(
+            recipient_user,
+            "no_speech",
+            _("No speech was detected in your meeting"),
+            context,
+        )
+    except smtplib.SMTPException:
+        logger.warning(
+            "Failed to send no-speech email to %s",
+            recipient_user.email,
+            exc_info=True,
+        )
+        return
+    logger.info("Sent no-speech email to %s for %s", recipient_user.email, recording.id)
+    await checkpoint.mark("email")
 
 
 async def _share_summary(  # noqa: PLR0913 - the shared summary needs the full context
@@ -833,6 +882,104 @@ async def _summary_wanted(options, starter, recording_id):
     return True
 
 
+def _recording_files(recording, file_content, language):
+    """The original recording for Twake Drive: the video and its audio, or the audio."""
+
+    async def _provide():
+        if recording.extension != FileExtension.MP4.value:
+            return [
+                (
+                    build_recording_filename(recording, "ogg", language),
+                    file_content,
+                    "audio/ogg",
+                )
+            ]
+        # OGG for drive — compressed, smaller; the original track went to LinTO
+        ogg_audio = await sync_to_async(extract_audio_from_video)(
+            file_content, output_format="ogg"
+        )
+        return [
+            (
+                build_recording_filename(recording, "mp4", language),
+                file_content,
+                "video/mp4",
+            ),
+            (
+                build_recording_filename(recording, "ogg", language),
+                ogg_audio,
+                "audio/ogg",
+            ),
+        ]
+
+    return _provide
+
+
+async def _wait_transcription(linto, recording, state, conversation_id):
+    """The transcribed media, or ``None`` when the recording holds no speech."""
+    recording_id = str(recording.id)
+    if state.get("no_speech"):
+        return None
+    if step_done(recording, "transcription"):
+        # Already transcribed on a prior attempt: re-fetch the media so the
+        # downstream steps (document/twake/email) have the transcript text.
+        # One-shot fetch (no polling): raises on HTTP failure → classify_external
+        # → TransientError retry, so there is never a silent empty transcript.
+        logger.info(
+            "Transcription already done for %s, re-fetching media", recording_id
+        )
+        with classify_external("re-fetch LinTO media"):
+            return await linto.get_media(conversation_id)
+
+    with classify_external("resume LinTO transcription polling"):
+        handle = await linto.poll_media(conversation_id)
+        result = await _await_media(handle, recording_id)
+
+    if result.get("success"):
+        media = result["media"]
+        # A conversation appended for the late joiners ends done and empty.
+        if media.turns:
+            await mark_done(recording, "transcription")
+            logger.info(
+                "Transcription done for %s: %d turns, %d chars",
+                recording_id,
+                len(media.turns),
+                len(media.full_text),
+            )
+            return media
+    elif await _transcription_error_code(linto, conversation_id) != NO_SPEECH:
+        # Transcription engine reported an error: this is a terminal,
+        # non-retryable outcome for this conversation.
+        raise RuntimeError(
+            f"LinTO Studio transcription failed for recording {recording_id}"
+        )
+    state["no_speech"] = True
+    await save_state(recording)
+    return None
+
+
+async def _deliver_no_speech(recording, file_content):
+    """No transcript nor summary: the recording goes to Twake Drive, the
+    recipient gets a no-speech email."""
+    logger.info("No speech in recording %s, delivering the recording", recording.id)
+    recipient_user = await sync_to_async(recording_recipient)(recording)
+    checkpoint = _recording_checkpoint(recording)
+    language = recipient_user.language if recipient_user else None
+    twake_drive_link = await _deliver_to_twake(
+        conversation_id=None,
+        recipient_user=recipient_user,
+        transcript_text=None,
+        pdf_content=None,
+        pub_filename=None,
+        pub_mime=None,
+        meeting=recording,
+        language=language,
+        extra_files_provider=_recording_files(recording, file_content, language),
+        log_id=recording.id,
+        checkpoint=checkpoint,
+    )
+    await _send_no_speech_email(recording, recipient_user, twake_drive_link, checkpoint)
+
+
 @async_to_sync
 async def _process_linto_transcription_sync(recording_id):  # noqa: PLR0915
     """Async implementation using LinTO SDK (idempotent / resumable)."""
@@ -960,38 +1107,11 @@ async def _process_linto_transcription_sync(recording_id):  # noqa: PLR0915
 
     # 4. Wait for transcription. Resume polling on the existing conversation
     # without re-uploading. Skip entirely if already completed.
-    media = None
-    if not step_done(recording, "transcription"):
-        with classify_external("resume LinTO transcription polling"):
-            handle = await linto.poll_media(conversation_id)
-            result = await _await_media(handle, recording_id)
-
-        if not result.get("success"):
-            # Transcription engine reported an error: this is a terminal,
-            # non-retryable outcome for this conversation.
-            raise RuntimeError(
-                f"LinTO Studio transcription failed for recording {recording_id}"
-            )
-
-        media = result["media"]
-        await mark_done(recording, "transcription")
-        logger.info(
-            "Transcription done for %s: %d turns, %d chars",
-            recording_id,
-            len(media.turns),
-            len(media.full_text),
-        )
-    else:
-        # Already transcribed on a prior attempt: re-fetch the media so the
-        # downstream steps (document/twake/email) have the transcript text.
-        # One-shot fetch (no polling): raises on HTTP failure → classify_external
-        # → TransientError retry, so there is never a silent empty transcript.
-        logger.info(
-            "Transcription already done for %s, re-fetching media", recording_id
-        )
-        with classify_external("re-fetch LinTO media"):
-            # Requires the new linto SDK (get_media one-shot fetch).
-            media = await linto.get_media(conversation_id)
+    media = await _wait_transcription(linto, recording, state, conversation_id)
+    if media is None:
+        await _deliver_no_speech(recording, file_content)
+        await _release_segments(recording)
+        return
 
     # 5.x Delivery — shared with process_bot_live_summary, checkpointed in
     # recording.linto_state (same steps/semantics as before the extraction).
@@ -1042,38 +1162,6 @@ async def _process_linto_transcription_sync(recording_id):  # noqa: PLR0915
 
     # 5.7 Upload to Twake Drive via Cloudery (soft-fail), including the
     # original recording bytes (video + extracted audio, or audio only).
-    async def _recording_media_files():
-        files = []
-        if recording.extension == FileExtension.MP4.value:
-            files.append(
-                (
-                    build_recording_filename(recording, "mp4", owner_language),
-                    file_content,
-                    "video/mp4",
-                )
-            )
-            # Also upload extracted audio alongside the video
-            # (OGG for drive — compressed, smaller; WAV was only for LinTO)
-            ogg_audio = await sync_to_async(extract_audio_from_video)(
-                file_content, output_format="ogg"
-            )
-            files.append(
-                (
-                    build_recording_filename(recording, "ogg", owner_language),
-                    ogg_audio,
-                    "audio/ogg",
-                )
-            )
-        else:
-            files.append(
-                (
-                    build_recording_filename(recording, "ogg", owner_language),
-                    file_content,
-                    "audio/ogg",
-                )
-            )
-        return files
-
     transcript_text = (media.full_text or "") if media else ""
     twake_drive_link = await _deliver_to_twake(
         conversation_id=conversation_id,
@@ -1084,7 +1172,7 @@ async def _process_linto_transcription_sync(recording_id):  # noqa: PLR0915
         pub_mime=pub_mime,
         meeting=recording,
         language=owner_language,
-        extra_files_provider=_recording_media_files,
+        extra_files_provider=_recording_files(recording, file_content, owner_language),
         log_id=recording_id,
         checkpoint=checkpoint,
     )
