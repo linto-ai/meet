@@ -1419,6 +1419,194 @@ def test_a_recording_with_its_own_file_has_no_segments():
     s3.assert_not_called()
 
 
+# ── Failures the late joiner is told about ─────────────────────────────────
+
+
+OLD_BRIEF = {"text": "Old", "covered_until": _iso(T0)}
+
+
+def test_a_failed_update_keeps_the_brief_marked_stale(active_transcript, studio):
+    """The update failed: the previous brief serves, flagged as not updated."""
+    _running(active_transcript, step="summarizing", brief=OLD_BRIEF)
+    studio.summary.return_value = ("error", None)
+    body = _status(active_transcript)
+    assert body["state"] == "ready"
+    assert body["brief"]["text"] == "Old"
+    assert body["stale"] is True
+    assert body["reason"] == "summary_service"
+
+
+def test_a_failure_without_brief_says_why(active_transcript, studio):
+    """No brief yet: the failure carries its reason."""
+    _running(active_transcript, step="summarizing")
+    studio.summary.return_value = ("done", "")
+    body = _status(active_transcript)
+    assert body["state"] == "failed"
+    assert body["reason"] == "summary_service"
+    assert body["stale"] is False
+
+
+@pytest.mark.parametrize(
+    ("setup", "reason"),
+    (
+        ("timeout", "timeout"),
+        ("studio_down", "linto_error"),
+        ("audio_refused", "transcription"),
+    ),
+)
+def test_each_failure_has_its_reason(
+    active_transcript, studio, settings, setup, reason
+):
+    """A job given up on, Studio down, or the audio refused: each says why."""
+    if setup == "timeout":
+        settings.LINTO_CATCHUP_JOB_TIMEOUT_S = 1
+        _running(active_transcript, started_at=_iso(T0))
+        body = _status(active_transcript)
+    elif setup == "studio_down":
+        _running(active_transcript)
+        studio.parts.side_effect = linto_catchup.CatchupError("down")
+        for _ in range(linto_catchup.MAX_STEP_ERRORS):
+            body = _status(active_transcript)
+    else:
+        _running(active_transcript, step="sending")
+        studio.create.side_effect = linto_catchup.StudioHTTPError(
+            "Studio: HTTP 415", 415, "unsupported"
+        )
+        with _segments_in_bucket():
+            body = _status(active_transcript)
+    assert body["state"] == "failed"
+    assert body["reason"] == reason
+
+
+def test_step_errors_are_counted_in_a_row(active_transcript, studio):
+    """A step that goes through forgets the errors before it."""
+    _running(active_transcript)
+    studio.parts.side_effect = linto_catchup.CatchupError("down")
+    for _ in range(linto_catchup.MAX_STEP_ERRORS - 1):
+        _status(active_transcript)
+    studio.parts.side_effect = None
+    studio.parts.return_value = _parts("pending")
+    _status(active_transcript)
+    assert linto_catchup.load_state(active_transcript.id)["job"]["errors"] == 0
+
+
+def test_every_part_in_error_is_a_transcription_failure(active_transcript, studio):
+    """Nothing transcribed is not "too little was said"."""
+    _running(active_transcript)
+    studio.parts.return_value = _parts("error", "error")
+    body = _status(active_transcript)
+    assert body["state"] == "failed"
+    assert body["reason"] == "transcription"
+    studio.trigger_summary.assert_not_called()
+
+
+def test_a_last_part_in_error_with_too_little_text_is_a_transcription_failure(
+    active_transcript, studio
+):
+    """Its own minutes not transcribed: not "too little was said" either."""
+    _running(active_transcript)
+    studio.parts.return_value = _parts("done", "error")
+    studio.conversation.return_value = _conversation("Bonjour.")
+    body = _status(active_transcript)
+    assert body["state"] == "failed"
+    assert body["reason"] == "transcription"
+
+
+def test_a_last_part_in_error_ends_the_brief_where_it_starts(active_transcript, studio):
+    """The brief does not claim the minutes Studio could not transcribe."""
+    _running(active_transcript)
+    studio.parts.return_value = _parts("done", "error")
+    studio.conversation.return_value = _conversation(LONG_ENOUGH)
+    assert _status(active_transcript)["state"] == "summarizing"
+    studio.summary.return_value = ("done", "New brief")
+    body = _status(active_transcript)
+    assert body["state"] == "ready"
+    assert body["brief"]["covered_until"] == _iso(T0)
+    assert body["reason"] == "transcription_gap"
+    assert body["stale"] is True
+
+
+def test_a_brief_covering_the_arrival_is_not_stale_for_it(active_transcript, studio):
+    """A later job's failure does not mark the brief of an earlier arrival."""
+    covered = {"text": "Old", "covered_until": _iso(T0 + timedelta(seconds=60))}
+    linto_catchup.save_state(
+        active_transcript.id,
+        {"brief": covered, "job": None, "outcome": "ready", "failure": "timeout"},
+    )
+    body, _ = _arrive(active_transcript, T0 + timedelta(seconds=65))
+    assert body["state"] == "ready"
+    assert body["stale"] is False
+    studio.create.assert_not_called()
+
+
+def test_a_timed_out_job_is_replaced_at_the_next_arrival(
+    active_transcript, studio, settings
+):
+    """An arrival does not inherit a job given up on: it plans its own."""
+    settings.LINTO_CATCHUP_JOB_TIMEOUT_S = 60
+    _running(
+        active_transcript, started_at=_iso(linto_catchup._now() - timedelta(hours=1))
+    )
+    body, _ = _arrive(active_transcript, T0 + timedelta(seconds=65))
+    assert body["state"] == "sending"
+    job = linto_catchup.load_state(active_transcript.id)["job"]
+    assert job["step"] == "sending"
+    assert job["up_to"] == _iso(T0 + timedelta(seconds=60))
+
+
+def test_retrying_summarizes_again_the_audio_already_sent(active_transcript, studio):
+    """The audio is in Studio, its summary failed: a retry asks it again."""
+    _hold(active_transcript, T0 + timedelta(seconds=120))
+    linto_catchup.save_state(
+        active_transcript.id,
+        {"brief": None, "job": None, "outcome": "failed", "failure": "timeout"},
+    )
+    body, read = _arrive(active_transcript, T0 + timedelta(seconds=125))
+    assert body["state"] == "transcribing"
+    read.assert_not_called()
+    job = linto_catchup.load_state(active_transcript.id)["job"]
+    assert job["conversation_id"] == "conv-1"
+    assert job["audio_s"] == 0
+
+
+def test_a_transcription_failure_is_not_retried_as_too_short(active_transcript, studio):
+    """Nothing new to send after a transcription failure: it stays a failure."""
+    _hold(active_transcript, T0 + timedelta(seconds=120))
+    linto_catchup.save_state(
+        active_transcript.id,
+        {"brief": None, "job": None, "outcome": "failed", "failure": "transcription"},
+    )
+    body, _ = _arrive(active_transcript, T0 + timedelta(seconds=125))
+    assert body["state"] == "failed"
+    assert body["reason"] == "transcription"
+
+
+def test_a_failing_summary_service_serves_the_previous_brief(active_transcript, studio):
+    """The summary service failed lately: the previous brief serves, flagged."""
+    linto_catchup.save_state(
+        active_transcript.id, {"brief": OLD_BRIEF, "job": None, "outcome": "ready"}
+    )
+    cache.set(linto_catchup.SUMMARY_UNAVAILABLE_KEY, "route: down", 60)
+    body, _ = _arrive(active_transcript, T0 + timedelta(seconds=300))
+    assert body["state"] == "ready"
+    assert body["stale"] is True
+    assert body["reason"] == "summary_service"
+    studio.create.assert_not_called()
+
+
+def test_a_bucket_out_of_reach_is_a_catchup_error():
+    """A connection error reading the bucket is retried like Studio's."""
+    error = botocore.exceptions.EndpointConnectionError(endpoint_url="http://s3")
+    with _bucket(error=error):
+        with pytest.raises(linto_catchup.CatchupError):
+            linto_catchup._list_segment_objects("catchup/r")
+    client = mock.MagicMock()
+    client.get_object.side_effect = error
+    with mock.patch.object(linto_catchup, "_s3", return_value=client):
+        with pytest.raises(linto_catchup.CatchupError):
+            linto_catchup._read_bytes("catchup/r/seg_00000.ts")
+
+
 # ── Webhooks ────────────────────────────────────────────────────────────────
 
 

@@ -1223,10 +1223,15 @@ class RoomViewSet(  # pylint: disable=too-many-public-methods
                 result = linto_catchup.request_status(room, recording_id)
             else:
                 joined_at_ms = request.data.get("joined_at_ms")
+                try:
+                    joined_at_ms = int(joined_at_ms) if joined_at_ms else None
+                except (TypeError, ValueError):
+                    return drf_response.Response(
+                        {"error": "invalid joined_at_ms"},
+                        status=drf_status.HTTP_400_BAD_REQUEST,
+                    )
                 result = linto_catchup.request_brief(
-                    room,
-                    identity,
-                    client_joined_at_ms=int(joined_at_ms) if joined_at_ms else None,
+                    room, identity, client_joined_at_ms=joined_at_ms
                 )
         except (
             ParticipantNotFoundException,
@@ -1235,11 +1240,6 @@ class RoomViewSet(  # pylint: disable=too-many-public-methods
         ):
             return drf_response.Response(
                 {"error": "not in the room"}, status=drf_status.HTTP_403_FORBIDDEN
-            )
-        except (TypeError, ValueError):
-            return drf_response.Response(
-                {"error": "invalid joined_at_ms"},
-                status=drf_status.HTTP_400_BAD_REQUEST,
             )
         except linto_catchup.CatchupError as exc:
             logger.warning("LinTO audio catch-up failed for room %s: %s", room.id, exc)

@@ -10,6 +10,7 @@ and this project adheres to
 
 ### Added
 
+- 🚸(backend) the late joiners' brief carries why it failed or was not updated
 - ✨(backend) a recording without speech goes to Drive, with a no-speech email
 - ✨(frontend) a live run stopped without speech says nothing will be sent
 - ✨(frontend) "before you arrived" gets its own side panel, offered again in Tools
