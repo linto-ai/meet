@@ -8,10 +8,13 @@ import { SupportMenuItem } from './SupportMenuItem'
 import { DocumentationMenuItem } from './DocumentationMenuItem'
 import { TranscriptMenuItem } from './TranscriptMenuItem'
 import { ScreenRecordingMenuItem } from './ScreenRecordingMenuItem'
+import { isIntentPage } from '@/features/intent/isIntentPage'
 import { PictureInPictureMenuItem } from '@/features/rooms/livekit/components/controls/Options/PictureInPictureMenuItem'
 
 // @todo try refactoring it to use MenuList component
 export const OptionsMenuItems = () => {
+  // PiP, transcript and recording are Meet features not planned in the /intents frame
+  const isIntent = isIntentPage()
   return (
     <RACMenu
       style={{
@@ -20,9 +23,9 @@ export const OptionsMenuItems = () => {
       }}
     >
       <MenuSection>
-        <PictureInPictureMenuItem />
-        <TranscriptMenuItem />
-        <ScreenRecordingMenuItem />
+        {!isIntent && <PictureInPictureMenuItem />}
+        {!isIntent && <TranscriptMenuItem />}
+        {!isIntent && <ScreenRecordingMenuItem />}
         <FullScreenMenuItem />
         <EffectsMenuItem />
       </MenuSection>

@@ -2,6 +2,13 @@
   "backToHome": "Back to homescreen",
   "cancel": "Cancel",
   "closeDialog": "Close dialog",
+  "intent": {
+    "error": {
+      "unauthenticated": "You are not signed in to Meet.",
+      "unreachable": "Meet could not be reached.",
+      "unsupported": "This page was not opened by a compatible application."
+    }
+  },
   "error": {
     "heading": "An error occurred while loading the page"
   },

@@ -4,6 +4,7 @@ import { useSyncUserPreferencesWithBackend } from '@/features/auth/api/useSyncUs
 import { useEffect } from 'react'
 import { CozyBridge } from 'cozy-external-bridge'
 import { getEnv } from '@/utils/getEnv'
+import { isIntentPage } from '@/features/intent/isIntentPage'
 
 const isOriginAllowed = (parentOrigin: string): boolean => {
   const allowlist = getEnv('VITE_BRIDGE_TARGET_ORIGIN_ALLOWLIST')
@@ -17,13 +18,16 @@ const isOriginAllowed = (parentOrigin: string): boolean => {
 
 export const AppInitialization = () => {
   const { data } = useConfig()
+  // No analytics or cozy bridge on /intents (a service framed by the host)
+  const isIntent = isIntentPage()
   useSyncUserPreferencesWithBackend()
 
   const { analytics = {}, custom_css_url = '' } = data ?? {}
 
-  useAnalytics(analytics)
+  useAnalytics(isIntent ? { isDisabled: true } : analytics)
 
   useEffect(() => {
+    if (isIntent) return
     const setupBridge = async () => {
       const bridge = new CozyBridge()
       if (!bridge.isInIframe()) return
@@ -36,7 +40,7 @@ export const AppInitialization = () => {
       window.twake = { twakeOrigin: `${parentOrigin}/#/bridge` }
     }
     setupBridge()
-  }, [])
+  }, [isIntent])
 
   useEffect(() => {
     if (custom_css_url) {

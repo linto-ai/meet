@@ -20,6 +20,8 @@ and this project adheres to
 - ✨(backend) late joiners' brief from the recording's audio, through Studio's standard API
 - ✨(frontend) live captions on top of a recording, outliving it if needed
 - ✨(backend) a live run started while recording only shows captions, keeps nothing
+- ✨(frontend) add /intents, Meet as the service of a cozy intent (cozy-interapp)
+- ✨(backend) POST stack-token/ exchanges the session id token for a Twake stack access token
 - ✨(backend) rooms/{id}/linto/catchup relays the late joiner's summary from Studio
 - ✨(frontend) add jittered exponential backoff to LiveKit reconnections
 - ✨(frontend) tell participants when a recording is interrupted

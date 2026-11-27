@@ -20,6 +20,7 @@ import { Screen } from '@/layout/Screen'
 import { QueryAware } from '@/components/QueryAware'
 import { ErrorScreen } from '@/components/ErrorScreen'
 import { joinRoom } from '../api/joinRoom'
+import { type ApiRoom, ApiAccessLevel } from '../api/ApiRoom'
 import { useCreateRoom } from '../api/createRoom'
 import { InviteDialog } from './InviteDialog'
 import { VideoConference } from '../livekit/prefabs/VideoConference'
@@ -54,15 +55,21 @@ const connectOptions = {
   peerConnectionTimeout: 60000, // Default: 15s. Extended for slow TURN/TLS negotiation
 }
 
-const handleError = (e: Error) => {
+const isMediaDeviceError = (e: Error) => {
   const failure = getMediaDeviceFailure(e)
-  if (failure && failure !== MediaDeviceFailure.Other) return
+  return !!failure && failure !== MediaDeviceFailure.Other
+}
 
-  // connect() was aborted by a disconnect() before the join completed
-  if (
-    e instanceof ConnectionError &&
-    e.reason === ConnectionErrorReason.Cancelled
-  ) {
+// connect() was aborted by a disconnect() before the join completed
+const isCancelled = (e: Error) =>
+  e instanceof ConnectionError && e.reason === ConnectionErrorReason.Cancelled
+
+const isBenignError = (e: Error) => isMediaDeviceError(e) || isCancelled(e)
+
+const handleError = (e: Error) => {
+  if (isMediaDeviceError(e)) return
+
+  if (isCancelled(e)) {
     void captureEvent('connection-cancelled')
     return
   }
@@ -128,14 +135,38 @@ const getConnectionEndReason = (
   }
 }
 
+/**
+ * Set by /intents: the call is joined with the LiveKit token and the
+ * media choices of the Chat page that frames Meet, and reports to it.
+ */
+export type IntentOptions = {
+  token: string
+  audio: boolean
+  video: boolean
+  isLeaving: boolean
+  onConnected: () => void
+  onDisconnected: (reason?: DisconnectReason) => void
+  onError: (error: Error) => void
+}
+
+const intentRoomData = (roomId: string, token: string): ApiRoom => ({
+  id: roomId,
+  name: roomId,
+  slug: roomId,
+  access_level: ApiAccessLevel.RESTRICTED,
+  livekit: { url: '', room: roomId, token },
+})
+
 export const Conference = ({
   roomId,
   mode = 'join',
   onLobbyRequired,
+  intent,
 }: {
   roomId: string
   mode?: 'join' | 'create'
   onLobbyRequired: () => void
+  intent?: IntentOptions
 }) => {
   const { t } = useTranslation('rooms')
   const { data: apiConfig } = useConfig()
@@ -166,7 +197,13 @@ export const Conference = ({
         return joinRoom({ roomId, username })
       }),
     retry: false,
+    // An intent call: the host already holds the token, the API is not asked
+    enabled: !intent,
+    initialData: intent && intentRoomData(roomId, intent.token),
   })
+
+  const audioEnabled = intent?.audio ?? userConfig.audioEnabled
+  const videoEnabled = intent?.video ?? userConfig.videoEnabled
 
   const isLobbyRequired =
     !!createRoomData && !createRoomData.livekit && !hasJoined
@@ -211,6 +248,12 @@ export const Conference = ({
     () => createLiveKitRoom(roomOptions, apiConfig?.livekit.reconnect),
     [roomOptions, apiConfig?.livekit.reconnect]
   )
+  // The room is recreated when /config/ arrives; the one thrown away may still
+  // report its disconnection, which the intent page must not take for the call's
+  const currentRoom = useRef(room)
+  useEffect(() => {
+    currentRoom.current = room
+  }, [room])
 
   /*
    * Ensure stable WebSocket connection URL. This is critical for legacy browser compatibility
@@ -232,7 +275,7 @@ export const Conference = ({
     if (
       userPreferencesSnap.is_auto_mute_large_room_enabled &&
       !hasAutoMutedRef.current &&
-      userConfig.audioEnabled &&
+      audioEnabled &&
       room.numParticipants > apiConfig.auto_mute_on_join_threshold
     ) {
       hasAutoMutedRef.current = true
@@ -242,12 +285,33 @@ export const Conference = ({
   }, [
     apiConfig,
     room,
-    userConfig.audioEnabled,
+    audioEnabled,
     userPreferencesSnap.is_auto_mute_large_room_enabled,
   ])
 
+  // LiveKitRoom lists its callbacks in the deps of its effects: a new function
+  // on each render would reconnect the room. The callbacks passed to it are
+  // stable and read the latest intent options and handleConnected through refs.
+  const intentRef = useRef(intent)
+  const handleConnectedRef = useRef(handleConnected)
+  useEffect(() => {
+    intentRef.current = intent
+    handleConnectedRef.current = handleConnected
+  }, [intent, handleConnected])
+
+  // Synchronous: the intent page reports as soon as LiveKit is connected
+  const onConnected = useCallback(() => {
+    intentRef.current?.onConnected()
+    void handleConnectedRef.current()
+  }, [])
+
   const handleDisconnected = useCallback(
     (reason?: DisconnectReason) => {
+      const currentIntent = intentRef.current
+      if (currentIntent) {
+        if (room === currentRoom.current) currentIntent.onDisconnected(reason)
+        return
+      }
       navigateTo(
         'feedback',
         {},
@@ -259,12 +323,21 @@ export const Conference = ({
         }
       )
     },
-    [roomId]
+    [roomId, room]
   )
 
+  const handleLiveKitError = useCallback((e: Error) => {
+    handleError(e)
+    if (!isBenignError(e)) intentRef.current?.onError(e)
+  }, [])
+
   useEffect(() => {
-    void captureMediaEvent('visit-room', { slug: roomId })
-  }, [roomId])
+    if (!intent) void captureMediaEvent('visit-room', { slug: roomId })
+  }, [roomId, intent])
+
+  useEffect(() => {
+    if (intent?.isLeaving) void room.disconnect()
+  }, [intent?.isLeaving, room])
 
   useEffect(() => {
     if (createRoomData?.livekit) setHasJoined(true)
@@ -307,10 +380,10 @@ export const Conference = ({
           room={room}
           serverUrl={serverUrl}
           token={createRoomData?.livekit?.token}
-          connect={isConnectionWarmedUp}
-          audio={userConfig.audioEnabled}
+          connect={isConnectionWarmedUp && !intent?.isLeaving}
+          audio={audioEnabled}
           video={
-            userConfig.videoEnabled && {
+            videoEnabled && {
               processor: BackgroundProcessorFactory.fromProcessorConfig(
                 userConfig.processorConfig
               ),
@@ -320,14 +393,14 @@ export const Conference = ({
           className={css({
             backgroundColor: 'primaryDark.50 !important',
           })}
-          onError={handleError}
-          onConnected={handleConnected}
+          onError={handleLiveKitError}
+          onConnected={onConnected}
           onDisconnected={handleDisconnected}
         >
           <WatchMediaDeviceErrors />
           <VideoConference />
-          {!isMobile && <InviteDialog mode={mode} />}
-          <PictureInPictureConference />
+          {!isMobile && !intent && <InviteDialog mode={mode} />}
+          {!intent && <PictureInPictureConference />}
           <MeetDevtools />
         </LiveKitRoom>
       </Screen>

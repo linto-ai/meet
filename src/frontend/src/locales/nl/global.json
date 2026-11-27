@@ -2,6 +2,13 @@
   "backToHome": "Terug naar het hoofdscherm",
   "cancel": "Annuleren",
   "closeDialog": "Sluit het dialoogvenster",
+  "intent": {
+    "error": {
+      "unauthenticated": "You are not signed in to Meet.",
+      "unreachable": "Meet could not be reached.",
+      "unsupported": "This page was not opened by a compatible application."
+    }
+  },
   "error": {
     "heading": "Er is een fout opgetreden bij het laden van de pagina"
   },
