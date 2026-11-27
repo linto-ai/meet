@@ -88,18 +88,99 @@ describe('catchUpView', () => {
     })
   })
 
-  it('says when the brief could not be prepared, unless one is left', () => {
-    const failed = (brief: AudioCatchUpState['brief']) =>
+  it('says why the brief failed, or keeps the one left as not updated', () => {
+    const failed = (brief: AudioCatchUpState['brief'], error?: string) =>
       catchUpView({
         liveServes: false,
         live: live({}),
         joinedAt: null,
-        audio: audio({ status: 'failed', brief }),
+        audio: audio({ status: 'failed', brief, error }),
       })
-    expect(failed(null)?.phase).toBe('failed')
-    expect(failed({ text: 'Old', coveredUntil: 1 })).toMatchObject({
+    expect(failed(null, 'summary_service')).toMatchObject({
+      phase: 'failed',
+      failure: 'service',
+      canRetry: true,
+    })
+    expect(failed(null, 'linto_error')).toMatchObject({ failure: 'service' })
+    expect(failed(null)).toMatchObject({ failure: 'generic', canRetry: true })
+    expect(failed({ text: 'Old', coveredUntil: 1 }, 'timeout')).toMatchObject({
       phase: 'text',
       text: 'Old',
+      stale: true,
+      failure: 'timeout',
+      canRetry: true,
+    })
+  })
+
+  it.each([
+    ['transcription', 'transcription'],
+    ['transcription_gap', 'gap'],
+    ['stopped', 'stopped'],
+  ])('offers no retry when %s failed', (error, failure) => {
+    expect(
+      catchUpView({
+        liveServes: false,
+        live: live({}),
+        joinedAt: null,
+        audio: audio({ status: 'failed', error }),
+      })
+    ).toMatchObject({ failure, canRetry: false })
+  })
+
+  it('flags a ready brief the server could not update', () => {
+    const view = catchUpView({
+      liveServes: false,
+      live: live({}),
+      joinedAt: null,
+      audio: audio({
+        status: 'ready',
+        brief: { text: 'Old', coveredUntil: 1 },
+        stale: true,
+        error: 'transcription_gap',
+      }),
+    })
+    expect(view).toMatchObject({
+      phase: 'text',
+      stale: true,
+      failure: 'gap',
+      canRetry: false,
+    })
+  })
+
+  it('says the connection is lost while the polls keep trying', () => {
+    expect(
+      catchUpView({
+        liveServes: false,
+        live: live({}),
+        joinedAt: null,
+        audio: audio({ status: 'transcribing', reconnecting: true }),
+      })
+    ).toMatchObject({ phase: 'preparing', reconnecting: true })
+  })
+
+  it('says why the live summary failed, keeping what streamed', () => {
+    const view = (state: Partial<LintoCatchUpState>) =>
+      catchUpView({
+        liveServes: true,
+        live: live({ status: 'error', ...state }),
+        joinedAt: JOINED,
+        audio: audio({}),
+      })
+    expect(view({ error: 'catchup_unavailable' })).toMatchObject({
+      phase: 'failed',
+      failure: 'service',
+      canRetry: true,
+    })
+    expect(view({ error: 'catchup_error' })).toMatchObject({
+      phase: 'failed',
+      failure: 'generic',
+    })
+    expect(view({ text: 'Le début ' })).toMatchObject({
+      phase: 'text',
+      text: 'Le début',
+      stale: true,
+      failure: 'interrupted',
+      canRetry: true,
     })
   })
 
@@ -135,7 +216,6 @@ describe('catchUpView', () => {
 
   it.each([
     ['idle', live({}), audio({})],
-    ['live failure', live({ status: 'error' }), audio({})],
     ['live unavailable', live({ status: 'unavailable' }), audio({})],
     ['empty live result', live({ status: 'done', text: '  ' }), audio({})],
     ['closed', live({ status: 'done', text: 'x', dismissed: true }), audio({})],

@@ -36,8 +36,14 @@ export type AudioCatchUpState = {
   // The step runs past its estimate.
   overdue: boolean
   brief: AudioCatchUpBrief | null
+  // The brief shown could not be updated (`error` says why).
+  stale: boolean
+  // Polls fail for now: the next ones keep trying.
+  reconnecting: boolean
   // The reader closed the block: gone for this arrival.
   dismissed: boolean
+  // Why the brief failed or was not updated, as the backend names it
+  // (`summary_service`, `transcription`, `timeout`…), or `connection`/`stopped`.
   error?: string
   // Bumped on every server answer: drives the next poll.
   updatedAt: number
@@ -50,6 +56,8 @@ export const IDLE_AUDIO_CATCH_UP: AudioCatchUpState = {
   etaS: null,
   overdue: false,
   brief: null,
+  stale: false,
+  reconnecting: false,
   dismissed: false,
   error: undefined,
   updatedAt: 0,

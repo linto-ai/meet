@@ -44,13 +44,29 @@
       "loading": "Résumé en préparation…",
       "unavailable": "Le service de rattrapage n'est pas disponible.",
       "joined": "Vous avez rejoint la réunion à {{time}}",
-      "empty": "Aucun résumé pour le moment.",
+      "empty": "Aucun résumé disponible.",
       "source": {
         "live": "Résumé de ce qui s'est dit avant votre arrivée, d'après la transcription en direct.",
         "audio": "Résumé de ce qui s'est dit avant votre arrivée, d'après l'enregistrement de la réunion."
       },
       "disclaimer": "Résumé généré automatiquement, il peut contenir des erreurs.",
-      "openLive": "Voir la transcription en direct"
+      "openLive": "Voir la transcription en direct",
+      "retry": "Réessayer",
+      "reconnecting": "connexion perdue, nouvelle tentative…",
+      "failure": {
+        "service": "Le service de résumé est momentanément indisponible.",
+        "transcription": "La transcription de ce que vous avez manqué n'a pas abouti.",
+        "timeout": "La préparation du résumé a pris trop de temps.",
+        "connection": "La connexion au serveur a été perdue.",
+        "stopped": "L'enregistrement a été arrêté avant que le résumé soit prêt.",
+        "generic": "Le résumé n'a pas pu être préparé."
+      },
+      "stale": {
+        "generic": "Le résumé n'a pas pu être mis à jour : il couvre la réunion jusqu'à {{time}}.",
+        "gap": "Les dernières minutes n'ont pas pu être transcrites : le résumé couvre la réunion jusqu'à {{time}}.",
+        "stopped": "L'enregistrement a été arrêté avant la mise à jour : le résumé couvre la réunion jusqu'à {{time}}.",
+        "interrupted": "Le résumé a été interrompu avant la fin."
+      }
     },
     "audioCatchup": {
       "step": {
@@ -64,8 +80,8 @@
       "etaMinutes_other": "environ {{count}} minutes",
       "etaRange": "environ {{min}} à {{max}} minutes",
       "overdue": "plus long que prévu",
+      "overdueHint": "Le résumé s'affichera ici dès qu'il sera prêt.",
       "updating": "Mise à jour avec la suite de la réunion…",
-      "failed": "Le résumé n'a pas pu être préparé.",
       "coveredUntil": "Couvre la réunion jusqu'à {{time}}",
       "tooShort": "Trop peu de paroles avant votre arrivée pour en faire un résumé."
     }

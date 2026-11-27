@@ -9,6 +9,17 @@ import {
  *  of its own, or the audio of a transcribed recording. */
 export type CatchUpSource = 'live' | 'audio'
 
+/** Why the brief failed, or why the brief shown was not updated. */
+export type CatchUpFailure =
+  | 'service'
+  | 'transcription'
+  | 'gap'
+  | 'timeout'
+  | 'connection'
+  | 'stopped'
+  | 'interrupted'
+  | 'generic'
+
 /** What the brief's panel shows, whatever the source. */
 export type CatchUpView = {
   source: CatchUpSource
@@ -21,6 +32,13 @@ export type CatchUpView = {
   progress: number | null
   etaS: readonly [number, number] | null
   overdue: boolean
+  // Polls fail for now: the next ones keep trying.
+  reconnecting: boolean
+  // A failed brief, or a brief shown that could not be updated (`stale`).
+  failure: CatchUpFailure | null
+  stale: boolean
+  // Asking again may help.
+  canRetry: boolean
   text: string
   // Audio: the end of the meeting the brief covers. Live: my arrival.
   coveredUntil: number | null
@@ -39,7 +57,16 @@ export const isLateArrival = (
 
 // The audio state as a valtio snapshot hands it (deeply read-only).
 type AudioInput = Readonly<
-  Pick<AudioCatchUpState, 'status' | 'progress' | 'overdue' | 'dismissed'>
+  Pick<
+    AudioCatchUpState,
+    | 'status'
+    | 'progress'
+    | 'overdue'
+    | 'dismissed'
+    | 'stale'
+    | 'reconnecting'
+    | 'error'
+  >
 > & {
   readonly etaS: readonly [number, number] | null
   readonly brief: Readonly<AudioCatchUpBrief> | null
@@ -50,10 +77,39 @@ const base = {
   progress: null,
   etaS: null,
   overdue: false,
+  reconnecting: false,
+  failure: null,
+  stale: false,
+  canRetry: false,
   text: '',
   coveredUntil: null,
   joinedAt: null,
 } as const
+
+// The backend's reasons (and the browser's own) as the panel words them.
+const AUDIO_FAILURES: Record<string, CatchUpFailure> = {
+  summary_service: 'service',
+  // Studio out of reach (often its LLM Gateway down): the same to the reader.
+  linto_error: 'service',
+  transcription: 'transcription',
+  transcription_gap: 'gap',
+  timeout: 'timeout',
+  connection: 'connection',
+  stopped: 'stopped',
+}
+
+// Asking again cannot bring back minutes Studio could not transcribe, nor a
+// stopped recording.
+const NOT_RETRIED: readonly CatchUpFailure[] = [
+  'transcription',
+  'gap',
+  'stopped',
+]
+
+const failed = (failure: CatchUpFailure) => ({
+  failure,
+  canRetry: !NOT_RETRIED.includes(failure),
+})
 
 /**
  * The view of the brief: from the live run when it serves the late joiners
@@ -91,6 +147,23 @@ export const catchUpView = ({
         return text ? { ...view, phase: 'text', text } : null
       case 'too_short':
         return { ...view, phase: 'too_short' }
+      case 'error':
+        // What streamed stays readable; the panel says it stopped short.
+        return text
+          ? {
+              ...view,
+              phase: 'text',
+              text,
+              stale: true,
+              ...failed('interrupted'),
+            }
+          : {
+              ...view,
+              phase: 'failed',
+              ...failed(
+                live.error === 'catchup_unavailable' ? 'service' : 'generic'
+              ),
+            }
       default:
         return null
     }
@@ -113,10 +186,17 @@ export const catchUpView = ({
       progress: audio.progress,
       etaS: audio.etaS,
       overdue: audio.overdue,
+      reconnecting: audio.reconnecting,
     }
   }
-  if (audio.status === 'ready' && brief) return { ...view, ...brief }
-  if (audio.status === 'failed') return { ...view, phase: 'failed', ...brief }
+  const failure = failed(AUDIO_FAILURES[audio.error ?? ''] ?? 'generic')
+  if (brief && (audio.status === 'ready' || audio.status === 'failed')) {
+    const stale = audio.status === 'failed' || audio.stale
+    return stale
+      ? { ...view, ...brief, stale, ...failure }
+      : { ...view, ...brief }
+  }
+  if (audio.status === 'failed') return { ...view, phase: 'failed', ...failure }
   if (audio.status === 'too_short') return { ...view, phase: 'too_short' }
   return null
 }

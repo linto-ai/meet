@@ -21,12 +21,15 @@ describe('catchUpFailureStatus', () => {
     )
   })
 
-  it('says the service is unavailable without an LLM service, or on a refusal', () => {
-    expect(catchUpFailureStatus(relayError(503, 'catchup_unavailable'))).toBe(
-      'unavailable'
-    )
+  it('hides the block when the room token is refused', () => {
     expect(catchUpFailureStatus(relayError(403, 'catchup_forbidden'))).toBe(
       'unavailable'
+    )
+  })
+
+  it('is an error the panel shows when Studio or its LLM fails', () => {
+    expect(catchUpFailureStatus(relayError(503, 'catchup_unavailable'))).toBe(
+      'error'
     )
   })
 
@@ -36,9 +39,9 @@ describe('catchUpFailureStatus', () => {
     )
   })
 
-  it('treats a rate limit as an error, not as an unavailable service', () => {
+  it('hides a rate limit: nothing is wrong with the service', () => {
     expect(catchUpFailureStatus(relayError(429, 'catchup_rate_limited'))).toBe(
-      'error'
+      'idle'
     )
   })
 

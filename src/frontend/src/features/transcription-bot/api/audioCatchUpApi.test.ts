@@ -103,6 +103,36 @@ describe('applyAudioCatchUp', () => {
     expect(next.overdue).toBe(false)
   })
 
+  it('flags a brief the server could not update, with the reason', () => {
+    const next = applyAudioCatchUp(IDLE_AUDIO_CATCH_UP, {
+      state: 'ready',
+      stale: true,
+      reason: 'summary_service',
+      brief: { text: 'Old', covered_until: '2026-11-15T10:00:00Z' },
+    })
+    expect(next.stale).toBe(true)
+    expect(next.error).toBe('summary_service')
+  })
+
+  it('reads a recording ended while its brief was prepared as stopped', () => {
+    const running = applyAudioCatchUp(IDLE_AUDIO_CATCH_UP, {
+      state: 'transcribing',
+      recording_id: 'rec',
+    })
+    expect(applyAudioCatchUp(running, { state: 'none' })).toMatchObject({
+      status: 'failed',
+      stale: false,
+      error: 'stopped',
+    })
+    const withBrief = { ...running, brief: { text: 'Old', coveredUntil: 1 } }
+    expect(applyAudioCatchUp(withBrief, { state: 'none' })).toMatchObject({
+      status: 'ready',
+      stale: true,
+      error: 'stopped',
+      brief: { text: 'Old' },
+    })
+  })
+
   it('says when a step runs past its estimate', () => {
     const next = applyAudioCatchUp(IDLE_AUDIO_CATCH_UP, {
       state: 'transcribing',

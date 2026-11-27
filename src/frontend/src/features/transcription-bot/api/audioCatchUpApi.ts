@@ -1,6 +1,7 @@
 import { fetchApi } from '@/api/fetchApi'
 import { getLiveKitAuthHeaders } from '@/features/rooms/utils/getLiveKitAuthHeaders'
 import {
+  AUDIO_CATCH_UP_RUNNING,
   AudioCatchUpBrief,
   AudioCatchUpState,
   AudioCatchUpStatus,
@@ -26,6 +27,8 @@ export type ApiAudioCatchUp = {
   progress?: number
   eta_s?: [number, number] | null
   overdue?: boolean
+  // The brief could not be updated: `reason` says why.
+  stale?: boolean
   joined_at?: string
   up_to?: string
   brief?: {
@@ -80,6 +83,22 @@ export const applyAudioCatchUp = (
   current: AudioCatchUpState,
   body: ApiAudioCatchUp
 ): AudioCatchUpState => {
+  if (
+    body.state === 'none' &&
+    AUDIO_CATCH_UP_RUNNING.includes(current.status)
+  ) {
+    // The recording ended while its brief was being prepared.
+    return {
+      ...current,
+      status: current.brief ? 'ready' : 'failed',
+      stale: !!current.brief,
+      reconnecting: false,
+      etaS: null,
+      overdue: false,
+      error: 'stopped',
+      updatedAt: Date.now(),
+    }
+  }
   const status = toStatus(body.state)
   return {
     ...current,
@@ -94,6 +113,8 @@ export const applyAudioCatchUp = (
     etaS: Array.isArray(body.eta_s) ? body.eta_s : null,
     overdue: !!body.overdue,
     brief: toBrief(body.brief, current.brief),
+    stale: !!body.stale,
+    reconnecting: false,
     error: body.reason || undefined,
     updatedAt: Date.now(),
   }

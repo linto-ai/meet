@@ -44,13 +44,29 @@
       "loading": "Preparing the summary…",
       "unavailable": "The catch-up service is not available.",
       "joined": "You joined the meeting at {{time}}",
-      "empty": "No summary yet.",
+      "empty": "No summary available.",
       "source": {
         "live": "Summary of what was said before you arrived, from the live transcription.",
         "audio": "Summary of what was said before you arrived, from the meeting recording."
       },
       "disclaimer": "Automatically generated summary, it may contain errors.",
-      "openLive": "See the live transcription"
+      "openLive": "See the live transcription",
+      "retry": "Try again",
+      "reconnecting": "connection lost, retrying…",
+      "failure": {
+        "service": "The summary service is temporarily unavailable.",
+        "transcription": "What you missed could not be transcribed.",
+        "timeout": "Preparing the summary took too long.",
+        "connection": "The connection to the server was lost.",
+        "stopped": "The recording was stopped before the summary was ready.",
+        "generic": "The summary could not be prepared."
+      },
+      "stale": {
+        "generic": "The summary could not be updated: it covers the meeting until {{time}}.",
+        "gap": "The last minutes could not be transcribed: the summary covers the meeting until {{time}}.",
+        "stopped": "The recording was stopped before the update: the summary covers the meeting until {{time}}.",
+        "interrupted": "The summary stopped before its end."
+      }
     },
     "audioCatchup": {
       "step": {
@@ -64,8 +80,8 @@
       "etaMinutes_other": "about {{count}} minutes",
       "etaRange": "about {{min}} to {{max}} minutes",
       "overdue": "taking longer than expected",
+      "overdueHint": "The summary will show here as soon as it is ready.",
       "updating": "Updating with the rest of the meeting…",
-      "failed": "The summary could not be prepared.",
       "coveredUntil": "Covers the meeting until {{time}}",
       "tooShort": "Too little was said before you arrived to summarize."
     }

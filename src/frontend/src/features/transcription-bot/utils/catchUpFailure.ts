@@ -7,18 +7,14 @@ type CatchUpError = {
   reason?: string
 }
 
-// A 429 hides the block (a reload within 20 s): nothing is wrong with the
-// service, so it is not reported as unavailable.
+// A missing relay route or a refused token hides the block ('unavailable'), so
+// does a 429 (a reload within 20 s, nothing is wrong): 'idle'. Studio or its
+// LLM failing (503) is an error the panel shows, with a retry.
 export const catchUpFailureStatus = (err: unknown): LintoCatchUpStatus => {
   const { code, status } = (err ?? {}) as CatchUpError
   if (code === 'catchup_too_short') return 'too_short'
-  if (
-    status === 404 ||
-    code === 'catchup_unavailable' ||
-    code === 'catchup_forbidden'
-  ) {
-    return 'unavailable'
-  }
+  if (code === 'catchup_rate_limited' || status === 429) return 'idle'
+  if (status === 404 || code === 'catchup_forbidden') return 'unavailable'
   return 'error'
 }
 

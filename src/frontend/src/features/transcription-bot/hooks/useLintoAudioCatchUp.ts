@@ -6,6 +6,7 @@ import { useRoomData } from '@/features/rooms/livekit/hooks/useRoomData'
 import { useSidePanel } from '@/features/rooms/livekit/hooks/useSidePanel'
 import { useRoomMetadata } from '@/features/recording/hooks/useRoomMetadata'
 import { notifyLintoCatchUpReady } from '@/features/notifications'
+import { ApiError } from '@/api/ApiError'
 import {
   ApiAudioCatchUp,
   applyAudioCatchUp,
@@ -32,8 +33,25 @@ import { useLiveServesCatchUp } from './useLiveServesCatchUp'
  */
 
 const POLL_INTERVAL_MS = 3000
-const MAX_POLL_ERRORS = 5
+const MAX_POLL_INTERVAL_MS = 30000
+// Failed polls in a row before the panel says the connection is lost, then
+// before it gives up (about four minutes of retries).
+const RECONNECTING_AFTER = 2
+const MAX_POLL_ERRORS = 10
+// The arrival's request, again, when the backend could not be reached.
+const ARRIVAL_RETRY_DELAYS_MS = [2000, 5000, 10000]
 const RECORDING_RUNNING = ['starting', 'started']
+
+const pollDelay = (errors: number) =>
+  Math.min(POLL_INTERVAL_MS * 2 ** errors, MAX_POLL_INTERVAL_MS)
+
+const wait = (ms: number) =>
+  new Promise<void>((resolve) => window.setTimeout(resolve, ms))
+
+// No answer, or a server error: worth asking again. A 4xx (not in the room)
+// is not.
+const isRetryable = (err: unknown) =>
+  !(err instanceof ApiError) || err.statusCode >= 500
 
 /** sessionStorage key of this tab's first join time in a room. */
 export const audioCatchUpJoinedAtKey = (roomId: string) =>
@@ -61,6 +79,8 @@ const readFirstJoin = (roomId: string, fallback: number): number => {
 const controller = {
   generation: 0,
   pollErrors: 0,
+  roomId: '',
+  token: '',
   isPanelOpen: () => false,
   // No side panel at all is open and the screen is not a phone's: the brief
   // may open the panel by itself.
@@ -77,6 +97,8 @@ const apply = (body: ApiAudioCatchUp, generation: number) => {
     next.status === 'ready' &&
     previous.status !== 'ready' &&
     !!next.brief &&
+    !next.stale &&
+    next.brief.text !== previous.brief?.text &&
     !controller.isPanelOpen()
   ) {
     notifyLintoCatchUpReady(() => controller.openPanel())
@@ -84,19 +106,78 @@ const apply = (body: ApiAudioCatchUp, generation: number) => {
 }
 
 /** Ask for the brief of what was said before my arrival, once per arrival.
- *  A late joiner gets the brief's panel opened by itself. */
+ *  A late joiner gets the brief's panel opened by itself. A retry keeps the
+ *  brief shown while it asks. */
 export const requestAudioCatchUpBrief = async (
   roomId: string,
-  token: string
+  token: string,
+  { retry = false } = {}
 ) => {
   if (!roomId || !token) return
   const generation = ++controller.generation
   controller.pollErrors = 0
-  audioCatchUpStore.catchUp = { ...IDLE_AUDIO_CATCH_UP }
-  try {
-    const body = await requestAudioCatchUp(roomId, token, {
-      joinedAtMs: readFirstJoin(roomId, Date.now()),
-    })
+  const previous = audioCatchUpStore.catchUp
+  audioCatchUpStore.catchUp = retry
+    ? {
+        ...IDLE_AUDIO_CATCH_UP,
+        status: 'sending',
+        recordingId: previous.recordingId,
+        brief: previous.brief,
+        updatedAt: Date.now(),
+      }
+    : { ...IDLE_AUDIO_CATCH_UP }
+  for (let attempt = 0; ; attempt += 1) {
+    const retryDelay = ARRIVAL_RETRY_DELAYS_MS[attempt]
+    let body: ApiAudioCatchUp
+    try {
+      body = await requestAudioCatchUp(roomId, token, {
+        joinedAtMs: readFirstJoin(roomId, Date.now()),
+      })
+    } catch (err) {
+      if (generation !== controller.generation) return
+      if (isRetryable(err) && retryDelay !== undefined) {
+        await wait(retryDelay)
+        if (generation !== controller.generation) return
+        continue
+      }
+      // Not in the room, or the backend stayed out of reach.
+      console.warn('LinTO audio catch-up request failed', err)
+      audioCatchUpStore.catchUp = retry
+        ? {
+            ...audioCatchUpStore.catchUp,
+            status: 'failed',
+            stale: !!audioCatchUpStore.catchUp.brief,
+            error: 'connection',
+            updatedAt: Date.now(),
+          }
+        : {
+            ...audioCatchUpStore.catchUp,
+            status: 'unavailable',
+            updatedAt: Date.now(),
+          }
+      return
+    }
+    if (
+      body.state === 'unavailable' &&
+      body.reason === 'linto_error' &&
+      retryDelay !== undefined
+    ) {
+      await wait(retryDelay)
+      if (generation !== controller.generation) return
+      continue
+    }
+    if (retry && body.state === 'unavailable') {
+      // Still out of service: the failure stays, with its reason.
+      const current = audioCatchUpStore.catchUp
+      audioCatchUpStore.catchUp = {
+        ...current,
+        status: 'failed',
+        stale: !!current.brief,
+        error: body.reason || current.error,
+        updatedAt: Date.now(),
+      }
+      return
+    }
     apply(body, generation)
     const { status } = audioCatchUpStore.catchUp
     if (status === 'unavailable') {
@@ -105,21 +186,23 @@ export const requestAudioCatchUpBrief = async (
       )
     }
     if (
+      !retry &&
       generation === controller.generation &&
       (AUDIO_CATCH_UP_RUNNING.includes(status) || status === 'ready') &&
       controller.mayOpenPanel()
     ) {
       controller.openPanel()
     }
-  } catch {
-    if (generation !== controller.generation) return
-    // Not in the room, backend down…: nothing to show.
-    audioCatchUpStore.catchUp = {
-      ...audioCatchUpStore.catchUp,
-      status: 'unavailable',
-      updatedAt: Date.now(),
-    }
+    return
   }
+}
+
+/** "Retry" in the brief's panel: ask again, the server resumes or restarts. */
+export const retryAudioCatchUp = () => {
+  if (!controller.roomId || !controller.token) return
+  void requestAudioCatchUpBrief(controller.roomId, controller.token, {
+    retry: true,
+  })
 }
 
 export const useLintoAudioCatchUp = () => {
@@ -143,6 +226,8 @@ export const useLintoAudioCatchUp = () => {
   const token = apiRoomData?.livekit?.token || ''
   const tokenRef = useRef(token)
   tokenRef.current = token
+  controller.roomId = roomId
+  controller.token = token
 
   const recordingMode = metadata?.recording_mode as string | undefined
   const recordingRunning =
@@ -174,7 +259,8 @@ export const useLintoAudioCatchUp = () => {
     void requestAudioCatchUpBrief(roomId, token)
   }, [recordingRunning, recordingMode, liveServes, roomId, token])
 
-  // Poll a running request every few seconds until it ends.
+  // Poll a running request every few seconds until it ends; failed polls
+  // space out, the panel says so, and give up after a few minutes.
   const { status, recordingId, updatedAt } = catchUp
   useEffect(() => {
     if (!AUDIO_CATCH_UP_RUNNING.includes(status)) return
@@ -192,14 +278,24 @@ export const useLintoAudioCatchUp = () => {
       } catch {
         if (generation !== controller.generation) return
         controller.pollErrors += 1
-        const failed = controller.pollErrors >= MAX_POLL_ERRORS
-        audioCatchUpStore.catchUp = {
-          ...audioCatchUpStore.catchUp,
-          ...(failed ? { status: 'failed', error: 'poll_failed' } : {}),
-          updatedAt: Date.now(),
-        }
+        const current = audioCatchUpStore.catchUp
+        audioCatchUpStore.catchUp =
+          controller.pollErrors >= MAX_POLL_ERRORS
+            ? {
+                ...current,
+                status: 'failed',
+                stale: !!current.brief,
+                reconnecting: false,
+                error: 'connection',
+                updatedAt: Date.now(),
+              }
+            : {
+                ...current,
+                reconnecting: controller.pollErrors >= RECONNECTING_AFTER,
+                updatedAt: Date.now(),
+              }
       }
-    }, POLL_INTERVAL_MS)
+    }, pollDelay(controller.pollErrors))
     return () => window.clearTimeout(timer)
   }, [status, recordingId, updatedAt, roomId])
 

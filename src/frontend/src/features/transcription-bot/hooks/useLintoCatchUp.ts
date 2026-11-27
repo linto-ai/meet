@@ -149,6 +149,13 @@ export const dismissLintoCatchUp = () => {
   lintoStore.catchUp = { ...lintoStore.catchUp, dismissed: true }
 }
 
+// The last summary asked for, so that "retry" asks it again (same join time:
+// the backend's rate limit lets it through).
+const liveRetry: { run: (() => void) | null } = { run: null }
+
+/** "Retry" in the brief's panel, after a failed live summary. */
+export const retryLintoCatchUp = () => liveRetry.run?.()
+
 export const useLintoCatchUp = () => {
   const room = useRoomContext()
   const apiRoomData = useRoomData()
@@ -197,6 +204,7 @@ export const useLintoCatchUp = () => {
       abortRef.current?.abort()
       const controller = new AbortController()
       abortRef.current = controller
+      liveRetry.run = () => void runSummary(meetRoomId, token, joinedAt)
       lintoStore.catchUp = { ...IDLE_CATCH_UP, status: 'loading' }
       try {
         const { enabled, reason } = await fetchLintoCatchUpStatus(
@@ -256,6 +264,8 @@ export const useLintoCatchUp = () => {
         lintoStore.catchUp = {
           ...IDLE_CATCH_UP,
           status,
+          // What streamed before the failure stays readable.
+          text: status === 'error' ? lintoStore.catchUp.text : '',
           updatedAt: Date.now(),
           error: code || (err as Error)?.message,
         }

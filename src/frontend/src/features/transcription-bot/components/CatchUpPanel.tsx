@@ -3,6 +3,9 @@ import { Button, Div, Text } from '@/primitives'
 import { useTranslation } from 'react-i18next'
 import { useSidePanel } from '@/features/rooms/livekit/hooks/useSidePanel'
 import { useCatchUpView } from '../hooks/useCatchUpView'
+import { retryAudioCatchUp } from '../hooks/useLintoAudioCatchUp'
+import { retryLintoCatchUp } from '../hooks/useLintoCatchUp'
+import type { CatchUpView } from '../utils/catchUpView'
 import { SimpleMarkdown } from './SimpleMarkdown'
 
 // Wall-clock HH:MM.
@@ -17,6 +20,14 @@ const formatTime = (ms: number | null, locale: string): string => {
     return ''
   }
 }
+
+// The note under a brief that could not be updated: why, and what it covers.
+const staleKey = (view: CatchUpView) =>
+  view.failure === 'gap' ||
+  view.failure === 'stopped' ||
+  view.failure === 'interrupted'
+    ? view.failure
+    : 'generic'
 
 /**
  * "Before you arrived" (fork): the brief of what a late joiner missed, in a
@@ -42,6 +53,7 @@ export const CatchUpPanel = () => {
   }
 
   const eta = (() => {
+    if (view.reconnecting) return t('catchup.reconnecting')
     if (view.overdue) return t('audioCatchup.overdue')
     if (!view.etaS) return ''
     const [low, high] = view.etaS
@@ -116,6 +128,11 @@ export const CatchUpPanel = () => {
                 />
               </div>
             )}
+            {view.overdue && !view.reconnecting && (
+              <Text variant="smNote" as="p">
+                {t('audioCatchup.overdueHint')}
+              </Text>
+            )}
           </div>
         )}
         {view.phase === 'too_short' && (
@@ -124,8 +141,13 @@ export const CatchUpPanel = () => {
           </Text>
         )}
         {view.phase === 'failed' && (
-          <Text variant="sm" as="p" data-testid="linto-catchup-failed">
-            {t('audioCatchup.failed')}
+          <Text
+            variant="sm"
+            as="p"
+            data-testid="linto-catchup-failed"
+            data-failure={view.failure ?? 'generic'}
+          >
+            {t(`catchup.failure.${view.failure ?? 'generic'}`)}
           </Text>
         )}
       </div>
@@ -135,17 +157,45 @@ export const CatchUpPanel = () => {
           <SimpleMarkdown text={view.text} />
         </div>
       )}
-      {view.phase === 'text' && (view.coveredUntil || view.joinedAt) && (
-        <Text variant="smNote" as="p" data-testid="linto-catchup-covered">
-          {view.coveredUntil
-            ? t('audioCatchup.coveredUntil', {
-                time: formatTime(view.coveredUntil, i18n.language),
-              })
-            : t('catchup.joined', {
-                time: formatTime(view.joinedAt, i18n.language),
-              })}
+      {view.phase === 'text' && view.stale && (
+        <Text
+          variant="sm"
+          as="p"
+          data-testid="linto-catchup-stale"
+          data-failure={view.failure ?? 'generic'}
+        >
+          {t(`catchup.stale.${staleKey(view)}`, {
+            time: formatTime(view.coveredUntil, i18n.language),
+          })}
         </Text>
       )}
+      {view.canRetry && (view.phase === 'failed' || view.stale) && (
+        <div>
+          <Button
+            variant="secondary"
+            size="sm"
+            data-testid="linto-catchup-retry"
+            onPress={() =>
+              view.source === 'live' ? retryLintoCatchUp() : retryAudioCatchUp()
+            }
+          >
+            {t('catchup.retry')}
+          </Button>
+        </div>
+      )}
+      {view.phase === 'text' &&
+        !view.stale &&
+        (view.coveredUntil || view.joinedAt) && (
+          <Text variant="smNote" as="p" data-testid="linto-catchup-covered">
+            {view.coveredUntil
+              ? t('audioCatchup.coveredUntil', {
+                  time: formatTime(view.coveredUntil, i18n.language),
+                })
+              : t('catchup.joined', {
+                  time: formatTime(view.joinedAt, i18n.language),
+                })}
+          </Text>
+        )}
       {view.phase === 'text' && (
         <Text variant="smNote" as="p">
           {t('catchup.disclaimer')}
