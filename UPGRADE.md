@@ -30,6 +30,15 @@ Studio nothing changes.
 
 ### LinTO fork: the catch-up segments
 
+- Celery Beat runs the catch-up reconciliation every
+  `LINTO_CATCHUP_RECONCILE_INTERVAL_S` (60 s); Beat must run (`worker -B`, as
+  for the storage polling). A run held behind a long task (a deferred
+  transcription on the solo worker, up to an hour) expires and the next one
+  replaces it: to stop orphan captures within a minute whatever the worker
+  does, keep the `linto_catchup_reconcile` CronJob asked for below.
+- The segments of a recording written as segments whose deferred
+  transcription failed now stay two days, like the others: its audio file may
+  not be written yet.
 - The late joiners' audio goes to Studio as M4A (the segments' AAC remuxed,
   not encoded again), a third lighter than their MPEG-TS.
 

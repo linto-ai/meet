@@ -18,6 +18,7 @@ from livekit import api
 from core.factories import RecordingFactory
 from core.services import linto_catchup
 from core.services.livekit_events import LiveKitEventsService
+from core.tasks.linto_catchup import reconcile_linto_catchup
 
 pytestmark = pytest.mark.django_db
 
@@ -1299,13 +1300,24 @@ def test_reconcile_discards_the_state_of_ended_recordings(studio):
 
 
 def test_reconcile_keeps_segments_until_the_transcription_read_them():
-    """Segments stay until the transcription read them, or too long."""
+    """Segments stay while a transcription may still read them, two days at most."""
     waiting = RecordingFactory(mode="transcript", status="notification_succeeded")
-    failed = RecordingFactory(mode="transcript", status="notification_failed")
+    failed = RecordingFactory(
+        mode="transcript", status="notification_failed", options={"segments": True}
+    )
+    failed_video = RecordingFactory(
+        mode="screen_recording", status="notification_failed"
+    )
     old = RecordingFactory(mode="transcript", status="saved")
     old.created_at = linto_catchup._now() - timedelta(days=3)
     old.save()
-    prefixes = [str(waiting.id), str(failed.id), str(old.id), "not-a-uuid"]
+    prefixes = [
+        str(waiting.id),
+        str(failed.id),
+        str(failed_video.id),
+        str(old.id),
+        "not-a-uuid",
+    ]
     with (
         mock.patch.object(linto_catchup, "_list_active_egresses", return_value=[]),
         mock.patch.object(linto_catchup, "list_prefixes", return_value=prefixes),
@@ -1313,8 +1325,63 @@ def test_reconcile_keeps_segments_until_the_transcription_read_them():
     ):
         result = linto_catchup.reconcile()
     deleted = {call.args[0] for call in delete.call_args_list}
-    assert deleted == {str(failed.id), str(old.id), "not-a-uuid"}
+    assert deleted == {str(failed_video.id), str(old.id), "not-a-uuid"}
     assert result["deleted"] == 3
+
+
+def test_reconcile_stops_only_the_egresses_of_ended_recordings():
+    """A recording starting (egress running, not saved ACTIVE yet) keeps its
+    egress for a while; an ended, stuck or unknown one loses it."""
+    stuck = RecordingFactory(mode="transcript", status="initiated")
+    stuck.created_at = linto_catchup._now() - timedelta(minutes=5)
+    stuck.save()
+    egresses = [
+        _egress(f"catchup/{r.id}/seg", f"EG_{r.status}")
+        for r in (
+            RecordingFactory(mode="transcript", status=status)
+            for status in ("initiated", "active", "stopped")
+        )
+    ] + [
+        _egress(f"catchup/{stuck.id}/seg", "EG_stuck"),
+        _egress("catchup/not-a-uuid/seg", "EG_foreign"),
+    ]
+    with (
+        mock.patch.object(
+            linto_catchup, "_list_active_egresses", return_value=egresses
+        ),
+        mock.patch.object(linto_catchup, "_stop_egress") as stop,
+        mock.patch.object(linto_catchup, "list_prefixes", return_value=[]),
+    ):
+        result = linto_catchup.reconcile()
+    assert {call.args[0] for call in stop.call_args_list} == {
+        "EG_stopped",
+        "EG_stuck",
+        "EG_foreign",
+    }
+    assert result["stopped"] == 3
+
+
+def test_the_reconcile_task_runs_one_pass():
+    """Celery Beat's task runs the reconciliation and answers its counts."""
+    counts = {"stopped": 1, "deleted": 2, "discarded": 0}
+    with mock.patch.object(linto_catchup, "reconcile", return_value=counts):
+        assert reconcile_linto_catchup() == counts
+
+
+def test_the_reconcile_task_survives_a_failure():
+    """LiveKit or the bucket down: the run is logged and given up."""
+    with mock.patch.object(
+        linto_catchup, "reconcile", side_effect=linto_catchup.CatchupError("down")
+    ):
+        assert reconcile_linto_catchup() is None
+
+
+def test_the_reconcile_task_does_nothing_when_off(settings):
+    """Without the catch-up, the task calls nothing."""
+    settings.LINTO_CATCHUP_ENABLED = False
+    with mock.patch.object(linto_catchup, "reconcile") as reconcile:
+        assert reconcile_linto_catchup() is None
+    reconcile.assert_not_called()
 
 
 # ── Webhooks ────────────────────────────────────────────────────────────────

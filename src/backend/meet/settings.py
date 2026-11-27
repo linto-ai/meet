@@ -1330,6 +1330,10 @@ class Base(Configuration):
     LINTO_CATCHUP_ETA_RTF = values.ListValue(
         ["0.05", "0.3"], environ_name="LINTO_CATCHUP_ETA_RTF", environ_prefix=None
     )
+    # Celery Beat reconciles captures, segments and states this often.
+    LINTO_CATCHUP_RECONCILE_INTERVAL_S = StrictlyPositiveIntegerValue(
+        60, environ_name="LINTO_CATCHUP_RECONCILE_INTERVAL_S", environ_prefix=None
+    )
 
     # Twake Drive integration (Cloudery + Cozy Stack)
     CLOUDERY_URL = values.Value(None, environ_name="CLOUDERY_URL", environ_prefix=None)

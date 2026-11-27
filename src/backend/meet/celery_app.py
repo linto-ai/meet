@@ -45,3 +45,14 @@ if settings.RECORDING_STORAGE_POLLING_ENABLED:
             "schedule": settings.RECORDING_STORAGE_POLLING_INTERVAL,
         },
     }
+
+# LinTO catch-up (fork): a run held behind a long task expires.
+if settings.LINTO_CATCHUP_ENABLED:
+    app.conf.beat_schedule = {
+        **app.conf.beat_schedule,
+        "linto-catchup-reconcile": {
+            "task": "core.tasks.linto_catchup.reconcile_linto_catchup",
+            "schedule": settings.LINTO_CATCHUP_RECONCILE_INTERVAL_S,
+            "options": {"expires": settings.LINTO_CATCHUP_RECONCILE_INTERVAL_S},
+        },
+    }

@@ -37,6 +37,7 @@ and this project adheres to
 ### Changed
 
 - ⚡️(backend) the late joiners' audio goes to Studio as M4A, a third lighter
+- 🔧(backend) Celery Beat runs the catch-up reconciliation every minute
 - ⬆️(backend) upgrade the linto SDK to 1.5.0
 - ⬆️(frontend) upgrade livekit-client to 2.23.0
 - ✨(backend) expose LiveKit reconnection settings in the config

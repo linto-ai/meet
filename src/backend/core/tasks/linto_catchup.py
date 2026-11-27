@@ -21,3 +21,24 @@ def start_linto_catchup_capture(recording_id: str):
         linto_catchup.start_capture(recording)
     except linto_catchup.CatchupError:
         logger.exception("Catch-up capture start failed for %s", recording_id)
+
+
+@task
+def reconcile_linto_catchup():
+    """Stop orphan captures, delete unneeded segments and ended states (Celery Beat)."""
+    if not linto_catchup.is_enabled():
+        return None
+    try:
+        result = linto_catchup.reconcile()
+    except Exception:  # pylint: disable=broad-exception-caught
+        logger.exception("Catch-up reconciliation failed")
+        return None
+    if any(result.values()):
+        logger.info(
+            "Catch-up reconciliation: %d captures stopped, %d segment prefixes "
+            "deleted, %d states discarded",
+            result["stopped"],
+            result["deleted"],
+            result["discarded"],
+        )
+    return result

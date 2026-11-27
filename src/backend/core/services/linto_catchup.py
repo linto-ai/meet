@@ -14,6 +14,7 @@ from typing import Optional
 from django.conf import settings
 from django.core.cache import cache
 from django.core.files.storage import default_storage
+from django.db.models import Q
 
 import aiohttp
 import botocore
@@ -57,6 +58,8 @@ SEGMENT_PREFIX = "seg"
 _SEGMENT_RE = re.compile(r"^seg_(\d+)\.ts$")
 READ_WORKERS = 8
 SEGMENTS_MAX_AGE = timedelta(days=2)
+# An egress runs before its recording is saved ACTIVE.
+START_GRACE = timedelta(minutes=2)
 SETTLED_PARTS = ("done", "error")
 
 # States in which the browser keeps polling.
@@ -342,25 +345,34 @@ def reconcile() -> dict:
 
 
 def _is_active(recording_id) -> bool:
-    return models.Recording.objects.filter(
-        id=recording_id, status=models.RecordingStatusChoices.ACTIVE
-    ).exists()
+    """Recording, or starting for less than START_GRACE."""
+    if not utils.is_uuid(str(recording_id)):
+        return False
+    started = Q(status=models.RecordingStatusChoices.ACTIVE) | Q(
+        status=models.RecordingStatusChoices.INITIATED,
+        created_at__gt=_now() - START_GRACE,
+    )
+    return models.Recording.objects.filter(started, id=recording_id).exists()
 
 
 def _segments_needed(recording_id) -> bool:
-    """A recording running, or waiting for its deferred transcription for a while."""
+    """A recording running, or waiting for its deferred transcription for a
+    while; a failed transcription of segments may not have written its file."""
     if not utils.is_uuid(str(recording_id)):
         return False
-    waiting = (
-        models.RecordingStatusChoices.ACTIVE,
-        models.RecordingStatusChoices.STOPPED,
-        models.RecordingStatusChoices.SAVED,
-        models.RecordingStatusChoices.NOTIFICATION_SUCCEEDED,
+    waiting = Q(
+        status__in=(
+            models.RecordingStatusChoices.ACTIVE,
+            models.RecordingStatusChoices.STOPPED,
+            models.RecordingStatusChoices.SAVED,
+            models.RecordingStatusChoices.NOTIFICATION_SUCCEEDED,
+        )
+    ) | Q(
+        status=models.RecordingStatusChoices.NOTIFICATION_FAILED,
+        options__segments=True,
     )
     return models.Recording.objects.filter(
-        id=recording_id,
-        status__in=waiting,
-        created_at__gt=_now() - SEGMENTS_MAX_AGE,
+        waiting, id=recording_id, created_at__gt=_now() - SEGMENTS_MAX_AGE
     ).exists()
 
 
@@ -807,10 +819,10 @@ def _hold_conversation(recording: models.Recording, held: dict):
 
 
 def _state_recording_ids() -> list:
-    keys = getattr(cache, "keys", None)
-    if keys is None:
+    iter_keys = getattr(cache, "iter_keys", None)
+    if iter_keys is None:
         return []
-    return [key[len(STATE_PREFIX) :] for key in keys(f"{STATE_PREFIX}*")]
+    return [key[len(STATE_PREFIX) :] for key in iter_keys(f"{STATE_PREFIX}*")]
 
 
 @contextmanager

@@ -1,8 +1,6 @@
 """Stop orphan LinTO catch-up captures, delete their segments and the state of
-ended recordings (fork).
-
-Meant for a Kubernetes CronJob every minute: a capture must never outlive the
-recording banner, and Meet's Celery beat can be held for an hour.
+ended recordings (fork): the pass Celery Beat runs every
+LINTO_CATCHUP_RECONCILE_INTERVAL_S, by hand or from a CronJob.
 """
 
 from django.core.management.base import BaseCommand
