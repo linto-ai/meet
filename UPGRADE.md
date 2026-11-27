@@ -16,6 +16,18 @@ the following command inside your docker container:
 
 ## [Unreleased]
 
+### LinTO fork: recordings and live runs without speech
+
+Meet reads Studio's `NO_SPEECH` code (linto-studio #422); with an older
+Studio nothing changes.
+
+- A deferred transcription without speech (Studio's code, or a late joiners'
+  conversation ending with no turn) is not a failure any more: no support
+  email, the recording goes to Twake Drive and the room owner gets a
+  "no speech" email (new template `no_speech`).
+- A live run whose stop answers `NO_SPEECH` delivers nothing: no summary
+  task, and the stop toast says so.
+
 ### LinTO fork: one Studio conversation per meeting for the late joiners' brief
 
 The late joiners' brief of a transcribed recording now goes through one Studio
