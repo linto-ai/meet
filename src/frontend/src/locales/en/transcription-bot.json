@@ -88,7 +88,8 @@
     "generic": "The summary will be sent to the meeting organizer.",
     "ownEmailTranscript": "The transcript will be sent to <recipient>{{email}}</recipient>",
     "genericTranscript": "The transcript will be sent to the meeting organizer.",
-    "sharedSuffix": "It will also be shared with the signed-in participants."
+    "sharedSuffix": "It will also be shared with the signed-in participants.",
+    "noSpeech": "No speech was transcribed: no summary will be sent."
   },
   "catchupToast": {
     "body": "The summary of what was said before you arrived is ready.",

@@ -26,6 +26,7 @@ export function ToastLintoSummary({ state, ...props }: Readonly<ToastProps>) {
   // Without a summary the recap carries the transcript alone: say so.
   const withSummary = props.toast.content.summary !== false
   const shared = withSummary && props.toast.content.shared === true
+  const noSpeech = props.toast.content.noSpeech === true
   const components = {
     recipient: (
       <strong
@@ -54,7 +55,9 @@ export function ToastLintoSummary({ state, ...props }: Readonly<ToastProps>) {
             whiteSpace: 'normal',
           })}
         >
-          {recipientIsMe && email ? (
+          {noSpeech ? (
+            t('noSpeech')
+          ) : recipientIsMe && email ? (
             withSummary ? (
               <Trans
                 t={t}
@@ -75,7 +78,7 @@ export function ToastLintoSummary({ state, ...props }: Readonly<ToastProps>) {
           ) : (
             t('genericTranscript')
           )}
-          {shared && (
+          {shared && !noSpeech && (
             <>
               <br />
               {t('sharedSuffix')}

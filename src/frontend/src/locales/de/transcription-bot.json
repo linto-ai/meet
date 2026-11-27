@@ -64,7 +64,8 @@
     "generic": "Das Protokoll wird an die organisierende Person des Meetings gesendet.",
     "ownEmailTranscript": "Das Transkript wird dir an <recipient>{{email}}</recipient> gesendet",
     "genericTranscript": "Das Transkript wird an die organisierende Person des Meetings gesendet.",
-    "sharedSuffix": "Es wird auch mit den angemeldeten Teilnehmenden geteilt."
+    "sharedSuffix": "Es wird auch mit den angemeldeten Teilnehmenden geteilt.",
+    "noSpeech": "Es wurde keine Sprache transkribiert: Es wird kein Protokoll gesendet."
   },
   "catchupToast": {
     "body": "Die Zusammenfassung dessen, was vor deiner Ankunft gesagt wurde, ist fertig.",

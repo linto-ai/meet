@@ -195,6 +195,7 @@ export const LintoSidePanel = () => {
           email: user?.email,
           summary: result.summary !== false,
           shared: result.share_summary === true,
+          noSpeech: result.no_speech === true,
         })
       }
     } catch (err) {

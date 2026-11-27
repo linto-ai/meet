@@ -64,7 +64,8 @@
     "generic": "Biên bản sẽ được gửi cho người tổ chức cuộc họp.",
     "ownEmailTranscript": "Bản chép lời sẽ được gửi cho bạn tại <recipient>{{email}}</recipient>",
     "genericTranscript": "Bản chép lời sẽ được gửi cho người tổ chức cuộc họp.",
-    "sharedSuffix": "Biên bản cũng sẽ được chia sẻ với người tham gia đã đăng nhập."
+    "sharedSuffix": "Biên bản cũng sẽ được chia sẻ với người tham gia đã đăng nhập.",
+    "noSpeech": "Không có lời nói nào được chép lại: sẽ không có biên bản nào được gửi."
   },
   "catchupToast": {
     "body": "Bản tóm tắt những gì đã nói trước khi bạn tham gia đã sẵn sàng.",

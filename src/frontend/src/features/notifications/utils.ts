@@ -102,11 +102,13 @@ export const notifyLintoSummarySaving = ({
   email,
   summary = true,
   shared = false,
+  noSpeech = false,
 }: {
   recipientIsMe: boolean
   email?: string
   summary?: boolean
   shared?: boolean
+  noSpeech?: boolean
 }) => {
   toastQueue.add(
     {
@@ -115,6 +117,7 @@ export const notifyLintoSummarySaving = ({
       email,
       summary,
       shared,
+      noSpeech,
     },
     { timeout: NotificationDuration.RECORDING_SAVING }
   )

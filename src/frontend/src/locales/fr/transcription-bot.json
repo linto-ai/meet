@@ -88,7 +88,8 @@
     "generic": "Le compte rendu sera envoyé à l'organisateur de la réunion.",
     "ownEmailTranscript": "La transcription vous sera envoyée à <recipient>{{email}}</recipient>",
     "genericTranscript": "La transcription sera envoyée à l'organisateur de la réunion.",
-    "sharedSuffix": "Il sera aussi partagé avec les participants connectés."
+    "sharedSuffix": "Il sera aussi partagé avec les participants connectés.",
+    "noSpeech": "Aucune parole n'a été transcrite : aucun compte rendu ne sera envoyé."
   },
   "catchupToast": {
     "body": "Le résumé de ce qui s'est dit avant votre arrivée est prêt.",

@@ -144,6 +144,8 @@ export interface LintoStopState {
   summary?: boolean
   share_summary?: boolean
   recipient_is_you?: boolean
+  // Studio transcribed no speech: nothing will be sent.
+  no_speech?: boolean
 }
 
 export interface StartLintoLiveParams {
