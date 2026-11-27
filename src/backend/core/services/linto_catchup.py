@@ -5,6 +5,7 @@
 import asyncio
 import logging
 import re
+import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
@@ -25,6 +26,7 @@ from core.entitlements.capabilities import summary_entitled
 from core.recording.worker.exceptions import WorkerResponseError
 from core.recording.worker.factories import WorkerServiceConfig
 from core.recording.worker.services import BaseEgressService
+from core.services.audio_extract import COPY_FORMAT, extract_audio_from_video
 
 logger = logging.getLogger(__name__)
 
@@ -394,6 +396,18 @@ def read_segments(keys: list) -> bytes:
         return b""
     with ThreadPoolExecutor(max_workers=READ_WORKERS) as pool:
         return b"".join(pool.map(_read_bytes, keys))
+
+
+def studio_audio(segments_audio: bytes) -> bytes:
+    """The segments' AAC remuxed into M4A, a third lighter than MPEG-TS; the
+    MPEG-TS itself when ffmpeg cannot remux it."""
+    try:
+        return extract_audio_from_video(
+            segments_audio, output_format=COPY_FORMAT, input_suffix=".ts"
+        )
+    except (OSError, RuntimeError, subprocess.SubprocessError) as e:
+        logger.warning("Catch-up audio sent as MPEG-TS, its remux failed: %s", e)
+        return segments_audio
 
 
 def _parse_time(value: Optional[str]) -> Optional[datetime]:
@@ -960,7 +974,7 @@ def _conversation_options(recording, client) -> dict:
 
 def _send(recording, client, held: dict, segments: list) -> dict:
     """Send the segments to the meeting's conversation, created by the first sending."""
-    audio = read_segments([seg["key"] for seg in segments])
+    audio = studio_audio(read_segments([seg["key"] for seg in segments]))
     if held.get("conversation_id"):
         client.append(held["conversation_id"], audio)
     else:

@@ -28,6 +28,11 @@ Studio nothing changes.
 - A live run whose stop answers `NO_SPEECH` delivers nothing: no summary
   task, and the stop toast says so.
 
+### LinTO fork: the catch-up segments
+
+- The late joiners' audio goes to Studio as M4A (the segments' AAC remuxed,
+  not encoded again), a third lighter than their MPEG-TS.
+
 ### LinTO fork: one Studio conversation per meeting for the late joiners' brief
 
 The late joiners' brief of a transcribed recording now goes through one Studio

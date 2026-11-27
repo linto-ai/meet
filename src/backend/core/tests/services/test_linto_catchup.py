@@ -2,6 +2,9 @@
 
 # pylint: disable=W0621,W0212,E1101,W0613,too-many-lines
 
+import json
+import shutil
+import subprocess
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from unittest import mock
@@ -154,6 +157,53 @@ def test_segments_between_without_end_takes_the_rest():
     with mock.patch.object(linto_catchup, "list_segments", return_value=_segments(10)):
         rest = linto_catchup.segments_between("r", T0 + timedelta(seconds=40), None)
     assert [s["name"] for s in rest] == [f"seg_{i:05d}.ts" for i in range(4, 10)]
+
+
+@pytest.mark.skipif(
+    shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None,
+    reason="needs ffmpeg",
+)
+def test_studio_audio_remuxes_mpeg_ts_into_m4a(tmp_path):
+    """Segments cut mid-stream become an M4A starting at 0, same audio, lighter."""
+    ts_path, m4a_path = tmp_path / "delta.ts", tmp_path / "delta.m4a"
+
+    def run(command, *paths):
+        return subprocess.run(
+            [*command.split(), *paths], check=True, capture_output=True
+        ).stdout
+
+    def pcm(path):
+        return run("ffmpeg -v error -i", path, "-f", "s16le", "-")
+
+    run(
+        "ffmpeg -v error -f lavfi -i sine=f=440:d=5 "
+        "-c:a aac -output_ts_offset 3660 -f mpegts",
+        ts_path,
+    )
+    m4a_path.write_bytes(linto_catchup.studio_audio(ts_path.read_bytes()))
+
+    probe = json.loads(
+        run(
+            "ffprobe -v error -show_entries format=format_name,start_time -of json",
+            m4a_path,
+        )
+    )["format"]
+    assert "mp4" in probe["format_name"]
+    assert float(probe["start_time"]) == 0
+    assert pcm(m4a_path) == pcm(ts_path)
+    assert m4a_path.stat().st_size < ts_path.stat().st_size
+
+
+@pytest.mark.parametrize(
+    "error",
+    (subprocess.CalledProcessError(1, "ffmpeg"), OSError(28, "No space left")),
+)
+def test_studio_audio_falls_back_to_mpeg_ts(error):
+    """When ffmpeg or its temp files fail, the MPEG-TS goes as it is (Studio reads it)."""
+    with mock.patch.object(
+        linto_catchup, "extract_audio_from_video", side_effect=error
+    ):
+        assert linto_catchup.studio_audio(b"TS") == b"TS"
 
 
 def test_read_segments_concatenates_in_order():
@@ -320,6 +370,27 @@ def _held(recording):
 
 
 @contextmanager
+def _segments_in_bucket(segments=12):
+    """The bucket's segments, read as their keys, sent without remux."""
+    with (
+        mock.patch.object(
+            linto_catchup, "list_segments", return_value=_segments(segments)
+        ),
+        mock.patch.object(
+            linto_catchup,
+            "read_segments",
+            side_effect=lambda keys: b"".join(k.encode() for k in keys),
+        ) as read,
+        mock.patch.object(
+            linto_catchup,
+            "extract_audio_from_video",
+            side_effect=lambda audio, **_: audio,
+        ),
+    ):
+        yield read
+
+
+@contextmanager
 def _stored(recording, joined_at, segments=12):
     """The recording's capture, segments and the caller's arrival, as LiveKit and S3 tell."""
     capture = _egress(f"catchup/{recording.id}/seg", started_at=T0)
@@ -330,14 +401,7 @@ def _stored(recording, joined_at, segments=12):
             "_participant_joined_at_ms",
             return_value=int(joined_at.timestamp() * 1000),
         ),
-        mock.patch.object(
-            linto_catchup, "list_segments", return_value=_segments(segments)
-        ),
-        mock.patch.object(
-            linto_catchup,
-            "read_segments",
-            side_effect=lambda keys: b"".join(k.encode() for k in keys),
-        ) as read,
+        _segments_in_bucket(segments) as read,
     ):
         yield read
 
@@ -399,6 +463,25 @@ def test_first_late_joiner_creates_the_meeting_conversation(
         "conversation_id": "conv-1",
         "covered_until": _iso(T0 + timedelta(seconds=60)),
     }
+
+
+def test_the_late_joiners_audio_goes_remuxed(
+    active_transcript, studio, no_speaker_identification
+):
+    """Studio gets the segments remuxed into M4A, not their MPEG-TS."""
+    with (
+        _stored(active_transcript, T0 + timedelta(seconds=65)) as read,
+        mock.patch.object(
+            linto_catchup, "extract_audio_from_video", return_value=b"M4A"
+        ) as remux,
+    ):
+        linto_catchup.request_brief(active_transcript.room, "alice")
+        linto_catchup.request_status(active_transcript.room, str(active_transcript.id))
+    keys = read.call_args.args[0]
+    remux.assert_called_once_with(
+        b"".join(k.encode() for k in keys), output_format="copy", input_suffix=".ts"
+    )
+    assert studio.create.call_args.args[0] == b"M4A"
 
 
 def test_next_to_a_video_the_conversation_only_serves_the_briefs(active_video, studio):
@@ -1119,16 +1202,7 @@ def test_the_end_of_the_recording_keeps_the_conversation(active_transcript, stud
 
 
 def _hand_over(recording, segments=12):
-    with (
-        mock.patch.object(
-            linto_catchup, "list_segments", return_value=_segments(segments)
-        ),
-        mock.patch.object(
-            linto_catchup,
-            "read_segments",
-            side_effect=lambda keys: b"".join(k.encode() for k in keys),
-        ),
-    ):
+    with _segments_in_bucket(segments):
         return linto_catchup.hand_over(recording)
 
 
